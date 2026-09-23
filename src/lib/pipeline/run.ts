@@ -9,10 +9,11 @@ import { extract } from "./extract";
 import { map } from "./map";
 import { normalise } from "./normalise";
 import { questionnaire } from "./questionnaire";
+import { flags } from "./flags";
 
 type StageFn = (resp: ResponseRow) => Promise<Record<string, unknown>>;
-// Stages land phase by phase (CLAUDE.md §3); the rest report "not built yet" instead of pretending.
-const IMPL: Partial<Record<Stage, StageFn>> = { classify, extract, map, normalise, questionnaire };
+// All six TRD §8 stages.
+const IMPL: Partial<Record<Stage, StageFn>> = { classify, extract, map, normalise, questionnaire, flags };
 
 export type StageEvent = { stage: Stage; status: "done" | "error" | "skipped"; ms: number; summary?: unknown; error?: string };
 

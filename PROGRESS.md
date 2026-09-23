@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P2, next task P2-T7 (flags stage)
+## Current: Phase P2, next task P2-T8 (eval runner)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -27,6 +27,7 @@
   **MER-0419 first pass:** states exactly the README §5 table (Balaji 30 confirmed · Kohinoor 27 inferred + 3 not quoted · Westline 26 confirmed + 4 ambiguous · OrientPack 29 inferred + 1 low confidence · Anand 22 inferred + 8 references_prior); a scratch comparison with gold.json: **150/150 state + value within 1 %**, Westline best guesses 27,960 / 54,960 / 14,080 / 11,580 = gold. (The eval runner proper lands in P2-T8.)
 - [x] P2-T6 Questionnaire stage — `src/lib/pipeline/questionnaire.ts`: one P-QA-EXTRACT call per response over questionnaire + quotation files (text, PDF, image) + email body (text capped 12,000, questionnaire files first), then one `decide()` per vendor — yes/no as a choice (yes / no / unclear or pending / not answered), number/text as "explicitly stated" booleans. `passes` vs `disqualify_if` (`no`, `yes`, `lt/lte/gt/gte:N`); `questionnaire_ambiguous` review items; reviewed answers never overwritten. Migration `0004_cleared_questionnaire.sql` fixes `v_vendor_status.cleared_questionnaire` (the §6.21 version counted ambiguous/missing as a pass): false if any fail or a mandatory one is missing, null while any is ambiguous or none read, else true.
   **MER-0419:** cleared = balaji ✓ kohinoor ✓ orientpack ✓ · westline ✗ (Q6 BRC = No) · anand null (Q6 pending). 48/50 answers match gold; both misses are Anand judgement calls (see Open questions). 10–23 s per response.
+- [x] P2-T7 Flags stage — `src/lib/pipeline/flags.ts`: flags from the decided terms (reused from normalise, decided afresh if normalise didn't run) + deterministic checks: `references_prior_pricing`, `freight_excluded`, `validity_short`, `currency_not_inr`, `total_discount_present`, `partial_quote` (any `not_quoted` cell). Writes the decision into the interpreted `response_terms` columns (so the realistic-Balaji "Revised from 13200" comment no longer reads as prior pricing), review items `validity_short` / `missing_line` (+ deduped freight/prior/discount), `rfx_vendors.status` invited → responded, RFx issued → receiving → reviewing when nobody is left waiting. **MER-0419:** Balaji [total_discount_present] · Kohinoor [validity_short, total_discount_present, partial_quote] · Westline [] · OrientPack [freight_excluded, currency_not_inr] · Anand [references_prior_pricing, freight_excluded]; RFx → reviewing. ~1.3 s.
 ## In progress
 ## Open questions (for Sabarish)
 - **Questionnaire, Anand Q8** "10-12 days for regular orders": we store 12 (the gold key says 10). Should a range be read as its lower or upper end? Left as the model read it; easy to change with one prompt line.
