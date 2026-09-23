@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P2, next task P2-T3 (map stage)
+## Current: Phase P2, next task P2-T4 (units / FX / discount / freight)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -21,6 +21,7 @@
 - [x] P1-T7 Pipeline runner — `src/lib/pipeline/run.ts` (`runStage`: status running→done/error, `stage_errors`, `summary[stage]` + timings, `audit_events pipeline.stage`; `runAll` chain stops at first error), `POST /api/responses/{id}/stage/{stage}`, `POST /api/responses/{id}/run-all` (NDJSON stream), pipeline strip with Run all / Retry per stage and elapsed time. Verified in the browser: Run all on Kohinoor → classify 6.1 s, extract 24.4 s; stages not built yet stay `pending`.
 - [x] P2-T1 Decision layer — `providers/jev.ts` (OpenRouter → Jev adapter: boolean→noul, choice→choice with o0..oN keys, score→score; 8 s timeout, retry on 429/5xx, two documented endpoints) + routing in `decide()` (`auto` → Jev only when `OPENROUTER_API_KEY` is set; `jev` same; `gemini` never calls Jev; any Jev error → Gemini, failure logged). No key yet → the adapter stays inert. 4 unit tests (mocked SDK/fetch): choice probabilities sum to 1, Jev mapping, fallback, gemini-only.
 - [x] P2-T2 Candidate shortlist — `src/lib/pipeline/shortlist.ts` (pure): size ±5% (TRD regex, also `×` and spaces), ply, item type words, Jaccard, our-SKU substring, explicit `item N` (+0.5), bare row number (+0.15 weak prior), ranges `items 1 to 12`. Reads the description/SKU first and the location snippet second (Westline's "items 5 and 9" sentence). 6 tests on the real line sheet green.
+- [x] P2-T3 Map stage — `src/lib/pipeline/map.ts`: shortlist top 5 + `none_of_these` → one `decide()` choice per item, 10 items per call (parallel batches, neighbour items as context); range items ("items 1 to 12") → one boolean "this offer covers lines N–M" and one mapping entry per line; thresholds from settings (≥ act mapped; review–act mapped + `low_confidence_read` "Mapping needs a look"; < review or none → `unmatched_items` + `unmapped_item`); conflict rule (higher p keeps the line, loser → `conflict` review item). Mapping stored in `responses.summary.map.mapping` (stage summaries live under the stage key). Review items tagged `evidence.stage` so a re-run replaces only its own open items (`src/lib/pipeline/reviews.ts`, TRD §12.1 dedupe key). **MER-0419: 147/147 items on the right line** (Balaji 30, Kohinoor 27, Westline 30 incl. 5/9/15/19, OrientPack 30, Anand 3 items → 30 lines via ranges), all p = 1.00 (Gemini emulation); ~4 s per response.
 ## In progress
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.

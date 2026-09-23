@@ -6,10 +6,11 @@ import { getResponse } from "@/lib/responses";
 import { STAGES, type ResponseRow, type Stage } from "@/types/db";
 import { classify } from "./classify";
 import { extract } from "./extract";
+import { map } from "./map";
 
 type StageFn = (resp: ResponseRow) => Promise<Record<string, unknown>>;
 // Stages land phase by phase (CLAUDE.md §3); the rest report "not built yet" instead of pretending.
-const IMPL: Partial<Record<Stage, StageFn>> = { classify, extract };
+const IMPL: Partial<Record<Stage, StageFn>> = { classify, extract, map };
 
 export type StageEvent = { stage: Stage; status: "done" | "error" | "skipped"; ms: number; summary?: unknown; error?: string };
 
