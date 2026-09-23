@@ -5,16 +5,20 @@ import { countWord, longDate, money } from "@/lib/format";
 import { ext, formatLabel } from "@/lib/file-labels";
 import { currencyCode } from "@/lib/normalise/fx";
 import { PipelineStrip } from "@/components/rfx/pipeline-strip";
+import type { MapSummary } from "@/lib/pipeline/map";
 import type { Stage } from "@/types/db";
 
 // TRD §17.7 / DESIGN §3.5 expanded row
 export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id]/responses/[rid]">) {
   const user = await requireUser();
   const { id, rid } = await params;
-  const [rfx, { response, vendor, files, items, terms }] = await Promise.all([getRfx(id), getResponseDetail(rid)]);
+  const [rfx, { response, vendor, files, items, terms, cells }] = await Promise.all([getRfx(id), getResponseDetail(rid)]);
   const kindOf = (fileId: string | null) => files.find((f) => f.id === fileId);
   const priced = items.filter((i) => i.unit_price !== null).length;
   const timings = (response.summary.timings ?? {}) as Partial<Record<Stage, number>>;
+  const mapping = (response.summary.map as MapSummary | undefined)?.mapping;
+  const mappedTo = (itemId: string) => mapping?.filter((m) => m.item_id === itemId).map((m) => m.line_no).sort((a, b) => a - b) ?? [];
+  const stateOf = (itemId: string) => cells.find((c) => c.extracted_item_id === itemId)?.state;
   const t = terms as Record<string, string | number | boolean | null> | null;
 
   return (
@@ -93,7 +97,7 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
           <div style={{ overflow: "auto", maxHeight: 520 }}>
             <table className="t">
               <thead>
-                <tr><th>#</th><th>Vendor description</th><th className="num">Price as written</th><th>Unit as written</th><th>Pack</th><th>Where</th><th>Read</th></tr>
+                <tr><th>#</th><th>Vendor description</th><th className="num">Price as written</th><th>Unit as written</th><th>Pack</th><th>Where</th><th>Read</th>{mapping && <th>Mapped</th>}</tr>
               </thead>
               <tbody>
                 {items.map((i) => (
@@ -111,8 +115,9 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
                     <td style={{ whiteSpace: "nowrap" }}>
                       <span className="pbar"><i style={{ width: `${Math.round((i.raw_confidence ?? 0) * 100)}%` }} /></span>{" "}
                       <span className="mono" style={{ fontSize: 11 }}>{i.raw_confidence?.toFixed(2) ?? "—"}</span>
-                      {(i.raw_confidence ?? 1) < 0.6 && <> <span className="chip amber">low read</span></>}
+                      {!mapping && (i.raw_confidence ?? 1) < 0.6 && <> <span className="chip amber">low read</span></>}
                     </td>
+                    {mapping && <td className="mono" style={{ fontSize: 11, whiteSpace: "nowrap" }}><Mapped lines={mappedTo(i.id)} state={stateOf(i.id)} /></td>}
                   </tr>
                 ))}
               </tbody>
@@ -122,6 +127,14 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
       </div>
     </div>
   );
+}
+
+// DESIGN §3.5: mono "L14" + amber/grey chips for unit? / low read / prior.
+function Mapped({ lines, state }: { lines: number[]; state?: string }) {
+  if (!lines.length) return <span className="chip amber">unplaced</span>;
+  const label = lines.length > 1 ? `L${lines[0]}–${lines[lines.length - 1]}` : `L${lines[0]}`;
+  const chip = { ambiguous: ["amber", "unit?"], low_confidence: ["amber", "low read"], references_prior: ["grey", "prior"], conflict: ["amber", "conflict"], not_quoted: ["grey", "not quoted"] }[state ?? ""];
+  return <>{label}{chip && <> <span className={`chip ${chip[0]}`}>{chip[1]}</span></>}</>;
 }
 
 function EmailKind({ summary }: { summary: Record<string, unknown> }) {

@@ -116,6 +116,7 @@ const SETTINGS: Record<string, unknown> = {
   fx_rates: { USD: { rate: 83.15, date: "2026-09-23", source: "manual" } },
   landed_cost: { include_tax: false, cost_of_money_annual_pct: 0 },
   discount_default: "gross",
+  freight_default_inr_per_1000: 180, // TRD §11.7
   vendor_addresses: {}, // shortCode → plus-alias, filled in Settings for gmail mode (P6)
 };
 must(
