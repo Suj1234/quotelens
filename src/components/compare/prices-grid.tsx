@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { CellState, Grid, GridCell } from "@/lib/comparison";
 import { inrShort, money } from "@/lib/format";
 import { AskButton } from "@/components/ask/ask-sheet";
+import { Button } from "@/components/ui/button";
 
 type View = "unit" | "landed" | "orig";
 const COUNTED: CellState[] = ["confirmed", "inferred", "reviewed"];
@@ -15,7 +16,7 @@ const LEGEND: [CellState, string][] = [
 const inr = (v: number) => Math.round(v).toLocaleString("en-IN");
 
 /** DESIGN §2.6–2.8: sticky grid, vendor headers, state-rendered cells, lowest-eligible edge, legend. */
-export function PricesGrid({ grid, onOpen, selected, onBasis, approver }: { rfxId: string; grid: Grid; approver?: boolean; onOpen?: (line: number, vendor: string) => void; selected?: string | null; onBasis?: (b: "unit" | "landed") => void }) {
+export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }: { rfxId: string; grid: Grid; approver?: boolean; onOpen?: (line: number, vendor: string) => void; selected?: string | null; onBasis?: (b: "unit" | "landed") => void }) {
   const [view, setViewState] = useState<View>("unit");
   const setView = (v: View) => { setViewState(v); onBasis?.(v === "landed" ? "landed" : "unit"); };
   const [inclDq, setInclDq] = useState(false);
@@ -42,6 +43,9 @@ export function PricesGrid({ grid, onOpen, selected, onBasis, approver }: { rfxI
         </label>
         <span style={{ flex: 1 }} />
         {approver && <AskButton />}
+        {/* DESIGN §2.8 Export (TRD: XLSX/CSV); the workbook uses the basis on screen */}
+        <Button asChild><a href={`/api/export/comparison?rfx=${rfxId}&format=xlsx&basis=${basis}`} download>Export</a></Button>
+        <Button asChild variant="ghost" size="sm"><a href={`/api/export/comparison?rfx=${rfxId}&format=csv&basis=${basis}`} download>CSV</a></Button>
       </div>
       <div className="gridbox">
         <table className="cmp">

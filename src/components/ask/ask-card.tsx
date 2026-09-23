@@ -127,6 +127,10 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
       )}
       <div className="acts">
         {a.ok && !bg && unsureInScope && a.unresolved_cells > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={bestGuesses}>{busy ? "Computing…" : "Include best guesses"}</Button>}
+        {cur.ok && cur.rows.length > 0 && <>
+          <Button asChild size="sm"><a href={`/api/export/query/${cur.query_id}?format=xlsx`} download>Export</a></Button>
+          <Button asChild size="sm" variant="ghost"><a href={`/api/export/query/${cur.query_id}?format=csv`} download>CSV</a></Button>
+        </>}
         <span className="hint" style={{ marginLeft: "auto" }}>{a.asked_by ? `${a.asked_by} · ` : ""}{(cur.duration_ms / 1000).toFixed(1)} s</span>
       </div>
     </div>

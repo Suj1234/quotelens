@@ -77,10 +77,10 @@
   | 19 | Q1–Q8 asked twice; both runs computed and equivalent | open |
   | 20 | Each answer ≤ 15 s; timings recorded (CLAUDE.md §10) | open |
   | 21 | Off-topic/unsafe → "I couldn't form a safe query for that; try rephrasing"; network error → toast with code (TRD §13.1, §19) | ✓ weather question → safe-query answer (script + curl); fetch forced to fail in the browser → toast 'Couldn't reach the server — check the connection and ask again (NETWORK)', question kept in the box; API errors toast '{error} ({code})' |
-  | 22 | `GET /api/export/comparison?rfx=&format=xlsx|csv&basis=` — xlsx line × vendor, state fills (DESIGN colours), legend + ledger sheet; csv tidy rows (TRD §16, PRD #28) | open |
-  | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | open |
-  | 24 | Export button in Comparison toolbar and on each answer card (DESIGN §2.8/§2.13) | open |
-  | 25 | Proof: downloaded files read back with a script (rows, values, fills) | open |
+  | 22 | `GET /api/export/comparison?rfx=&format=xlsx|csv&basis=` — xlsx line × vendor, state fills (DESIGN colours), legend + ledger sheet; csv tidy rows (TRD §16, PRD #28) | ✓ `src/lib/export.ts` + route: MER-0419 xlsx = Comparison (30 lines × 5 vendors, headers ✓/✗/?, totals row), 'Legend & notes' (9 states with meanings + counts, vendor questionnaire status), 'Ledger' (8 folded rows); csv = 150 tidy rows (line, vendor, state, unit, landed, best guess, as written, annual value) |
+  | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | ✓ `/api/export/query/{id}` xlsx (Answer sheet in the query's column order + Question sheet with answer, how, exclusions, SQL) and csv; Q1 → 30 rows |
+  | 24 | Export button in Comparison toolbar and on each answer card (DESIGN §2.8/§2.13) | ✓ Comparison toolbar: Export (xlsx, basis on screen) + CSV, both roles; each answer card with rows: Export + CSV |
+  | 25 | Proof: downloaded files read back with a script (rows, values, fills) | ✓ curl as Priya → 200 with attachment names; read back with exceljs: line 5 Westline '27,960? (best guess)', line 14 OrientPack '?', line 30 'prior pricing'/'not quoted'; fills FFE7EAF6 ×78 (inferred), FFFAF0DB ×5 (4 ambiguous + 1 low), FFF1F0EB ×11 (3 not quoted + 8 prior) = grid legend; line 1 lowest (Kohinoor ₹67,508) bold with teal left edge; logged out → 401 |
   | 26 | Tests + lint + build green; pipeline:seed 150/150; push | open |
   | 27 | Production: Q1 as Priya and as Sujit, computed with SQL shown; one export downloads | open |
   | 28 | This table fully ticked with evidence | open |
