@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P3 ✅ checkpoint (re-audited) — next task P4-T1 (SQL guard)
+## Current: Phase P4 — in progress (P4-T1 SQL guard)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): clean MER-0419 **150/150**, questionnaire **50/50** (twice) · realistic MER-0417 **150/150**, questionnaire 42–43/50 (the 7 misses = OrientPack sent no questionnaire) — 2026-09-24 01:30
 ## Done
@@ -41,17 +41,49 @@
 - [x] **P3 audit (2026-09-24, on Sabarish's request).** The first P3 report said "finished" without a full checklist; the audit found 9 unbuilt spec items, untested actions and 4 real bugs. All fixed; see DECISIONS ("P3 audit follow-up", "Robustness fixes"). **P3 requirement checklist** (✓ = built and checked, with how):
   | # | Requirement (source) | Status / evidence |
   |---|---|---|
-  | 1 | Grid: sticky column/headers, vendor headers (coverage, validity, cleared, freight, total), 8 state renderings + legend counts, per-line min, Unit/Landed, As written, show disqualified (TRD §17.9, DESIGN §2.6–2.8, PRD #20–22) | ✓ screenshots vs prototype at 1440 px; toggles checked (landed +₹180 OrientPack/Anand) |
-  | 2 | Hover tooltip from the chain; click → drawer; selected outline (DESIGN §2.6) | ✓ |
-  | 3 | Drawer: source (row / PDF page / photo / text), as written, mapping + p + provider label, chain with basis + ledger link, review history, Open in queue, approver "Waiting for Sujit." (TRD §17.10, PRD #24) | ✓ all 5 source types; Open in queue lands on the focused card; approver checked on prod |
-  | 4 | Review queue: filters, evidence, proposed value + p, actions by type, keyboard J/K/C, bulk bar, group by vendor/type, clarification note (TRD §17.8, §12.3, DESIGN §2.11/§3.6, PRD #16–17) | ✓ each action run in the UI: Confirm, Override, Exclude, Map to line, Ignore, Ask vendor draft + Mark as asked, Treat as not quoted, Accept as Yes, Treat as No, Dismiss, bulk Confirm/Dismiss, J/J/C |
-  | 5 | Every outcome-changing action in the ledger with before/after; audit event per action (PRD #18, TRD §12.3) | ✓ ledger rows checked for confirm, override, exclude, prior, map, Q-decisions |
-  | 6 | Tabs Questionnaire (click → evidence), Documents, Ledger (filter, When), Timeline (TRD §17.9, PRD #23) | ✓ side by side with prototype |
+  | 1 | Grid: sticky column/headers, vendor headers (coverage, validity, cleared, freight, total), 8 state renderings + legend counts, per-line min, Unit/Landed, As written, show disqualified (TRD §17.9, DESIGN §2.6–2.8, PRD #20–22) | ✓ `sql-guard.test.ts` rule 1 (`explain …` rejected) |
+  | 2 | Hover tooltip from the chain; click → drawer; selected outline (DESIGN §2.6) | ✓ test rule 2: delete/CTE-delete, `;`, `--`, `/*`, pg_sleep, information_schema, current_user, lateral, into, set_config() each rejected |
+  | 3 | Drawer: source (row / PDF page / photo / text), as written, mapping + p + provider label, chain with basis + ledger link, review history, Open in queue, approver "Waiting for Sujit." (TRD §17.10, PRD #24) | ✓ test rule 3: users, line_quotes, alias-named-users UNION, comma join to users, public.*, password_hash, dblink(), implicit alias each rejected naming the token; plus base-table names rejected anywhere and FROM/JOIN targets limited to views/CTEs (see DECISIONS) |
+  | 4 | Review queue: filters, evidence, proposed value + p, actions by type, keyboard J/K/C, bulk bar, group by vendor/type, clarification note (TRD §17.8, §12.3, DESIGN §2.11/§3.6, PRD #16–17) | ✓ test rule 4: no rfx filter, other id only, other id added, and a join that leaves one view unscoped — all rejected |
+  | 5 | Every outcome-changing action in the ledger with before/after; audit event per action (PRD #18, TRD §12.3) | ✓ test rule 5 (4,010-char query rejected) |
+  | 6 | Tabs Questionnaire (click → evidence), Documents, Ledger (filter, When), Timeline (TRD §17.9, PRD #23) | ✓ 9 tests green: Q1 (2 CTEs + row_number/min over partition) and Q6 accepted; extract/cast/quoted alias/best-guess view accepted; best-guess rewrite tests |
   | 7 | Unmatched items panel, unmatched senders, assign vendor, IT quote + WhatsApp don't crash (TRD §16, CLAUDE P3-T5) | ✓ Balaji grid/ledger/answers unchanged by the IT quote; WhatsApp → 8 items, new vendor assigned |
   | 8 | Roles: approver tabs Comparison only, read-only queue, API 403 (DESIGN §4) | ✓ local + prod |
   | 9 | Response Detail: flags chips, counts, Go to Review Queue (n) (TRD §17.7) | ✓ |
   | — | Deferred by plan: Export (P4-T4), Ask panel (P4), Outbox/Sync inbox (P5/P6), lock bar (P7), Settings link on assumption cards (P8), 2-minute screen capture (needs Sabarish) | open, by phase |
 ## In progress
+- **Phase 4 requirement checklist** (definition of done; sources: handoff §4, TRD §6.17/§6.21/§9.8–9.9/§13/§16/§17.9, PRD §8 Stage 7/§13, DESIGN §2.3/§2.13/§2.15/§3.7/§4). ✓ only with evidence.
+  | # | Requirement (source) | Status / evidence |
+  |---|---|---|
+  | 1 | Guard: trimmed SQL starts with `select`/`with` (TRD §13.4) | open |
+  | 2 | Guard: rejects DML/DDL words, `;` `--` `/*` `pg_` `information_schema` `current_user` `set\s` `lateral` `into\s` (TRD §13.4) | open |
+  | 3 | Guard: identifier allowlist = 5 views + their columns + keywords + allowed functions (aggregates, coalesce, round, case, string/number fns, window fns); other token → rejected by name; base tables never (TRD §13.4, DECISIONS "Known risk for P4") | open |
+  | 4 | Guard: literal `rfx_id = '<this id>'`; any other rfx id rejected (TRD §13.4) | open |
+  | 5 | Guard: ≤ 4,000 chars (TRD §13.4) | open |
+  | 6 | Guard unit tests: one per rule incl. `users`, `line_quotes`, other rfx id, missing rfx_id; accepts Q1 (CTE + window) and Q6 SQL | open |
+  | 7 | Migration 0006: `v_comparison_bestguess` (same columns, best guess folded into unit/landed/annual values, state unchanged, security_invoker, same grants) (TRD §13.2) | open |
+  | 7a | Result columns keep the SQL's order (the §6.21 function returns `jsonb`, which sorts keys) and a model-written `LIMIT` doesn't break the function's appended `limit 500` (found while reading 0002) | open |
+  | 8 | `POST /api/ask` per TRD §13.1 steps 1–9 (history 4, P-SQL strong + Zod, guard + 1 repair, safe-query fallback text + log, 500-row cap + timing, TS aggregates incl. unresolved_cells, P-NARRATE fast, chart_spec, `queries` row incl. `error`, response shape) | open |
+  | 9 | `include_best_guess` → same SQL rewritten onto `v_comparison_bestguess`; both totals returned (TRD §13.2) | open |
+  | 10 | Follow-ups use history ("and on landed cost?" → landed_price) (TRD §13.3) | open |
+  | 11 | `GET /api/ask/history?rfx=` last 20 (TRD §16) | open |
+  | 12 | Both roles can ask; `maxDuration = 120` (DESIGN §4, TRD §21) | open |
+  | 13 | Done-when: Q1 on MER-0419 → 30 rows, total, exclusions (Westline disqualified, Anand pending Q6, unsure cells count), SQL (CLAUDE.md P4-T2) | open |
+  | 14 | Buyer: "Ask" (chat icon) in RFx header → 400px side sheet; approver: "Ask" in Comparison toolbar → same sheet; no Sync inbox yet (DESIGN §2.3/§3.7) | open |
+  | 15 | Sheet: stacked answer cards, 3 suggestion chips, textarea, Ask, history list (DESIGN §3.7, TRD §17.9) | open |
+  | 16 | Card: question, answer, amber exclusions, How I computed this + Show query `<pre>`, 260px table box paginated, inline bar chart (no library), unresolved notice + Include best guesses → both totals, Export (DESIGN §2.13/§2.15, TRD §17.9, PRD #25–26) | open |
+  | 17 | No dead "Save as scenario" button; DECISIONS says it lands with P7-T1 | open |
+  | 18 | All PRD §13 questions computed on MER-0419 through the UI (Q1–Q8 + shortest validity, line 22, Anand 5-ply per-kg) with answer / rows / total / SQL summary recorded | open |
+  | 19 | Q1–Q8 asked twice; both runs computed and equivalent | open |
+  | 20 | Each answer ≤ 15 s; timings recorded (CLAUDE.md §10) | open |
+  | 21 | Off-topic/unsafe → "I couldn't form a safe query for that; try rephrasing"; network error → toast with code (TRD §13.1, §19) | open |
+  | 22 | `GET /api/export/comparison?rfx=&format=xlsx|csv&basis=` — xlsx line × vendor, state fills (DESIGN colours), legend + ledger sheet; csv tidy rows (TRD §16, PRD #28) | open |
+  | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | open |
+  | 24 | Export button in Comparison toolbar and on each answer card (DESIGN §2.8/§2.13) | open |
+  | 25 | Proof: downloaded files read back with a script (rows, values, fills) | open |
+  | 26 | Tests + lint + build green; pipeline:seed 150/150; push | open |
+  | 27 | Production: Q1 as Priya and as Sujit, computed with SQL shown; one export downloads | open |
+  | 28 | This table fully ticked with evidence | open |
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
