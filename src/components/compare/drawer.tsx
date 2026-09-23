@@ -75,7 +75,7 @@ export function ProvenanceDrawer({ rfxId, cellKey, basis, canReview, onClose }: 
                   {d.chain.map((s, i) => (
                     <div className="step" key={i}>
                       <span className="n">{i + 1}</span>
-                      <span>{s.text}{s.assumption && <div className="hint" style={{ marginTop: 2 }}>{s.assumption}</div>}</span>
+                      <span>{s.text}{s.assumption && <div className="hint" style={{ marginTop: 2 }}>{s.assumption} · <Link href={`/rfx/${rfxId}/comparison?tab=ledger`} style={{ color: "inherit" }}>in the ledger</Link></div>}</span>
                       <span className="basis">{s.basis}</span>
                     </div>
                   ))}

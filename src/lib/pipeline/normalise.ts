@@ -149,7 +149,11 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
         if (guess) {
           factor = 1000 / guess;
           bestGuessNote = `Best guess ${guess}/${unit === "per_box" ? "box" : "bundle"} from the vendor's other ${line.ply}-ply items — not applied`;
-          chain.push({ step: "unit", from: unit, to: "per_1000_pcs", factor, basis: `pack size ${guess} inferred from the vendor's other items`, basis_kind: "system_inferred", p: 0.6 });
+          // Ledger row for the guess (DESIGN prototype: "Bundle size not stated; best guess from pattern — not applied").
+          const aid = randomUUID();
+          assumptions.push({ id: aid, kind: "pack_size", basis: "system_inferred", rfx_line_id: line.id, line_quote_id: id, value: { pack: guess, applied: false },
+            description: `Line ${line.line_no}: ${unit === "per_box" ? "box" : "bundle"} size not stated; best guess ${guess} from the vendor's other ${line.ply}-ply items — not applied.` });
+          chain.push({ step: "unit", from: unit, to: "per_1000_pcs", factor, basis: `pack size ${guess} inferred from the vendor's other items`, basis_kind: "system_inferred", p: 0.6, assumption_id: aid });
         }
       }
     } else if (unit === "per_kg" || unit === "per_tonne") {
@@ -210,7 +214,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     const theirs = o.unit_price_inr_per_1000 ?? o.best_guess_value;
     reviews.push({ type: "conflict", rfx_line_id: c.rfx_line_id, line_quote_id: o.id, extracted_item_id: c.extracted_item_id as string, proposed_value: mine,
       title: `Line ${lineById.get(c.rfx_line_id)!.line_no}: two prices from this vendor`,
-      detail: `Earlier reply: ${theirs != null ? `${money(Number(theirs))} per 1000` : o.state.replaceAll("_", " ")}. This reply: ${mine != null ? `${money(mine)} per 1000` : c.state.replaceAll("_", " ")}. Confirm uses this reply's price.` });
+      detail: `Earlier reply: ${theirs != null ? `${money(Number(theirs))} per 1000` : o.state.replaceAll("_", " ")}. This reply: ${mine != null ? `${money(mine)} per 1000` : c.state.replaceAll("_", " ")}.${mine != null ? " Confirm uses this reply's price; Dismiss keeps the earlier one." : " Override to set a price, or Dismiss to keep the earlier one."}` });
   }
 
   // Lines with no item: references_prior when the vendor pointed at earlier pricing (TRD §11.6), else not_quoted.

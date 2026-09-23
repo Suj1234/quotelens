@@ -9,7 +9,7 @@ const LABEL = { draft: "Draft", issued: "Issued", receiving: "Receiving", review
 
 // DESIGN.md §2.3. Tabs appear as their screens are built (Overview P5, Review/Comparison P3, Award P7).
 export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/[id]">) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   const [rfx, { count: openItems }] = await Promise.all([getRfx(id), db().from("review_items").select("id", { count: "exact", head: true }).eq("rfx_id", id).eq("status", "open")]);
   return (
@@ -27,7 +27,10 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
             </div>
           </div>
         </div>
-        <RfxTabs id={id} tabs={[{ slug: "responses", label: "Responses" }, { slug: "review", label: "Review", count: openItems ?? 0 }, { slug: "comparison", label: "Comparison" }]} />
+        {/* DESIGN §4: the approver's tabs are Decide · Comparison · Award (Decide/Award arrive in P7); the buyer's Overview (P5) and Award (P7) likewise. */}
+        <RfxTabs id={id} tabs={user.role === "approver"
+          ? [{ slug: "comparison", label: "Comparison" }]
+          : [{ slug: "responses", label: "Responses" }, { slug: "review", label: "Review", count: openItems ?? 0 }, { slug: "comparison", label: "Comparison" }]} />
       </div>
       {children}
     </>

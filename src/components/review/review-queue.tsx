@@ -8,6 +8,8 @@ import { countWord, money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { EvidenceBlock } from "@/components/compare/evidence";
 
+const TYPE_ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
+const PRICE_TYPES = ["ambiguous_unit", "low_confidence_read", "conflict"];
 const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "validity_short", "missing_line"];
 const LABEL: Record<Action, string> = {
   confirm: "Confirm", override: "Override…", exclude: "Exclude", map: "Map to line…", ignore: "Ignore", "ask-vendor": "Ask vendor",
@@ -21,13 +23,20 @@ const DONE: Record<Action, string> = {
 };
 type Draft = { to: string; reply_to: string; subject: string; body: string };
 
-export function ReviewQueue({ items, canAct, focus }: { items: QueueItem[]; canAct: boolean; focus: string | null }) {
+export function ReviewQueue({ items, canAct, focus, vendor: initialVendor = "" }: { items: QueueItem[]; canAct: boolean; focus: string | null; vendor?: string }) {
   const router = useRouter();
-  const [vendor, setVendor] = useState(""); const [type, setType] = useState(""); const [status, setStatus] = useState("open");
+  const [vendor, setVendor] = useState(initialVendor); const [type, setType] = useState(""); const [status, setStatus] = useState("open");
   const [cur, setCur] = useState<string | null>(focus);
   const [busy, setBusy] = useState<string | null>(null);
+  const [group, setGroup] = useState<"type" | "vendor">("type");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const shown = useMemo(() => items.filter((i) => (!vendor || i.vendor?.code === vendor) && (!type || i.type === type)
     && (status === "all" || (status === "open" ? i.status === "open" : i.status !== "open"))), [items, vendor, type, status]);
+  // PRD #17: grouped by type (DESIGN §3.6 order) or by vendor; J/K follow the same order.
+  const keyOf = useCallback((i: QueueItem) => (group === "type" ? i.type : i.vendor?.name ?? "Unknown sender"), [group]);
+  const ordered = useMemo(() => [...shown].sort((a, b) => group === "type"
+    ? (TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)) || (a.vendor?.name ?? "").localeCompare(b.vendor?.name ?? "")
+    : keyOf(a).localeCompare(keyOf(b)) || TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)), [shown, group, keyOf]);
   const open = items.filter((i) => i.status === "open");
   const vendors = [...new Map(items.filter((i) => i.vendor).map((i) => [i.vendor!.code, i.vendor!.name])).entries()];
   const types = [...new Set(items.map((i) => i.type))];
@@ -44,14 +53,28 @@ export function ReviewQueue({ items, canAct, focus }: { items: QueueItem[]; canA
     finally { setBusy(null); }
   }, [router]);
 
-  const ackAll = async () => {
-    const ids = open.filter((i) => INFO.includes(i.type)).map((i) => i.id);
+  const bulk = async (ids: string[], action: Action, done: string) => {
     if (!ids.length) return;
     setBusy("bulk");
-    const r = await fetch("/api/review/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids, action: "confirm" }) });
+    const r = await fetch("/api/review/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids, action }) }).catch(() => null);
     setBusy(null);
-    if (r.ok) { toast.success(`Acknowledged ${ids.length} assumptions`); router.refresh(); } else toast.error("Couldn't acknowledge them — try again.");
+    const j = await r?.json().catch(() => null) as { results?: { error?: string }[] } | null;
+    if (!r?.ok || !j?.results) return toast.error("Couldn't apply that — try again.");
+    const failed = j.results.filter((x) => x.error).length;
+    if (failed) toast.error(`${ids.length - failed} done, ${failed} skipped (that action doesn't apply to them)`); else toast.success(`${done} ${ids.length}`);
+    setPicked(new Set());
+    router.refresh();
   };
+  const ackAll = () => bulk(open.filter((i) => INFO.includes(i.type)).map((i) => i.id), "confirm", "Acknowledged");
+  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  const groups = [...new Set(ordered.map(keyOf))];
+  // DESIGN §3.6 note while a clarification is out.
+  const asked = [...new Set(items.filter((i) => i.status === "asked_vendor").map((i) => i.vendor?.name ?? "the vendor"))].map((v) => {
+    const its = items.filter((i) => i.status === "asked_vendor" && (i.vendor?.name ?? "the vendor") === v);
+    const nos = its.map((i) => i.line_no).filter((n): n is number => n !== null).sort((a, b) => a - b);
+    return `Clarification asked of ${v}${nos.length ? ` for ${nos.length === 1 ? "item" : "items"} ${nos.length > 1 ? `${nos.slice(0, -1).join(", ")} and ${nos[nos.length - 1]}` : nos[0]}` : ` (${its.length} ${its.length === 1 ? "point" : "points"})`}. Waiting for their reply.`;
+  });
 
   // J / K move, C confirms the current card (TRD §17.8).
   useEffect(() => {
@@ -59,14 +82,14 @@ export function ReviewQueue({ items, canAct, focus }: { items: QueueItem[]; canA
       if ((e.target as HTMLElement).closest("input, textarea, select")) return;
       const k = e.key.toLowerCase();
       if (k !== "j" && k !== "k" && k !== "c") return;
-      const i = shown.findIndex((x) => x.id === cur);
-      if (k === "c") { const it = shown[i]; if (canAct && it?.status === "open" && it.actions.includes("confirm")) run(it, "confirm"); return; }
-      const next = shown[Math.min(shown.length - 1, Math.max(0, i + (k === "j" ? 1 : -1)))];
+      const i = ordered.findIndex((x) => x.id === cur);
+      if (k === "c") { const it = ordered[i]; if (canAct && it?.status === "open" && it.actions.includes("confirm")) run(it, "confirm"); return; }
+      const next = ordered[Math.min(ordered.length - 1, Math.max(0, i + (k === "j" ? 1 : -1)))];
       if (next) { setCur(next.id); document.getElementById(`rq-${next.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [shown, cur, canAct, run]);
+  }, [ordered, cur, canAct, run]);
   useEffect(() => { if (focus) document.getElementById(`rq-${focus}`)?.scrollIntoView({ block: "center" }); }, [focus]);
 
   return (
@@ -81,18 +104,38 @@ export function ReviewQueue({ items, canAct, focus }: { items: QueueItem[]; canA
         <select value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Vendor" className="sel"><option value="">All vendors</option>{vendors.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
         <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type" className="sel"><option value="">All types</option>{types.map((t) => <option key={t} value={t}>{t.replaceAll("_", " ")}</option>)}</select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status" className="sel"><option value="open">Open</option><option value="resolved">Decided</option><option value="all">All</option></select>
+        <div className="seg" role="group" aria-label="Group by">
+          <button className={group === "type" ? "on" : ""} onClick={() => setGroup("type")}>By type</button>
+          <button className={group === "vendor" ? "on" : ""} onClick={() => setGroup("vendor")}>By vendor</button>
+        </div>
         <span className="hint"><span className="kbd">J</span> <span className="kbd">K</span> move · <span className="kbd">C</span> confirm</span>
       </div>
+      {asked.map((a) => <div key={a} className="lock" style={{ marginBottom: 12 }}>{a}</div>)}
+      {canAct && picked.size > 0 && (
+        <div className="lock" style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, position: "sticky", top: 0, zIndex: 5, color: "var(--ink)" }}>
+          <b>{picked.size} selected</b>
+          <Button size="sm" variant="default" disabled={busy === "bulk"} onClick={() => bulk([...picked], "confirm", "Confirmed")}>Confirm</Button>
+          <Button size="sm" disabled={busy === "bulk"} onClick={() => bulk([...picked], "dismiss", "Dismissed")}>Dismiss</Button>
+          <Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>Clear</Button>
+          <span className="hint">Confirm uses each card&apos;s proposed value; cards it doesn&apos;t apply to are skipped.</span>
+        </div>
+      )}
       <div className="rq">
-        {shown.map((it) => <Card key={it.id} it={it} canAct={canAct} busy={busy === it.id} current={cur === it.id} onPick={() => setCur(it.id)} run={run} />)}
+        {groups.map((g) => (
+          <section key={g} className="rq">
+            <div className="eyebrow" style={{ marginTop: 6 }}>{group === "type" ? g.replaceAll("_", " ") : g} · {ordered.filter((i) => keyOf(i) === g).length}</div>
+            {ordered.filter((i) => keyOf(i) === g).map((it) => <Card key={it.id} it={it} canAct={canAct} busy={busy === it.id} current={cur === it.id} onPick={() => setCur(it.id)} run={run}
+              selected={picked.has(it.id)} onSelect={() => toggle(it.id)} />)}
+          </section>
+        ))}
         {!shown.length && <div className="empty"><b>No items match.</b> Change the filters to see decided items or other vendors.</div>}
       </div>
     </>
   );
 }
 
-function Card({ it, canAct, busy, current, onPick, run }: {
-  it: QueueItem; canAct: boolean; busy: boolean; current: boolean; onPick: () => void;
+function Card({ it, canAct, busy, current, onPick, run, selected, onSelect }: {
+  it: QueueItem; canAct: boolean; busy: boolean; current: boolean; onPick: () => void; selected: boolean; onSelect: () => void;
   run: (it: QueueItem, a: Action, body?: Record<string, unknown>) => Promise<{ status: string; draft?: Draft } | null>;
 }) {
   const [mode, setMode] = useState<"override" | "exclude" | "map" | null>(null);
@@ -108,24 +151,27 @@ function Card({ it, canAct, busy, current, onPick, run }: {
     if (a === "ask-vendor") { const r = await run(it, a, { mode: "draft" }); if (r?.draft) setDraft(r.draft); return; }
     await run(it, a);
   };
-  const label = (a: Action) => a === "confirm" && it.proposed_value !== null && ["ambiguous_unit", "low_confidence_read"].includes(it.type)
+  const label = (a: Action) => a === "confirm" && it.proposed_value !== null && PRICE_TYPES.includes(it.type)
     ? `Confirm ${money(it.proposed_value, "INR", 0)}` : a === "confirm" && INFO.includes(it.type) ? "Acknowledge" : LABEL[a];
 
   return (
     <div className={`rqcard${resolved ? " resolved" : ""}${current ? " cur" : ""}`} id={`rq-${it.id}`} onClick={onPick}>
       <EvidenceBlock ev={it.evidence} />
       <div>
-        <div className="ttl">{it.title}</div>
+        <div className="ttl">
+          {canAct && !resolved && <input type="checkbox" checked={selected} onChange={onSelect} onClick={(e) => e.stopPropagation()} aria-label="Select for bulk action" />}
+          {it.title}
+        </div>
         <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
           {it.vendor && <span className="chip">{it.vendor.name}</span>}
           <span className="chip grey">{it.type.replaceAll("_", " ")}</span>
           {resolved && <span className="chip green">{it.status.replaceAll("_", " ")}</span>}
         </div>
         {(it.proposed_note || it.detail) && <div className="text-muted-foreground" style={{ marginTop: 8, maxWidth: "60ch", fontSize: 12 }}>{it.proposed_note ?? it.detail}</div>}
-        {(it.probability !== null || (it.proposed_value !== null && ["ambiguous_unit", "low_confidence_read"].includes(it.type))) && (
+        {(it.probability !== null || (it.proposed_value !== null && PRICE_TYPES.includes(it.type))) && (
           <div className="prop">
             {it.probability !== null && <span><span className="pbar"><i style={{ width: `${Math.round(it.probability * 100)}%` }} /></span> <span className="mono" style={{ fontSize: 11 }}>p {it.probability.toFixed(2)}</span></span>}
-            {it.proposed_value !== null && ["ambiguous_unit", "low_confidence_read"].includes(it.type) && <span>proposed <span className="v">{money(it.proposed_value, "INR", 0)}</span> <span className="text-muted-foreground" style={{ fontSize: 11 }}>per 1000</span></span>}
+            {it.proposed_value !== null && PRICE_TYPES.includes(it.type) && <span>proposed <span className="v">{money(it.proposed_value, "INR", 0)}</span> <span className="text-muted-foreground" style={{ fontSize: 11 }}>per 1000</span></span>}
           </div>
         )}
         {resolved && it.resolution && <div className="hint" style={{ marginTop: 8 }}>{[it.resolution.value !== undefined && it.type !== "questionnaire_ambiguous" ? money(it.resolution.value, "INR", 0) : null, it.resolution.note, it.resolution.by && `by ${it.resolution.by}`].filter(Boolean).join(" · ")}</div>}

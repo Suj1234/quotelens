@@ -54,7 +54,7 @@ export type ItemRow = {
 
 export async function getResponseDetail(responseId: string) {
   const { data, error } = await db().from("responses")
-    .select("*, vendors(name, city, short_code), response_files(*), extracted_items(*), response_terms(*), line_quotes(state, extracted_item_id)")
+    .select("*, vendors(name, city, short_code), response_files(*), extracted_items(*), response_terms(*), line_quotes(state, extracted_item_id), review_items(status)")
     .eq("id", responseId).maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError("NOT_FOUND", "Response not found", undefined, 404);
@@ -68,5 +68,6 @@ export async function getResponseDetail(responseId: string) {
     items: (data.extracted_items as ItemRow[]).sort((a, b) => a.item_index - b.item_index),
     terms: (data.response_terms as Record<string, unknown>[])[0] ?? null,
     cells: data.line_quotes as { state: string; extracted_item_id: string | null }[],
+    openReviews: (data.review_items as { status: string }[]).filter((r) => r.status === "open").length,
   };
 }

@@ -4,15 +4,16 @@ import { signedUrl } from "@/lib/storage";
 
 // TRD §17.9 / DESIGN §3.7 — Questionnaire, Documents, Ledger, Timeline tabs of the Comparison screen.
 
+export type QaCell = { show: string; tone: "" | "red" | "amber"; tip: string; raw: string | null; snippet: string | null; where: string | null; p: string | null; state: string; passes: boolean | null };
 export type QaGrid = {
   vendors: { code: string; name: string }[];
-  rows: { q_no: number; text: string; disqualifying: boolean; answers: Record<string, { show: string; tone: "" | "red" | "amber"; tip: string } | null> }[];
+  rows: { q_no: number; text: string; disqualifying: boolean; answers: Record<string, QaCell | null> }[];
 };
 
 export async function getQuestionnaireGrid(rfxId: string): Promise<QaGrid> {
   const [qQ, aQ, vQ] = await Promise.all([
     db().from("rfx_questions").select("id, q_no, text, answer_type, disqualify_if").eq("rfx_id", rfxId).order("q_no"),
-    db().from("questionnaire_answers").select("question_id, vendor_id, state, answer_bool, answer_number, answer_text, answer_raw, probability, provider, passes").eq("rfx_id", rfxId),
+    db().from("questionnaire_answers").select("question_id, vendor_id, state, answer_bool, answer_number, answer_text, answer_raw, probability, provider, passes, location").eq("rfx_id", rfxId),
     db().from("rfx_vendors").select("vendors(id, short_code, name)").eq("rfx_id", rfxId),
   ]);
   for (const x of [qQ, aQ, vQ]) if (x.error) throw x.error;
@@ -24,12 +25,15 @@ export async function getQuestionnaireGrid(rfxId: string): Promise<QaGrid> {
       answers: Object.fromEntries(vendors.map((v) => {
         const a = (aQ.data ?? []).find((x) => x.question_id === q.id && x.vendor_id === v.id);
         if (!a) return [v.short_code, null];
-        const p = a.probability != null ? ` · p ${Number(a.probability).toFixed(2)} (${a.provider === "jev-openrouter" ? "measured" : "LLM-estimated"})` : "";
+        const p = a.probability != null ? ` · ${q.answer_type === "yes_no" ? "p(yes)" : "p"} ${Number(a.probability).toFixed(2)} (${a.provider === "jev-openrouter" ? "measured" : "LLM-estimated"})` : "";
         const tip = `${a.answer_raw ?? "not answered"}${p}`;
-        if (a.state === "missing") return [v.short_code, { show: "—", tone: "amber", tip }];
-        if (a.state === "ambiguous") return [v.short_code, { show: clip(a.answer_raw ?? "unclear", 28), tone: "amber", tip }];
+        const loc = a.location as { snippet?: string; page?: number; line?: number; sheet?: string; ref?: string; type?: string } | null;
+        const ev = { tip, raw: a.answer_raw, snippet: loc?.snippet ?? null, p: p ? p.slice(3) : null, state: a.state, passes: a.passes,
+          where: loc ? [loc.sheet && `sheet ${loc.sheet}`, loc.ref && `cell ${loc.ref}`, loc.page && `page ${loc.page}`, loc.line && `line ${loc.line}`].filter(Boolean).join(" · ") || null : null };
+        if (a.state === "missing") return [v.short_code, { ...ev, show: "—", tone: "amber" }];
+        if (a.state === "ambiguous") return [v.short_code, { ...ev, show: clip(a.answer_raw ?? "unclear", 28), tone: "amber" }];
         const show = q.answer_type === "yes_no" ? (a.answer_bool ? "Yes" : "No") : q.answer_type === "number" ? Number(a.answer_number).toLocaleString("en-IN") : clip(a.answer_text ?? a.answer_raw ?? "", 34);
-        return [v.short_code, { show, tone: a.passes === false || (q.answer_type === "yes_no" && a.answer_bool === false) ? "red" : "", tip }];
+        return [v.short_code, { ...ev, show, tone: a.passes === false || (q.answer_type === "yes_no" && a.answer_bool === false) ? "red" : "" }];
       })),
     })),
   };
@@ -86,7 +90,7 @@ export async function getLedger(rfxId: string): Promise<LedgerRow[]> {
 // Folded per-line rows describe the rule, not one line's numbers.
 const FOLDED: Record<string, string> = {
   weight_per_piece: "Per-kg rate converted with our spec's weight per piece for each line, not the vendor's",
-  pack_size: "Pack size taken from our line spec (vendor didn't state it)",
+  pack_size: "Pack size not stated by the vendor; best guess or our line spec used",
   unit_conversion: "Unit converted on a basis the vendor didn't state",
 };
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
@@ -108,7 +112,7 @@ const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "valid
 
 export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string };
 
-/** Audit events in words, newest first. Pipeline runs fold into one row per response (plus any failed stage). */
+/** Audit events in words, oldest first (latest 150). Pipeline runs fold into one row per response (plus any failed stage). */
 export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
   const [eQ, rQ, iQ, uQ] = await Promise.all([
     db().from("audit_events").select("event, actor, entity_id, payload, created_at").eq("rfx_id", rfxId).order("created_at", { ascending: false }).limit(400),
@@ -138,5 +142,5 @@ export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
       rows.push({ at: e.created_at, dir: a === "ask-vendor" ? "→" : "·", text: `${who(e.actor)} ${verb} “${title(e.entity_id).replace(/^“|”$/g, "")}”${p.reason ? ` — ${p.reason}` : ""}` });
     } else rows.push({ at: e.created_at, dir: e.event.startsWith("dispatch") ? "→" : "·", text: `${who(e.actor)}: ${e.event.replaceAll(".", " ")}` });
   }
-  return rows.slice(0, 150);
+  return rows.slice(0, 150).reverse(); // the latest 150, shown oldest first like the prototype
 }

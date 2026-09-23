@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { LedgerRow } from "@/lib/rfx-tabs";
+import { shortDate } from "@/lib/format";
 
-/** DESIGN §3.7 Ledger: Kind · Vendor · Lines · Assumption · Basis · By, with a kind / vendor filter (TRD §17.9). */
+/** DESIGN §3.7 Ledger: Kind · Vendor · Lines · Assumption · Basis · By (+ When, TRD §17.9), with a kind / vendor filter (TRD §17.9). */
 export function LedgerTab({ rows }: { rows: LedgerRow[] }) {
   const [kind, setKind] = useState(""); const [vendor, setVendor] = useState("");
   const shown = rows.filter((r) => (!kind || r.kind === kind) && (!vendor || r.vendor === vendor));
@@ -17,12 +18,12 @@ export function LedgerTab({ rows }: { rows: LedgerRow[] }) {
         </span>
       </div>
       <table className="t">
-        <thead><tr><th>Kind</th><th>Vendor</th><th>Lines</th><th>Assumption</th><th>Basis</th><th>By</th></tr></thead>
+        <thead><tr><th>Kind</th><th>Vendor</th><th>Lines</th><th>Assumption</th><th>Basis</th><th>By</th><th>When</th></tr></thead>
         <tbody>
           {shown.map((r, i) => (
             <tr key={i}>
               <td className="mono" style={{ fontSize: 11.5 }}>{r.kind}</td><td>{r.vendor}</td><td className="mono">{r.lines}</td>
-              <td style={{ maxWidth: 460 }}>{r.description}</td><td className="text-muted-foreground">{r.basis}</td><td className="text-muted-foreground">{r.by}</td>
+              <td style={{ maxWidth: 460 }}>{r.description}</td><td className="text-muted-foreground">{r.basis}</td><td className="text-muted-foreground">{r.by}</td><td className="mono text-muted-foreground" style={{ fontSize: 11 }}>{shortDate(r.at)}</td>
             </tr>
           ))}
         </tbody>

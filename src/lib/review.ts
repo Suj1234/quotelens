@@ -45,7 +45,7 @@ export function actionsFor(r: Pick<Row, "type" | "proposed_value" | "line_quote_
     case "unmapped_item": return ["map", "ignore"];
     case "conflict": return [...(r.proposed_value !== null ? ["confirm" as const] : []), "override", "dismiss"];
     case "unknown_vendor": case "not_a_quote": return ["dismiss"];
-    default: return ["confirm"]; // informational: acknowledge
+    default: return ["confirm", "dismiss"]; // informational: acknowledge, or dismiss (TRD §12.3)
   }
 }
 
@@ -154,7 +154,7 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
         const value = Number(r.proposed_value ?? c.best_guess_value);
         if (!Number.isFinite(value)) throw new AppError("NO_VALUE", "Nothing to confirm: enter a value with Override.", undefined, 400);
         await patchCell(c.id, { state: "reviewed", unit_price_inr_per_1000: value, landed_price_inr_per_1000: value + await freightFor(r.rfx_id, c.vendor_id), review_note: "Confirmed the system's value" });
-        await ledger("other", `${await lineLabel()}: buyer confirmed the system's value ${money(value)} per 1000.`, { value }, { line_quote_id: c.id });
+        await ledger("other", `${await lineLabel()}: buyer confirmed the system's value ${money(value)} per 1000 (was ${c.state.replaceAll("_", " ")}).`, { before: { state: c.state, value: c.unit_price_inr_per_1000 }, after: { state: "reviewed", value } }, { line_quote_id: c.id });
         resolution = { ...resolution, value };
       } else if (r.proposed_state === "mapped") {
         const c = await cell();
@@ -183,10 +183,14 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
     }
     case "accept-yes": case "treat-no": {
       const yes = action === "accept-yes";
-      const { data: q } = await db().from("rfx_questions").select("disqualify_if").eq("id", r.question_id!).single();
+      const { data: q } = await db().from("rfx_questions").select("q_no, disqualify_if").eq("id", r.question_id!).single();
+      const { data: before } = await db().from("questionnaire_answers").select("state, answer_raw, passes").eq("question_id", r.question_id!).eq("vendor_id", r.vendor_id!).maybeSingle();
       const { error: e } = await db().from("questionnaire_answers").update({ state: "reviewed", answer_bool: yes, passes: passes(q?.disqualify_if ?? null, { bool: yes }), ...by })
         .eq("question_id", r.question_id!).eq("vendor_id", r.vendor_id!);
       if (e) throw e;
+      // PRD #18: every decision that can change the outcome is in the ledger, with before/after.
+      await ledger("other", `Q${q?.q_no}: buyer ${yes ? "accepted as Yes" : "treated as No"} (“${(before?.answer_raw ?? "").slice(0, 80)}”)${q?.disqualify_if ? ` — ${passes(q.disqualify_if, { bool: yes }) ? "passes" : "fails"} the disqualifying rule` : ""}.`,
+        { question: q?.q_no, before: { state: before?.state, passes: before?.passes ?? null }, after: { answer: yes, passes: passes(q?.disqualify_if ?? null, { bool: yes }) } });
       status = yes ? "confirmed" : "overridden"; resolution = { ...resolution, value: yes ? 1 : 0, note: yes ? "Accepted as Yes" : "Treated as No" };
       break;
     }

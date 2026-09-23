@@ -35,7 +35,7 @@ export async function decideTerms(resp: ResponseRow, rfx: Rfx, t: TermsRow, item
     freight_excluded: { type: "boolean", statement: "Freight to the buyer's plants is NOT included in the quoted prices (e.g. ex-works, FOB, 'freight extra', 'to buyer's account')." },
     taxes_excluded: { type: "boolean", statement: "Taxes such as GST are NOT included in the quoted prices." },
     total_discount_conditional: { type: "boolean", statement: "The supplier mentions a discount that applies only under a condition (award size, early payment, volume)." },
-    rates_net_of_discount: { type: "boolean", statement: "The quoted rates ALREADY have a discount deducted (they are printed net of it), rather than the discount being an extra reduction on top of the quoted rates." },
+    rates_net_of_discount: { type: "boolean", statement: "The quoted rates ALREADY have a discount deducted (they are printed net of it), rather than the discount being an extra reduction on top of the quoted rates. Signs of net rates: the supplier says rates are net of the discount, or tells the buyer to divide the quoted rate by (1 − the discount) or otherwise pay more than quoted when the condition isn't met." },
     buyer_misses_condition: { type: "boolean", statement: "Under the buyer's own payment terms stated above, the condition attached to the supplier's discount is NOT met." },
   }, { purpose: "flags", rfx_id: resp.rfx_id, response_id: resp.id });
 

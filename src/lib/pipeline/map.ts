@@ -1,6 +1,7 @@
 import "server-only";
 import { bool, choice, decide, type DecisionResult, type Question } from "@/lib/ai/decision";
 import { db } from "@/lib/db";
+import { get } from "@/lib/storage";
 import { getSetting } from "@/lib/settings";
 import type { ResponseRow, RfxLine } from "@/types/db";
 import { itemRange, shortlist, type ItemLike } from "./shortlist";
@@ -29,7 +30,7 @@ export async function map(resp: ResponseRow): Promise<MapSummary> {
     getSetting("thresholds"),
   ]);
   if (ie || le) throw ie ?? le;
-  const all = items as ExtractedItem[];
+  const all = await withSheetRows(items as ExtractedItem[]);
   const L = lines as RfxLine[];
   const byNo = new Map(L.map((l) => [l.line_no, l]));
 
@@ -148,3 +149,20 @@ export async function map(resp: ResponseRow): Promise<MapSummary> {
 }
 
 const round = (p: number) => Math.round(p * 1000) / 1000;
+
+/**
+ * Spreadsheet items: match on the whole source row (size, ply, type columns), not just the snippet the extractor chose —
+ * it sometimes quotes only the price cell ("G17=36660"). In-memory only; the stored location is unchanged.
+ */
+async function withSheetRows(items: ExtractedItem[]): Promise<ExtractedItem[]> {
+  const fileIds = [...new Set(items.filter((i) => i.location?.type === "cell" && i.location.ref && i.file_id).map((i) => i.file_id as string))];
+  if (!fileIds.length) return items;
+  const { data: files } = await db().from("response_files").select("id, derived_text_path").in("id", fileIds);
+  const text = new Map<string, string[]>();
+  for (const f of files ?? []) if (f.derived_text_path) text.set(f.id, (await get("derived", f.derived_text_path)).toString("utf8").split("\n"));
+  return items.map((i) => {
+    const ref = i.location?.type === "cell" ? String(i.location.ref ?? "") : "";
+    const row = ref && i.file_id ? text.get(i.file_id)?.find((l) => l.includes(` ${ref}=`)) : undefined;
+    return row ? { ...i, location: { ...i.location, snippet: row } } : i;
+  });
+}

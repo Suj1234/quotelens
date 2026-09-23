@@ -5,6 +5,7 @@ import { countWord, longDate, money } from "@/lib/format";
 import { ext, formatLabel } from "@/lib/file-labels";
 import { currencyCode } from "@/lib/normalise/fx";
 import { PipelineStrip } from "@/components/rfx/pipeline-strip";
+import { Button } from "@/components/ui/button";
 import type { MapSummary } from "@/lib/pipeline/map";
 import type { Stage } from "@/types/db";
 
@@ -12,13 +13,14 @@ import type { Stage } from "@/types/db";
 export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id]/responses/[rid]">) {
   const user = await requireUser();
   const { id, rid } = await params;
-  const [rfx, { response, vendor, files, items, terms, cells }] = await Promise.all([getRfx(id), getResponseDetail(rid)]);
+  const [rfx, { response, vendor, files, items, terms, cells, openReviews }] = await Promise.all([getRfx(id), getResponseDetail(rid)]);
   const kindOf = (fileId: string | null) => files.find((f) => f.id === fileId);
   const priced = items.filter((i) => i.unit_price !== null).length;
   const timings = (response.summary.timings ?? {}) as Partial<Record<Stage, number>>;
   const mapping = (response.summary.map as MapSummary | undefined)?.mapping;
   const mappedTo = (itemId: string) => mapping?.filter((m) => m.item_id === itemId).map((m) => m.line_no).sort((a, b) => a - b) ?? [];
   const stateOf = (itemId: string) => cells.find((c) => c.extracted_item_id === itemId)?.state;
+  const flags = ((response.summary.flags as { flags?: string[] } | undefined)?.flags ?? []);
   const t = terms as Record<string, string | number | boolean | null> | null;
 
   return (
@@ -41,6 +43,16 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
       <div style={{ marginTop: 18 }}>
         <PipelineStrip responseId={rid} status={response.pipeline_status} errors={response.stage_errors} timings={timings} canRun={user.role !== "approver"} />
       </div>
+
+      {/* TRD §17.7: flags chips, summary counts, Go to Review Queue (n) */}
+      {(flags.length > 0 || mapping || openReviews > 0) && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+          {flags.map((f) => <span key={f} className="chip amber">{FLAG_LABEL[f] ?? f.replaceAll("_", " ")}</span>)}
+          {mapping && <span className="hint">{countWord(new Set(mapping.map((m) => m.line_no)).size)} lines mapped · {cells.filter((c) => ["confirmed", "inferred", "reviewed"].includes(c.state)).length} priced in the grid</span>}
+          <span style={{ flex: 1 }} />
+          {openReviews > 0 && user.role !== "approver" && <Button asChild size="sm"><Link href={`/rfx/${id}/review?vendor=${vendor?.short_code ?? ""}`}>Go to Review Queue ({openReviews})</Link></Button>}
+        </div>
+      )}
 
       <div className="grid2" style={{ marginTop: 14 }}>
         <div className="card">
@@ -128,6 +140,11 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
     </div>
   );
 }
+
+const FLAG_LABEL: Record<string, string> = {
+  references_prior_pricing: "prior pricing", freight_excluded: "freight extra", validity_short: "short validity",
+  currency_not_inr: "not INR", total_discount_present: "discount offered", partial_quote: "partial quote",
+};
 
 // DESIGN §3.5: mono "L14" + amber/grey chips for unit? / low read / prior.
 function Mapped({ lines, state }: { lines: number[]; state?: string }) {

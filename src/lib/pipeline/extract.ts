@@ -26,6 +26,7 @@ Rules:
 - Never skip an item because it seems irrelevant. Never merge two items.
 - If a number is unreadable, still create the item with unit_price null, notes explaining, raw_confidence ≤ 0.3.
 - If the document contains no prices at all, return items: [] and explain in terms.other_notes.
+- Also report rows_with_prices: how many priced rows or price mentions the document shows in total (count them before listing items).
 - Return ONLY JSON matching the schema.
 {input_format}`;
 
@@ -46,6 +47,7 @@ const Location = z.object({
   snippet: z.string(),
 });
 export const ExtractionResult = z.object({
+  rows_with_prices: z.number().int().min(0),
   items: z.array(z.object({
     vendor_sku: s, vendor_description: z.string(), quantity: n, quantity_unit: s,
     unit_price: n, price_unit_raw: s, currency_raw: s, pack_size: n, pack_size_unit: s,
@@ -98,10 +100,19 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
   const results = await Promise.all(sources.map(async (src) => {
     const out: Extraction[] = [];
     for (const c of src.chunks) {
-      out.push(await generateJSON({
+      const ask = (extra = "") => generateJSON({
         tier: "strong", purpose: "extract", rfx_id: resp.rfx_id, response_id: resp.id, schema: ExtractionResult, temperature: 0.1,
-        parts: [...c.parts, { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) }],
-      }));
+        parts: [...c.parts, { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) + extra }],
+      });
+      let r = await ask();
+      // Self-check: the model occasionally collapses a table (esp. photos) into one item. If it returned clearly fewer items
+      // than the priced rows it says it sees, retry once with the mismatch spelled out and keep the fuller result.
+      if (isShort(r)) {
+        console.warn(`[stage:extract] ${src.name}: ${r.items.length} items for ${r.rows_with_prices} priced rows — retrying once`);
+        const again = await ask(`\nYour previous answer listed ${r.items.length} items but you counted ${r.rows_with_prices} priced rows. List EVERY priced row as its own item.`);
+        if (again.items.length > r.items.length) r = again;
+      }
+      out.push(r);
     }
     return { src, out };
   }));
@@ -144,6 +155,9 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
     sources: sources.map((s) => s.name),
   };
 }
+
+/** Fewer items than priced rows the model itself counted (by 3+ and a third or more). Exported for the unit test. */
+export const isShort = (r: { rows_with_prices: number; items: unknown[] }) => r.rows_with_prices - r.items.length >= 3 && r.items.length < r.rows_with_prices * 0.67;
 
 /** Idempotency: this stage owns extracted_items and response_terms for the response. */
 async function clearExtraction(responseId: string) {

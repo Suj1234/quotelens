@@ -38,7 +38,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const [{ data: files, error: fe }, { data: qs, error: qe }, { data: prior, error: pe }] = await Promise.all([
     db().from("response_files").select("*").eq("response_id", resp.id).in("file_kind", ["questionnaire", "quotation"]).order("created_at"),
     db().from("rfx_questions").select("*").eq("rfx_id", resp.rfx_id).order("q_no"),
-    db().from("questionnaire_answers").select("question_id, state, response_id").eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id),
+    db().from("questionnaire_answers").select("question_id, state, response_id, answer_bool, answer_number, answer_raw").eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id),
   ]);
   if (fe || qe || pe) throw fe ?? qe ?? pe;
   const questions = qs as RfxQuestion[];
@@ -87,8 +87,8 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const d = found.length ? await decide(state, dq, { purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id }) : null;
 
   const reviewed = new Set((prior ?? []).filter((p) => p.state === "reviewed").map((p) => p.question_id));
-  // An answer another reply from this vendor gave is never replaced by "missing" from this one (e.g. a price-only follow-up).
-  const answeredElsewhere = new Set((prior ?? []).filter((p) => p.state !== "missing" && p.response_id !== resp.id).map((p) => p.question_id));
+  // An answer another reply from this vendor gave is never replaced by this one; a different answer raises a card instead.
+  const elsewhere = new Map((prior ?? []).filter((p) => p.state !== "missing" && p.response_id !== resp.id).map((p) => [p.question_id, p]));
   const rows = questions.filter((q) => !reviewed.has(q.id)).map((q) => {
     const a = byNo.get(q.q_no);
     const base = { rfx_id: resp.rfx_id, question_id: q.id, vendor_id: resp.vendor_id, response_id: resp.id, answer_raw: a?.answer_raw ?? null, location: a?.location ?? null, provider: d?.provider ?? null, reviewed_by: null, reviewed_at: null };
@@ -110,16 +110,22 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
     if (stated < 0.5 || (q.answer_type === "number" && num === null)) return { ...missing, answer_raw: a.answer_raw, provider: d.provider, probability: round(stated) };
     return { ...base, state: "answered", answer_bool: null, answer_number: num, answer_text: a.answer_text ?? a.answer_raw, probability: round(stated), passes: passes(q.disqualify_if, { num }) };
   });
-  const write = rows.filter((r) => !(r.state === "missing" && answeredElsewhere.has(r.question_id)));
+  const write = rows.filter((r) => !elsewhere.has(r.question_id));
+  const disagree = rows.filter((r) => {
+    const o = elsewhere.get(r.question_id);
+    return o && r.state === "answered" && (r.answer_bool !== o.answer_bool || (r.answer_number !== null && Number(r.answer_number) !== Number(o.answer_number)));
+  });
   if (write.length) {
     const { error } = await db().from("questionnaire_answers").upsert(write, { onConflict: "question_id,vendor_id" });
     if (error) throw error;
   }
 
-  const reviews: ReviewInput[] = rows.filter((r) => r.state === "ambiguous").map((r) => {
+  const reviews: ReviewInput[] = [...write.filter((r) => r.state === "ambiguous"), ...disagree].map((r) => {
     const q = questions.find((x) => x.id === r.question_id)!;
     return {
-      type: "questionnaire_ambiguous", question_id: q.id, title: `Q${q.q_no}: “${(r.answer_raw ?? "").slice(0, 70)}”`, detail: q.text, probability: r.probability,
+      type: "questionnaire_ambiguous", question_id: q.id,
+      title: elsewhere.has(q.id) ? `Q${q.q_no}: two answers from this vendor — “${(elsewhere.get(q.id)!.answer_raw ?? "").slice(0, 40)}” vs “${(r.answer_raw ?? "").slice(0, 40)}”` : `Q${q.q_no}: “${(r.answer_raw ?? "").slice(0, 70)}”`,
+      detail: elsewhere.has(q.id) ? `${q.text} The earlier answer stands until you decide.` : q.text, probability: r.probability,
       evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw },
     };
   });
