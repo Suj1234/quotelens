@@ -137,11 +137,17 @@ async function clearResponses(rfxId: string, source: string) {
   if (!data?.length) return;
   const ids = data.map((r) => r.id);
   const vendorIds = data.map((r) => r.vendor_id).filter(Boolean);
-  for (const t of ["line_quotes", "review_items", "questionnaire_answers"]) {
+  // Children before line_quotes: review items and ledger rows point at cells.
+  for (const t of ["review_items", "questionnaire_answers"]) {
     const { error } = await db().from(t).delete().in("response_id", ids);
     if (error) throw error;
   }
-  if (vendorIds.length) await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", vendorIds);
+  if (vendorIds.length) {
+    const { error } = await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", vendorIds);
+    if (error) throw error;
+  }
+  const lq = await db().from("line_quotes").delete().in("response_id", ids);
+  if (lq.error) throw lq.error;
   const del = await db().from("responses").delete().in("id", ids);
   if (del.error) throw del.error;
   await db().from("communications").delete().in("id", data.map((r) => r.communication_id).filter(Boolean));

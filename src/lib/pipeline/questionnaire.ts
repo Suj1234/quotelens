@@ -64,7 +64,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
 
   const qList = questions.map((q) => `Q${q.q_no} (${q.answer_type}): ${q.text}`).join(" | ");
   const qa = parts.length
-    ? await generateJSON({ tier: "strong", purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id, schema: QaResult, temperature: 0,
+    ? await generateJSON({ tier: "fast", purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id, schema: QaResult, temperature: 0,
         parts: [{ text: P_QA.replace("{questions}", qList) }, ...parts] })
     : { answers: [] };
   const byNo = new Map(qa.answers.map((a) => [a.q_no, a]));
