@@ -51,7 +51,7 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
   await clearStageReviews(resp.id, "flags");
   const v = validityDays(terms, resp.received_at);
   const reviews: ReviewInput[] = [];
-  if (on.validity_short) reviews.push({ type: "validity_short", title: `Validity ${v} days — asked for ${rfx.validity_days_requested}`, detail: terms?.validity_until ? `Valid until ${terms.validity_until}.` : null, proposed_value: v, evidence: { terms: true } });
+  if (on.validity_short) reviews.push({ type: "validity_short", title: `Validity ${v} days (RFx asked ${rfx.validity_days_requested})`, detail: terms?.validity_until ? `Valid until ${terms.validity_until}.` : null, proposed_value: v, evidence: { terms: true } });
   if (on.partial_quote) reviews.push({ type: "missing_line", title: `${notQuoted} of ${cells.length} lines not quoted`, detail: terms?.other_notes, proposed_value: notQuoted, evidence: { terms: true } });
   if (on.freight_excluded) reviews.push({ type: "freight_treatment", title: "Freight not included", detail: terms?.freight_terms_raw, probability: td?.p.freight_excluded, evidence: { terms: true } });
   if (on.references_prior_pricing) reviews.push({ type: "prior_pricing", title: "Refers to earlier pricing", detail: terms?.references_prior_pricing_text, probability: td?.p.references_prior_pricing, evidence: { terms: true } });

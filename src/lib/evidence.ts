@@ -18,7 +18,8 @@ export type Evidence = {
 const PAD = 0.04; // TRD §12.2: pad 4%
 
 /** Build the evidence block for a location in a response file (or the email body when file is null). */
-export async function buildEvidence(loc: Loc | null | undefined, file: ResponseFile | null, emailText: string | null, cacheKey: string): Promise<Evidence | null> {
+/** `markHint` (e.g. the unit as written, "per bundle") is highlighted instead of the whole snippet when it appears in it. */
+export async function buildEvidence(loc: Loc | null | undefined, file: ResponseFile | null, emailText: string | null, cacheKey: string, markHint?: string | null): Promise<Evidence | null> {
   if (!loc) return null;
   const snippet = loc.snippet?.trim() || undefined;
   const name = file?.original_name ?? "email body";
@@ -62,13 +63,13 @@ export async function buildEvidence(loc: Loc | null | undefined, file: ResponseF
     : lines.slice(Math.max(0, at - 1), at + 2).filter((l) => l.replace(/^\[l \d+\]/, "").trim()).join("\n"); // email: ±1 non-empty line
   const cellMark = loc.type === "cell" && loc.ref && at >= 0 ? lines[at].match(new RegExp(`${loc.ref}=[^ ]+`))?.[0] : undefined;
   const where = loc.type === "cell" ? `${loc.sheet ? `${loc.sheet} · ` : ""}cell ${loc.ref ?? "?"}` : file ? `paragraph ${loc.line ?? "?"}` : `line ${loc.line ?? "?"}`;
-  return { kind: "text", text: context, mark: cellMark ?? snippet, caption: `${name} · ${where}`, open_url };
+  const hint = markHint && context?.toLowerCase().includes(markHint.toLowerCase()) ? context.slice(context.toLowerCase().indexOf(markHint.toLowerCase()), context.toLowerCase().indexOf(markHint.toLowerCase()) + markHint.length) : undefined;
+  return { kind: "text", text: context, mark: cellMark ?? hint ?? snippet, caption: `${name} · ${where}`, open_url };
 }
 
-/** Long paragraphs: ~180 characters either side of the snippet. */
-function around(text: string, snippet?: string, pad = 180): string {
-  if (text.length <= 2 * pad + 60 || !snippet) return text;
-  const i = Math.max(0, text.indexOf(snippet.slice(0, 30)));
-  const a = Math.max(0, i - pad), b = Math.min(text.length, i + snippet.length + pad);
-  return `${a > 0 ? "…" : ""}${text.slice(a, b)}${b < text.length ? "…" : ""}`;
+/** Long paragraphs: just the vendor's sentence (the snippet), marked as an excerpt (DESIGN §2.10). */
+function around(text: string, snippet?: string): string {
+  if (text.length <= 240 || !snippet || !text.includes(snippet.slice(0, 30))) return text;
+  const i = text.indexOf(snippet.slice(0, 30));
+  return `${i > 0 ? "… " : ""}${snippet}${i + snippet.length < text.length ? " …" : ""}`;
 }

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { currencyCode, fxRate } from "@/lib/normalise/fx";
 import { applyLineDiscount, grossUp, landed, round2 } from "@/lib/normalise/price";
 import { parseUnit, toPer1000Factor, type UnitKey } from "@/lib/normalise/units";
+import { longDate } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
 import type { ResponseRow, Rfx, RfxLine } from "@/types/db";
 import type { ExtractedItem, MapSummary } from "./map";
@@ -16,6 +17,7 @@ type Assumption = { id: string; kind: string; description: string; value: unknow
 
 export type NormaliseSummary = { cells: number; states: Partial<Record<State, number>>; assumptions: number; reviews: number; terms: TermsDecision; freight_included: boolean; kept_buyer_cells: number };
 
+const SRC_WORD: Record<string, string> = { image: "photo", pdf: "PDF", cell: "sheet", text: "text" };
 const LOW_READ = 0.6; // raw_confidence below this → low_confidence (TRD §8.4, §11.5)
 
 /** TRD §8.4 + §11 — mapping → line_quotes (one per line × vendor), assumptions ledger, review items. */
@@ -31,7 +33,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     db().from("extracted_items").select("*").eq("response_id", resp.id),
     db().from("response_terms").select("*").eq("response_id", resp.id).maybeSingle(),
     db().from("rfx_vendors").select("freight_assumption_inr_per_1000").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).maybeSingle(),
-    db().from("line_quotes").select("id, rfx_line_id, state").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
+    db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
     getSetting("fx_rates"), getSetting("thresholds"), getSetting("discount_default"), getSetting("freight_default_inr_per_1000"),
   ]);
   for (const q of [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ]) if (q.error) throw q.error;
@@ -53,8 +55,9 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   await clearStageReviews(resp.id, "normalise");
   const del = await db().from("assumptions").delete().eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system");
   if (del.error) throw del.error;
-  const existing = new Map((existingQ.data ?? []).map((c) => [c.rfx_line_id as string, c as { id: string; state: string }]));
-  const buyerOwned = new Set([...existing].filter(([, c]) => c.state === "reviewed" || c.state === "excluded").map(([l]) => l));
+  const existing = new Map((existingQ.data ?? []).map((c) => [c.rfx_line_id as string, c as { id: string; state: string; reviewed_by: string | null }]));
+  // Any buyer decision (reviewed, excluded, or "treat as not quoted") survives a re-run.
+  const buyerOwned = new Set([...existing].filter(([, c]) => c.reviewed_by || c.state === "reviewed" || c.state === "excluded").map(([l]) => l));
 
   const assumptions: Assumption[] = [];
   const reviews: ReviewInput[] = [];
@@ -96,9 +99,9 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     if (it.unit_price === null) {
       if ((it.raw_confidence ?? 1) < LOW_READ) {
         cells.push({ ...base, state: "low_confidence", best_guess_note: it.notes ?? "Price could not be read." });
-        reviews.push({ type: "low_confidence_read", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Price unreadable for line ${line.line_no}`, detail: it.notes, probability: it.raw_confidence, proposed_state: "reviewed", evidence: ev });
+        reviews.push({ type: "low_confidence_read", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Line ${line.line_no}: price unreadable in the ${SRC_WORD[String(it.location.type)] ?? "source"}`, detail: it.notes, probability: it.raw_confidence, proposed_state: "reviewed", evidence: ev });
       } else if (refPrior) {
-        cells.push({ ...base, state: "references_prior", best_guess_note: terms.references_prior_pricing_text ?? it.notes });
+        cells.push({ ...base, state: "references_prior", best_guess_note: it.notes ?? terms.references_prior_pricing_text });
       } else {
         cells.push({ ...base, state: "not_quoted", best_guess_note: it.notes });
       }
@@ -140,7 +143,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
         ambiguous = `Priced ${unit.replace("per_", "per ")} but the ${unit === "per_box" ? "box" : "bundle"} size isn't stated for this item.`;
         if (guess) {
           factor = 1000 / guess;
-          bestGuessNote = `Best guess: ${guess} per ${unit === "per_box" ? "box" : "bundle"}, the size this vendor states for other ${line.ply}-ply ${line.item_type ?? "items"} (p≈0.6).`;
+          bestGuessNote = `Best guess ${guess}/${unit === "per_box" ? "box" : "bundle"} from the vendor's other ${line.ply}-ply items — not applied`;
           chain.push({ step: "unit", from: unit, to: "per_1000_pcs", factor, basis: `pack size ${guess} inferred from the vendor's other items`, basis_kind: "system_inferred", p: 0.6 });
         }
       }
@@ -181,10 +184,11 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     const landedV = round2(landed(value, { freight_included: freightIncluded, freight_per_1000: freightPer1000 }));
     if (ambiguous) {
       cells.push({ ...base, state: "ambiguous", conversion_chain: chain, best_guess_value: factor !== null ? value : null, best_guess_note: [ambiguous, bestGuessNote].filter(Boolean).join(" ") });
-      reviews.push({ type: "ambiguous_unit", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Unit unclear for line ${line.line_no}`, detail: ambiguous, proposed_value: factor !== null ? value : null, proposed_note: bestGuessNote, evidence: ev });
+      reviews.push({ type: "ambiguous_unit", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: (unit === "per_box" || unit === "per_bundle") && !it.pack_size ? `Item ${line.line_no}: price ${unit.replace("per_", "per ")}, ${unit === "per_box" ? "box" : "bundle"} size not stated` : `Line ${line.line_no}: ${ambiguous}`,
+        detail: ambiguous, proposed_value: factor !== null ? value : null, proposed_note: bestGuessNote, probability: bestGuessNote ? 0.6 : null, proposed_state: "reviewed", evidence: ev });
     } else if ((it.raw_confidence ?? 1) < LOW_READ) {
       cells.push({ ...base, state: "low_confidence", conversion_chain: chain, best_guess_value: value, best_guess_note: it.notes ?? "Low read confidence." });
-      reviews.push({ type: "low_confidence_read", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Low-confidence read on line ${line.line_no}`, detail: it.notes, probability: it.raw_confidence, proposed_value: value, evidence: ev });
+      reviews.push({ type: "low_confidence_read", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Line ${line.line_no}: price read with low confidence in the ${SRC_WORD[String(it.location.type)] ?? "source"}`, detail: it.notes, probability: it.raw_confidence, proposed_value: value, evidence: ev });
     } else if (conflictLines.has(line.id)) {
       cells.push({ ...base, state: "conflict", conversion_chain: chain, best_guess_value: value, best_guess_note: "Another item from this vendor also maps to this line." });
     } else {
@@ -208,7 +212,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       description: `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
   }
   if (terms.total_discount_pct) {
-    reviews.push({ type: "discount_treatment", title: grossUpPct ? `Rates are net of a ${grossUpPct}% discount we won't earn` : `${terms.total_discount_pct}% total discount offered`,
+    reviews.push({ type: "discount_treatment", title: grossUpPct ? `Printed rates are net of a ${grossUpPct}% discount we won't earn` : `${terms.total_discount_pct}% discount on total${terms.total_discount_condition ? ` ${terms.total_discount_condition}` : ""}`,
       detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
       proposed_value: terms.total_discount_pct, evidence: { terms: true } });
   }
@@ -216,18 +220,23 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   if (refPriorLines.length) {
     vendorAssumption("prior", { kind: "prior_pricing", basis: "vendor_stated", value: { lines: refPriorLines.length, text: terms.references_prior_pricing_text },
       description: `${refPriorLines.length} lines reference earlier pricing not on file ("${terms.references_prior_pricing_text ?? "same as before"}"); no value used.` });
-    reviews.push({ type: "prior_pricing", title: `${refPriorLines.length} lines priced "as before"`, detail: terms.references_prior_pricing_text, probability: td.p.references_prior_pricing, evidence: { terms: true } });
-    for (const c of refPriorLines) {
-      reviews.push({ type: "prior_pricing", rfx_line_id: c.rfx_line_id, line_quote_id: c.id, title: `Line ${lineById.get(c.rfx_line_id)!.line_no}: no price, refers to earlier pricing`, detail: terms.references_prior_pricing_text, evidence: { terms: true } });
-    }
+    // One vendor-level card (DESIGN §3.6); its actions apply to every affected line.
+    const nos = refPriorLines.map((c) => lineById.get(c.rfx_line_id)!.line_no).sort((a, b) => a - b);
+    const span = nos.length > 1 && nos[nos.length - 1] - nos[0] === nos.length - 1 ? `Items ${nos[0]}–${nos[nos.length - 1]}` : `Items ${nos.join(", ")}`;
+    // Quote the vendor's shortest wording (the terms text can be the whole sentence; an item note is often just the phrase).
+    const phrase = [terms.references_prior_pricing_text, ...refPriorLines.map((c) => c.best_guess_note as string | null)]
+      .filter((t): t is string => !!t).sort((a, b) => a.length - b.length)[0] ?? "same as before";
+    reviews.push({ type: "prior_pricing", title: `${span}: “${phrase.slice(0, 60)}” — prior pricing not on file`,
+      detail: `${nos.length} lines cannot be priced without a number from the vendor.`, probability: td.p.references_prior_pricing, proposed_value: nos.length, evidence: { terms: true, lines: nos } });
   }
   if (!freightIncluded) {
     vendorAssumption("freight", { kind: "freight_treatment", basis: rvQ.data?.freight_assumption_inr_per_1000 ? "buyer_entered" : "settings_default", value: { inr_per_1000: freightPer1000 },
       description: `Freight not included ("${terms.freight_terms_raw ?? "not stated"}"); landed price adds ₹${freightPer1000} per 1000 pcs.` });
-    reviews.push({ type: "freight_treatment", title: "Freight not included", detail: `"${terms.freight_terms_raw ?? "not stated"}" → landed price adds ₹${freightPer1000} per 1000.`, proposed_value: freightPer1000, probability: td.p.freight_excluded, evidence: { terms: true } });
+    reviews.push({ type: "freight_treatment", title: `${(terms.freight_terms_raw ?? "Freight not stated").slice(0, 70)} — freight excluded`, detail: `"${terms.freight_terms_raw ?? "not stated"}" → landed price adds ₹${freightPer1000} per 1000.`, proposed_value: freightPer1000, probability: td.p.freight_excluded, evidence: { terms: true } });
   }
   for (const a of assumptions.filter((a) => a.kind === "fx_rate")) {
-    reviews.push({ type: "fx_assumption", title: a.description, detail: "Acknowledge once for this vendor.", evidence: { assumption_id: a.id } });
+    const r = a.value as { rate: number; date: string };
+    reviews.push({ type: "fx_assumption", title: `${a.description.split("→")[0]} → INR at ${r.rate}${r.date ? ` (${longDate(r.date)})` : ""}`, detail: `${a.description} Acknowledge once for this vendor.`, evidence: { assumption_id: a.id } });
   }
 
   // Write: cells first (per-line assumptions and review items point at them; chains hold assumption ids as plain values).

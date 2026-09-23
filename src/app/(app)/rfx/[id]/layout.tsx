@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getRfx } from "@/lib/rfx-detail";
+import { db } from "@/lib/db";
 import { longDate, shortDate } from "@/lib/format";
 import { RfxTabs } from "@/components/rfx/rfx-tabs";
 
@@ -10,7 +11,7 @@ const LABEL = { draft: "Draft", issued: "Issued", receiving: "Receiving", review
 export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/[id]">) {
   await requireUser();
   const { id } = await params;
-  const rfx = await getRfx(id);
+  const [rfx, { count: openItems }] = await Promise.all([getRfx(id), db().from("review_items").select("id", { count: "exact", head: true }).eq("rfx_id", id).eq("status", "open")]);
   return (
     <>
       <div className="rfxhead">
@@ -26,7 +27,7 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
             </div>
           </div>
         </div>
-        <RfxTabs id={id} tabs={[{ slug: "responses", label: "Responses" }, { slug: "comparison", label: "Comparison" }]} />
+        <RfxTabs id={id} tabs={[{ slug: "responses", label: "Responses" }, { slug: "review", label: "Review", count: openItems ?? 0 }, { slug: "comparison", label: "Comparison" }]} />
       </div>
       {children}
     </>

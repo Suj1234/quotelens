@@ -116,7 +116,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const reviews: ReviewInput[] = rows.filter((r) => r.state === "ambiguous").map((r) => {
     const q = questions.find((x) => x.id === r.question_id)!;
     return {
-      type: "questionnaire_ambiguous", question_id: q.id, title: `Q${q.q_no} answer unclear: ${q.text}`, detail: r.answer_raw, probability: r.probability,
+      type: "questionnaire_ambiguous", question_id: q.id, title: `Q${q.q_no}: “${(r.answer_raw ?? "").slice(0, 70)}”`, detail: q.text, probability: r.probability,
       evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw },
     };
   });
