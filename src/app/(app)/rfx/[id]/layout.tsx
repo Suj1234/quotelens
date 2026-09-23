@@ -26,7 +26,7 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
             </div>
           </div>
         </div>
-        <RfxTabs id={id} tabs={[{ slug: "responses", label: "Responses" }]} />
+        <RfxTabs id={id} tabs={[{ slug: "responses", label: "Responses" }, { slug: "comparison", label: "Comparison" }]} />
       </div>
       {children}
     </>

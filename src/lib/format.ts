@@ -26,3 +26,10 @@ const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct
 const ist = (iso: string) => new Date(new Date(iso).getTime() + 330 * 60_000);
 export const shortDate = (iso: string) => { const d = ist(iso); return `${String(d.getUTCDate()).padStart(2, "0")} ${MON[d.getUTCMonth()]}`; };
 export const longDate = (iso: string) => `${shortDate(iso)} ${ist(iso).getUTCFullYear()}`;
+
+/** Large sums in prose/headers (DESIGN §1.3): ₹4.39 cr, ₹38.2 L, else ₹ with Indian grouping. */
+export function inrShort(v: number): string {
+  if (Math.abs(v) >= 1e7) return `₹${(v / 1e7).toFixed(2)} cr`;
+  if (Math.abs(v) >= 1e5) return `₹${(v / 1e5).toFixed(1)} L`;
+  return money(Math.round(v));
+}
