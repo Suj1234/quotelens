@@ -1,7 +1,7 @@
 # Progress
-## Current: Phase P4 — in progress (P4-T1 SQL guard)
+## Current: Phase P4 ✅ checkpoint — Phase P5 in progress (P5-T1 New RFx + co-pilot)
 ## Deploy URL: https://quotelens-seven.vercel.app
-## Eval (latest): clean MER-0419 **150/150**, questionnaire **50/50** (twice) · realistic MER-0417 **150/150**, questionnaire 42–43/50 (the 7 misses = OrientPack sent no questionnaire) — 2026-09-24 01:30
+## Eval (latest): clean MER-0419 **150/150**, questionnaire **50/50** (P4 checkpoint reload, 2026-09-24 03:55) · realistic MER-0417 **150/150**, questionnaire 42–43/50 (the 7 misses = OrientPack sent no questionnaire)
 ## Done
 - [x] P0-T1 Scaffold — Next 16.3.6 + Tailwind v4 + shadcn (radix-nova, sonner instead of toast), all listed deps, DESIGN tokens in globals.css, IBM Plex via next/font, `.env.example`, vitest config. `npm run dev` shows a page.
 - [x] P0-T2 Supabase — migrations 0001 (TRD §6.1–6.20 verbatim + RLS lock-down), 0002 (§6.21 views + `run_readonly_query`), 0003 (buckets); validated on embedded Postgres; `src/lib/db.ts`, `src/types/db.ts`. Applied 2026-09-23 with `npm run db:migrate`; `db:check`: rfx count ran, 4 private buckets, `run_readonly_query` OK. Publishable key blocked from `users` and views (42501).
@@ -52,6 +52,7 @@
   | 9 | Response Detail: flags chips, counts, Go to Review Queue (n) (TRD §17.7) | ✓ Q1 re-run via base_query_id → SQL reads v_comparison_bestguess, NOT IN list lost ambiguous/low_confidence; totals without/with returned (₹4,53,38,297 both — the only best guesses in scope are Westline's, disqualified; 0 cells filled). Q6 with best guesses → ₹73,16,208 at stake on 13 cells |
   | — | Deferred by plan: Export (P4-T4), Ask panel (P4), Outbox/Sync inbox (P5/P6), lock bar (P7), Settings link on assumption cards (P8), 2-minute screen capture (needs Sabarish) | open, by phase |
 ## In progress
+- [x] **P4 Ask panel + exports — checkpoint passed** (commits 17ec43b … aae6c02). What works: SQL guard, Ask route with best-guess re-run and follow-ups, Ask sheet for both roles, grid/answer exports. What doesn't: model latency varies (one 19 s outlier seen on curl; UI runs 3.4–10.2 s); column names in answers vary run to run.
 - **Phase 4 requirement checklist** (definition of done; sources: handoff §4, TRD §6.17/§6.21/§9.8–9.9/§13/§16/§17.9, PRD §8 Stage 7/§13, DESIGN §2.3/§2.13/§2.15/§3.7/§4). ✓ only with evidence.
   | # | Requirement (source) | Status / evidence |
   |---|---|---|
@@ -81,9 +82,9 @@
   | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | ✓ `/api/export/query/{id}` xlsx (Answer sheet in the query's column order + Question sheet with answer, how, exclusions, SQL) and csv; Q1 → 30 rows |
   | 24 | Export button in Comparison toolbar and on each answer card (DESIGN §2.8/§2.13) | ✓ Comparison toolbar: Export (xlsx, basis on screen) + CSV, both roles; each answer card with rows: Export + CSV |
   | 25 | Proof: downloaded files read back with a script (rows, values, fills) | ✓ curl as Priya → 200 with attachment names; read back with exceljs: line 5 Westline '27,960? (best guess)', line 14 OrientPack '?', line 30 'prior pricing'/'not quoted'; fills FFE7EAF6 ×78 (inferred), FFFAF0DB ×5 (4 ambiguous + 1 low), FFF1F0EB ×11 (3 not quoted + 8 prior) = grid legend; line 1 lowest (Kohinoor ₹67,508) bold with teal left edge; logged out → 401 |
-  | 26 | Tests + lint + build green; pipeline:seed 150/150; push | open |
-  | 27 | Production: Q1 as Priya and as Sujit, computed with SQL shown; one export downloads | open |
-  | 28 | This table fully ticked with evidence | open |
+  | 26 | Tests + lint + build green; pipeline:seed 150/150; push | ✓ 54 tests (13 files, incl. 9 guard + 5 result tests), lint clean, `next build` green; `npm run pipeline:seed` from scratch: 150/150, questionnaire 50/50 (231 s); pushed aae6c02 |
+  | 27 | Production: Q1 as Priya and as Sujit, computed with SQL shown; one export downloads | ✓ production: Q1 as Priya (4.6 s) and as Sujit (3.6 s) → 30 rows, ₹4,53,38,297, SQL returned; answer xlsx (9.8 kB) and grid xlsx (12.7 kB) download as valid Excel files; browser as Priya: toolbar Ask → sheet, history card, Show query |
+  | 28 | This table fully ticked with evidence | ✓ rows 1–27 ticked with evidence |
   **Ask results on MER-0419 (UI, as Priya, 2026-09-24; answer · rows · total · SQL shape · time):**
   | Q | Answer (computed) | Rows | Total | SQL | Time (run A / B) |
   |---|---|---|---|---|---|
