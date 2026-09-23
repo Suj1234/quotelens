@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P1, next task P1-T5 (classify)
+## Current: Phase P1, next task P1-T6 (extract)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -13,6 +13,7 @@
 - [x] P1-T2 Preprocessors — `src/lib/preprocess/` xlsx (cell refs, text numbers verbatim, comments, hidden rows marked, empty sheets dropped, 2,000-cell cap), docx (`[p N]`, `[table t row r]`), email/txt/eml (quoted blocks, `On … wrote:`, `-- ` and `Sent from my` removed; `[l N]`), image (EXIF rotate, ≤2000 px, normalise), pdf (page count, >20 pages split). 13 unit tests on the realistic seed files green.
 - [x] P1-T3 Gemini client — `src/lib/ai/gemini.ts` `generateJSON` (Zod → `responseJsonSchema`, validate, one retry with the validation error, one retry on 429/5xx after 2 s, `MODEL_INVALID`/`MODEL_ERROR`), `generateText`, `inlineFile`; `src/lib/log.ts` `logModelCall`/`audit`. Live: strong model read the Kohinoor PDF (vendor, 2 pages, the * footnote verbatim); calls land in `model_calls`. 4 unit tests (mocked provider) green.
 - [x] P1-T4 Response intake — `src/lib/responses.ts` (`createResponse`: inbound mock communication → response → each file raw to bucket + row → derived text/image/page count), `POST /api/responses` (multipart), `POST /api/rfx/{id}/seed-responses[?set=realistic]` (replaces earlier seed responses and their outputs; leaves other sources alone). MER-0419 has 5 seeded responses: Balaji xlsx+cert, Kohinoor pdf+profile, Westline docx+profile, OrientPack photo+questionnaire, Anand email text.
+- [x] P1-T5 Classify — decision layer interface `src/lib/ai/decision/index.ts` + Gemini emulation provider (P-DECIDE §10.4, per-option probabilities, renormalise, margin confidence); `src/lib/pipeline/classify.ts` (one `decide()` per response over all files + email body; P-CAPTION for PDFs/images; top < 0.50 → unknown; `not_a_quote` review items). MER-0419: Balaji xlsx/Kohinoor pdf/Westline docx/OrientPack photo/Anand email → quotation (p 1.00); certificate + profiles → supporting; OrientPack questionnaire PDF → questionnaire.
 ## In progress
 ## Open questions (for Sabarish)
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
