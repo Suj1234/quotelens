@@ -16,19 +16,23 @@ export type VendorRow = {
   response: (Pick<ResponseRow, "id" | "received_at" | "pipeline_status" | "summary" | "source" | "email_text"> & {
     files: Pick<ResponseFile, "id" | "original_name" | "file_kind">[]; items: number; priced: number;
   }) | null;
+  more_replies: number;
 };
 
-/** One row per invited vendor with its latest non-clarification response (DESIGN §3.5). */
+/** One row per invited vendor with its main reply — the one that supplied most of its grid cells, else the latest (DESIGN §3.5). */
 export async function listVendorResponses(rfxId: string): Promise<VendorRow[]> {
-  const [inv, resp] = await Promise.all([
+  const [inv, resp, cellsQ] = await Promise.all([
     db().from("rfx_vendors").select("status, vendors(id, name, city, short_code)").eq("rfx_id", rfxId),
     db().from("responses").select("id, vendor_id, received_at, pipeline_status, summary, source, email_text, is_clarification, response_files(id, original_name, file_kind, created_at), extracted_items(unit_price)")
       .eq("rfx_id", rfxId).eq("is_clarification", false).order("received_at", { ascending: false }),
+    db().from("line_quotes").select("response_id").eq("rfx_id", rfxId).not("extracted_item_id", "is", null),
   ]);
+  const owned = (id: string) => (cellsQ.data ?? []).filter((c) => c.response_id === id).length;
   if (inv.error || resp.error) throw inv.error ?? resp.error;
   return (inv.data ?? []).map((iv) => {
     const v = iv.vendors as unknown as { id: string; name: string; city: string | null; short_code: string };
-    const r = resp.data?.find((x) => x.vendor_id === v.id);
+    const mine = (resp.data ?? []).filter((x) => x.vendor_id === v.id);
+    const r = [...mine].sort((a, b) => owned(b.id) - owned(a.id))[0]; // stable sort keeps "latest" among ties
     return {
       vendor_id: v.id, name: v.name, city: v.city, short_code: v.short_code, status: iv.status,
       response: r ? {
@@ -36,6 +40,7 @@ export async function listVendorResponses(rfxId: string): Promise<VendorRow[]> {
         files: [...r.response_files].sort((a, b) => a.created_at.localeCompare(b.created_at)),
         items: r.extracted_items.length, priced: r.extracted_items.filter((i) => i.unit_price !== null).length,
       } : null,
+      more_replies: Math.max(0, mine.length - 1),
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
 }

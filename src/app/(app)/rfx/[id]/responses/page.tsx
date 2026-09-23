@@ -5,13 +5,16 @@ import { countWord, shortDate } from "@/lib/format";
 import { ext, formatLabel } from "@/lib/file-labels";
 import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
+import { AssignVendor } from "@/components/rfx/assign-vendor";
+import { getUnmatchedResponses } from "@/lib/unmatched";
+import { db } from "@/lib/db";
 import { STAGES } from "@/types/db";
 
 export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/responses">) {
   const user = await requireUser();
   const buyer = user.role !== "approver";
   const { id } = await params;
-  const rows = await listVendorResponses(id);
+  const [rows, strays, { data: allVendors }] = await Promise.all([listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name")]);
   const replied = rows.filter((r) => r.response).length;
   const running = rows.filter((r) => r.response && STAGES.some((s) => r.response!.pipeline_status[s] === "running")).length;
 
@@ -44,7 +47,7 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               </div>
               <div className="sub">
                 {r.response
-                  ? <>received {shortDate(r.response.received_at)} · <span className="mono">{r.response.priced}</span> prices read</>
+                  ? <>received {shortDate(r.response.received_at)} · <span className="mono">{r.response.priced}</span> prices read{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}</>
                   : "no reply yet"}
               </div>
               <div className="sub">
@@ -58,6 +61,24 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               <div className="sub" />
               <div>
                 {r.response && <Button asChild size="sm"><Link href={`/rfx/${id}/responses/${r.response.id}`}>Open</Link></Button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {strays.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="hd"><b>Unmatched senders <span className="mono text-muted-foreground">{strays.length}</span></b><span className="hint">replies we couldn&apos;t tie to a vendor — pricing waits until you assign one</span></div>
+          {strays.map((s) => (
+            <div className="vrow" key={s.id}>
+              <div><div className="nm">{s.from ?? "Unknown sender"}</div><div className="sub">{s.source.replace("_", " ")} · received {shortDate(s.received_at)}</div></div>
+              <div className="sub">{s.files.join(", ") || (s.email ? "email body" : "—")}</div>
+              <div className="sub"><span className="mono">{s.items}</span> items read</div>
+              <div className="sub" />
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {buyer && <AssignVendor responseId={s.id} vendors={allVendors ?? []} />}
+                <Button asChild size="sm"><Link href={`/rfx/${id}/responses/${s.id}`}>Open</Link></Button>
               </div>
             </div>
           ))}

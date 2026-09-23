@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { currencyCode, fxRate } from "@/lib/normalise/fx";
 import { applyLineDiscount, grossUp, landed, round2 } from "@/lib/normalise/price";
 import { parseUnit, toPer1000Factor, type UnitKey } from "@/lib/normalise/units";
-import { longDate } from "@/lib/format";
+import { longDate, money } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
 import type { ResponseRow, Rfx, RfxLine } from "@/types/db";
 import type { ExtractedItem, MapSummary } from "./map";
@@ -33,7 +33,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     db().from("extracted_items").select("*").eq("response_id", resp.id),
     db().from("response_terms").select("*").eq("response_id", resp.id).maybeSingle(),
     db().from("rfx_vendors").select("freight_assumption_inr_per_1000").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).maybeSingle(),
-    db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
+    db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by, response_id, unit_price_inr_per_1000, best_guess_value").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
     getSetting("fx_rates"), getSetting("thresholds"), getSetting("discount_default"), getSetting("freight_default_inr_per_1000"),
   ]);
   for (const q of [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ]) if (q.error) throw q.error;
@@ -53,9 +53,14 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   // Idempotency: this stage owns the system's assumptions for this vendor, its open review items, and every cell
   // of this vendor except the ones a buyer already decided (reviewed / excluded) — those are never overwritten.
   await clearStageReviews(resp.id, "normalise");
-  const del = await db().from("assumptions").delete().eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system");
+  // System ledger rows carry the reply they came from (value.response_id): a re-run replaces only its own (untagged = pre-P3 rows).
+  const del = await db().from("assumptions").delete().eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system")
+    .or(`value->>response_id.eq.${resp.id},value->>response_id.is.null`);
   if (del.error) throw del.error;
-  const existing = new Map((existingQ.data ?? []).map((c) => [c.rfx_line_id as string, c as { id: string; state: string; reviewed_by: string | null }]));
+  type Existing = { id: string; state: string; reviewed_by: string | null; response_id: string | null; unit_price_inr_per_1000: number | null; best_guess_value: number | null };
+  const existing = new Map((existingQ.data ?? []).map((c) => [c.rfx_line_id as string, c as Existing]));
+  // Cells another reply from this vendor wrote: this reply never overwrites them (clarification replies: TRD §8.7, P6).
+  const others = new Map([...existing].filter(([, c]) => c.response_id && c.response_id !== resp.id && c.state !== "not_quoted"));
   // Any buyer decision (reviewed, excluded, or "treat as not quoted") survives a re-run.
   const buyerOwned = new Set([...existing].filter(([, c]) => c.reviewed_by || c.state === "reviewed" || c.state === "excluded").map(([l]) => l));
 
@@ -196,22 +201,36 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     }
   }
 
+  // A second price for a line another reply already priced → conflict card; the earlier cell stays until the buyer decides.
+  for (let i = cells.length - 1; i >= 0; i--) {
+    const c = cells[i], o = others.get(c.rfx_line_id);
+    if (!o) continue;
+    cells.splice(i, 1);
+    const mine = (c.unit_price_inr_per_1000 ?? c.best_guess_value ?? null) as number | null;
+    const theirs = o.unit_price_inr_per_1000 ?? o.best_guess_value;
+    reviews.push({ type: "conflict", rfx_line_id: c.rfx_line_id, line_quote_id: o.id, extracted_item_id: c.extracted_item_id as string, proposed_value: mine,
+      title: `Line ${lineById.get(c.rfx_line_id)!.line_no}: two prices from this vendor`,
+      detail: `Earlier reply: ${theirs != null ? `${money(Number(theirs))} per 1000` : o.state.replaceAll("_", " ")}. This reply: ${mine != null ? `${money(mine)} per 1000` : c.state.replaceAll("_", " ")}. Confirm uses this reply's price.` });
+  }
+
   // Lines with no item: references_prior when the vendor pointed at earlier pricing (TRD §11.6), else not_quoted.
   const covered = new Set(cells.map((c) => c.rfx_line_id));
   for (const line of lines) {
-    if (covered.has(line.id) || buyerOwned.has(line.id)) continue;
+    if (covered.has(line.id) || buyerOwned.has(line.id) || others.has(line.id)) continue;
     cells.push({
       id: cellId(line.id), rfx_id: resp.rfx_id, rfx_line_id: line.id, vendor_id: vendorId, response_id: resp.id, extracted_item_id: null,
       state: refPrior ? "references_prior" : "not_quoted", best_guess_note: refPrior ? terms.references_prior_pricing_text : null,
     });
   }
 
-  // Vendor-level ledger entries and informational review items (TRD §8.4, §11.4, §11.7).
-  if (terms.total_discount_pct && !grossUpPct) {
+  // Vendor-level ledger entries and informational review items (TRD §8.4, §11.4, §11.7) — only when this reply priced something
+  // (a stray file for a known vendor must not raise freight/discount cards or ledger rows).
+  const wrote = cells.some((c) => c.extracted_item_id);
+  if (wrote && terms.total_discount_pct && !grossUpPct) {
     vendorAssumption("discount", { kind: "discount_treatment", basis: "settings_default", value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: discountDefault },
       description: `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
   }
-  if (terms.total_discount_pct) {
+  if (wrote && terms.total_discount_pct) {
     reviews.push({ type: "discount_treatment", title: grossUpPct ? `Printed rates are net of a ${grossUpPct}% discount we won't earn` : `${terms.total_discount_pct}% discount on total${terms.total_discount_condition ? ` ${terms.total_discount_condition}` : ""}`,
       detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
       proposed_value: terms.total_discount_pct, evidence: { terms: true } });
@@ -229,7 +248,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     reviews.push({ type: "prior_pricing", title: `${span}: “${phrase.slice(0, 60)}” — prior pricing not on file`,
       detail: `${nos.length} lines cannot be priced without a number from the vendor.`, probability: td.p.references_prior_pricing, proposed_value: nos.length, evidence: { terms: true, lines: nos } });
   }
-  if (!freightIncluded) {
+  if (wrote && !freightIncluded) {
     vendorAssumption("freight", { kind: "freight_treatment", basis: rvQ.data?.freight_assumption_inr_per_1000 ? "buyer_entered" : "settings_default", value: { inr_per_1000: freightPer1000 },
       description: `Freight not included ("${terms.freight_terms_raw ?? "not stated"}"); landed price adds ₹${freightPer1000} per 1000 pcs.` });
     reviews.push({ type: "freight_treatment", title: `${(terms.freight_terms_raw ?? "Freight not stated").slice(0, 70)} — freight excluded`, detail: `"${terms.freight_terms_raw ?? "not stated"}" → landed price adds ₹${freightPer1000} per 1000.`, proposed_value: freightPer1000, probability: td.p.freight_excluded, evidence: { terms: true } });
@@ -251,7 +270,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     if (error) throw error;
   }
   if (assumptions.length) {
-    const { error } = await db().from("assumptions").insert(assumptions.map((a) => ({ ...a, rfx_id: resp.rfx_id, vendor_id: vendorId, made_by: "system" })));
+    const { error } = await db().from("assumptions").insert(assumptions.map((a) => ({ ...a, value: { ...(a.value as object), response_id: resp.id }, rfx_id: resp.rfx_id, vendor_id: vendorId, made_by: "system" })));
     if (error) throw error;
   }
   const nReviews = await insertReviews(resp, "normalise", reviews);

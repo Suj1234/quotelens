@@ -63,8 +63,8 @@ export async function getComparison(rfxId: string): Promise<Grid> {
     db().from("rfx").select("validity_days_requested").eq("id", rfxId).single(),
     db().from("rfx_lines").select("id, line_no, sku, description, annual_qty, delivery_location").eq("rfx_id", rfxId).order("line_no"),
     db().from("v_vendor_status").select("*").eq("rfx_id", rfxId),
-    db().from("line_quotes").select("rfx_line_id, vendor_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value, best_guess_note, original_value, original_unit, original_currency, conversion_chain, extracted_items(location)").eq("rfx_id", rfxId),
-    db().from("responses").select("vendor_id, received_at, response_terms(currency, validity_days, validity_until)").eq("rfx_id", rfxId).order("received_at", { ascending: false }),
+    db().from("line_quotes").select("rfx_line_id, vendor_id, response_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value, best_guess_note, original_value, original_unit, original_currency, conversion_chain, extracted_items(location)").eq("rfx_id", rfxId),
+    db().from("responses").select("id, vendor_id, received_at, response_terms(currency, validity_days, validity_until, freight_included)").eq("rfx_id", rfxId).order("received_at", { ascending: false }),
     db().from("questionnaire_answers").select("vendor_id, state, passes, answer_raw, rfx_questions(q_no, disqualify_if, mandatory)").eq("rfx_id", rfxId),
   ]);
   for (const q of [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ]) if (q.error) throw q.error;
@@ -96,7 +96,11 @@ export async function getComparison(rfxId: string): Promise<Grid> {
   const qa = (qaQ.data ?? []) as unknown as { vendor_id: string; state: string; passes: boolean | null; answer_raw: string | null; rfx_questions: { q_no: number; disqualify_if: string | null; mandatory: boolean } }[];
   const vendors: GridVendor[] = statuses.map((s) => {
     const mine = cells.filter((c) => c.vendor === s.vendor_code && COUNTED.includes(c.state));
-    const terms = (respQ.data ?? []).find((r) => r.vendor_id === s.vendor_id)?.response_terms as unknown as { currency: string | null; validity_days: number | null; validity_until: string | null }[] | undefined;
+    // Header terms come from the reply that supplied most of this vendor's cells, not simply the latest reply (a stray file mustn't relabel the vendor).
+    const owners = (cellsQ.data ?? []).filter((c) => c.vendor_id === s.vendor_id && c.response_id).map((c) => c.response_id as string);
+    const main = owners.sort((a, b) => owners.filter((x) => x === b).length - owners.filter((x) => x === a).length)[0];
+    const resp = (respQ.data ?? []).find((r) => r.id === main) ?? (respQ.data ?? []).find((r) => r.vendor_id === s.vendor_id);
+    const terms = resp?.response_terms as unknown as { currency: string | null; validity_days: number | null; validity_until: string | null; freight_included: boolean | null }[] | undefined;
     const t = terms?.[0];
     const answers = qa.filter((a) => a.vendor_id === s.vendor_id && a.rfx_questions.disqualify_if);
     const failing = answers.filter((a) => a.passes === false).map((a) => `Q${a.rfx_questions.q_no}: ${a.answer_raw ?? "no"}`);
@@ -106,7 +110,7 @@ export async function getComparison(rfxId: string): Promise<Grid> {
     return {
       id: s.vendor_id, code: s.vendor_code, name: s.vendor, cleared: s.cleared_questionnaire,
       cleared_note: s.cleared_questionnaire === true ? "Cleared the questionnaire" : [...failing, ...missing, ...pending].join(" · ") || "Questionnaire not read yet",
-      priced: mine.length, lines: s.lines_total, freight_included: s.freight_included, currency: t?.currency ?? null,
+      priced: mine.length, lines: s.lines_total, freight_included: t?.freight_included ?? s.freight_included, currency: t?.currency ?? null,
       validity_days: t?.validity_days ?? null, validity_short: !!t?.validity_days && t.validity_days < requested,
       total_unit: mine.reduce((a, c) => a + annual(c, c.unit), 0), total_landed: mine.reduce((a, c) => a + annual(c, c.landed), 0),
     };

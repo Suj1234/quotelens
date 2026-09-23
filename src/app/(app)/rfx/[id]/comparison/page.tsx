@@ -4,6 +4,8 @@ import { getDocuments, getLedger, getQuestionnaireGrid, getTimeline } from "@/li
 import { ComparisonView } from "@/components/compare/comparison-view";
 import { CMP_TABS, CmpTabs, DocumentsTab, QuestionnaireTab, TimelineTab, type CmpTab } from "@/components/compare/tabs";
 import { LedgerTab } from "@/components/compare/ledger-tab";
+import { UnmatchedPanel } from "@/components/compare/unmatched-panel";
+import { getUnmatched } from "@/lib/unmatched";
 
 // DESIGN §3.7 / TRD §17.9
 export default async function ComparisonPage({ params, searchParams }: PageProps<"/rfx/[id]/comparison">) {
@@ -24,8 +26,11 @@ export default async function ComparisonPage({ params, searchParams }: PageProps
 }
 
 async function Prices({ id, canReview }: { id: string; canReview: boolean }) {
-  const grid = await getComparison(id);
-  return grid.cells.length
-    ? <ComparisonView rfxId={id} grid={grid} canReview={canReview} />
-    : <div className="empty" style={{ marginTop: 24 }}><b>No prices yet.</b> Load or add responses and run the stages; cells appear here as each vendor is normalised.</div>;
+  const [grid, unmatched] = await Promise.all([getComparison(id), getUnmatched(id)]);
+  return <>
+    {grid.cells.length
+      ? <ComparisonView rfxId={id} grid={grid} canReview={canReview} />
+      : <div className="empty" style={{ marginTop: 24 }}><b>No prices yet.</b> Load or add responses and run the stages; cells appear here as each vendor is normalised.</div>}
+    <UnmatchedPanel items={unmatched} lines={grid.lines} canAct={canReview} />
+  </>;
 }

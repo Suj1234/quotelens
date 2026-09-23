@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { getResponse } from "@/lib/responses";
+import { insertReviews } from "./reviews";
 import { STAGES, type ResponseRow, type Stage } from "@/types/db";
 import { classify } from "./classify";
 import { extract } from "./extract";
@@ -13,6 +14,7 @@ import { flags } from "./flags";
 
 type StageFn = (resp: ResponseRow) => Promise<Record<string, unknown>>;
 // All six TRD §8 stages.
+const NEEDS_VENDOR: Stage[] = ["normalise", "questionnaire", "flags"];
 const IMPL: Partial<Record<Stage, StageFn>> = { classify, extract, map, normalise, questionnaire, flags };
 
 export type StageEvent = { stage: Stage; status: "done" | "error" | "skipped"; ms: number; summary?: unknown; error?: string };
@@ -24,6 +26,11 @@ export async function runStage(responseId: string, stage: Stage, actor = "system
   if (!fn) return { stage, status: "skipped", ms: 0, error: "not built yet" };
 
   const resp = await getResponse(responseId);
+  // Pricing, questionnaire and flags need a vendor: an unknown sender waits (stage stays pending) with one review card.
+  if (!resp.vendor_id && NEEDS_VENDOR.includes(stage)) {
+    await insertReviews(resp, "intake", [{ type: "unknown_vendor", title: "Reply from an unknown sender — assign a vendor", detail: "Pricing waits until the reply belongs to a vendor. Assign it on the Responses tab." }]);
+    return { stage, status: "skipped", ms: 0, error: "waiting for a vendor" };
+  }
   await setStatus(resp, stage, "running");
   const t0 = Date.now();
   console.log(`[stage:${stage}] start ${responseId}`);

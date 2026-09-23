@@ -56,7 +56,8 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
   if (on.freight_excluded) reviews.push({ type: "freight_treatment", title: "Freight not included", detail: terms?.freight_terms_raw, probability: td?.p.freight_excluded, evidence: { terms: true } });
   if (on.references_prior_pricing) reviews.push({ type: "prior_pricing", title: "Refers to earlier pricing", detail: terms?.references_prior_pricing_text, probability: td?.p.references_prior_pricing, evidence: { terms: true } });
   if (on.total_discount_present) reviews.push({ type: "discount_treatment", title: "Discount offered", detail: terms?.total_discount_condition, evidence: { terms: true } });
-  await insertReviews(resp, "flags", reviews);
+  // A reply that priced nothing (stray file) raises no vendor-level cards.
+  if (((resp.summary.map as { mapped?: number } | undefined)?.mapped ?? 0) > 0) await insertReviews(resp, "flags", reviews);
 
   // Status: vendor responded; RFx issued → receiving → reviewing once no invited vendor is still waiting (TRD §8.6).
   const rv = await db().from("rfx_vendors").update({ status: "responded" }).eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id).eq("status", "invited");

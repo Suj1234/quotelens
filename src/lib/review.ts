@@ -43,7 +43,7 @@ export function actionsFor(r: Pick<Row, "type" | "proposed_value" | "line_quote_
     case "questionnaire_ambiguous": return ["accept-yes", "treat-no", "ask-vendor"];
     case "questionnaire_missing": return ["ask-vendor", "dismiss"];
     case "unmapped_item": return ["map", "ignore"];
-    case "conflict": return ["override", "exclude", "dismiss"];
+    case "conflict": return [...(r.proposed_value !== null ? ["confirm" as const] : []), "override", "dismiss"];
     case "unknown_vendor": case "not_a_quote": return ["dismiss"];
     default: return ["confirm"]; // informational: acknowledge
   }
@@ -149,7 +149,7 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
 
   switch (action) {
     case "confirm": {
-      if (["ambiguous_unit", "low_confidence_read"].includes(r.type) && r.proposed_state !== "mapped") {
+      if (["ambiguous_unit", "low_confidence_read", "conflict"].includes(r.type) && r.proposed_state !== "mapped") {
         const c = await cell();
         const value = Number(r.proposed_value ?? c.best_guess_value);
         if (!Number.isFinite(value)) throw new AppError("NO_VALUE", "Nothing to confirm: enter a value with Override.", undefined, 400);
