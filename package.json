@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:migrate": "echo \"Apply supabase/migrations/*.sql in order via the Supabase SQL editor (see DECISIONS.md)\"",
-    "seed": "tsx --conditions=react-server scripts/seed.ts",
-    "pipeline:seed": "tsx --conditions=react-server scripts/run-seed-pipeline.ts",
-    "eval": "tsx --conditions=react-server scripts/run-eval.ts --rfx MER-0419"
+    "db:migrate": "echo \"Paste supabase/migrations/0001..0003 in order into the Supabase SQL editor (DECISIONS.md)\"",
+    "seed": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed.ts",
+    "pipeline:seed": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/run-seed-pipeline.ts",
+    "eval": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/run-eval.ts --rfx MER-0419",
+    "db:check": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/db-check.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
@@ -47,7 +48,6 @@
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "dotenv": "^18.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
