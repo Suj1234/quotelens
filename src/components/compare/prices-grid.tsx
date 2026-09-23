@@ -14,8 +14,9 @@ const LEGEND: [CellState, string][] = [
 const inr = (v: number) => Math.round(v).toLocaleString("en-IN");
 
 /** DESIGN §2.6–2.8: sticky grid, vendor headers, state-rendered cells, lowest-eligible edge, legend. */
-export function PricesGrid({ grid, onOpen, selected }: { rfxId: string; grid: Grid; onOpen?: (line: number, vendor: string) => void; selected?: string | null }) {
-  const [view, setView] = useState<View>("unit");
+export function PricesGrid({ grid, onOpen, selected, onBasis }: { rfxId: string; grid: Grid; onOpen?: (line: number, vendor: string) => void; selected?: string | null; onBasis?: (b: "unit" | "landed") => void }) {
+  const [view, setViewState] = useState<View>("unit");
+  const setView = (v: View) => { setViewState(v); onBasis?.(v === "landed" ? "landed" : "unit"); };
   const [inclDq, setInclDq] = useState(false);
   const cellAt = useMemo(() => new Map(grid.cells.map((c) => [`${c.line_no}:${c.vendor}`, c])), [grid.cells]);
   const vendors = grid.vendors.filter((v) => inclDq || v.cleared !== false);
