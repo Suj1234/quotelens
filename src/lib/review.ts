@@ -233,7 +233,7 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
 
   const { error: ue } = await db().from("review_items").update({ status, resolution, updated_at: at }).eq("id", r.id);
   if (ue) throw ue;
-  await audit({ rfx_id: r.rfx_id, actor: user.id, event: `review.${action}`, entity_type: "review_item", entity_id: r.id, payload: { type: r.type, status, ...body } });
+  await audit({ rfx_id: r.rfx_id, actor: user.id, event: `review.${action}`, entity_type: "review_item", entity_id: r.id, payload: { type: r.type, status, ...pick(action, body) } });
   return { status, draft };
 }
 
@@ -258,5 +258,8 @@ async function clarificationDraft(r: Row & { rfx_id: string }) {
     body: `Dear ${v?.contact_name ?? v?.name ?? "Sir/Madam"},\n\nThank you for your quotation for ${rfx?.title}. Before we can compare it, please clarify:\n\n${points.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n\nA short reply to this email is enough.\n\nRegards,\nSujit Menon\nCategory Buyer — Packaging, Meridian Foods`,
   };
 }
+
+/** Only the fields an action uses go into the audit trail. */
+const pick = (a: Action, b: ActBody) => a === "override" ? { value: b.value, reason: b.reason } : a === "exclude" ? { reason: b.reason } : a === "map" ? { line_id: b.line_id } : a === "ask-vendor" ? { mode: b.mode } : {};
 
 export const isInformational = (type: string) => INFORMATIONAL.includes(type);
