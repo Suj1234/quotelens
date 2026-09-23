@@ -38,7 +38,10 @@ export default async function SignInPage() {
         </div>
       </div>
       <div className={s.form}>
-        <SignInForm />
+        <div>
+          <div className={`brand ${s.mbrand}`} style={{ fontSize: 15 }}><span className="brand-mark" />QuoteLens</div>
+          <SignInForm />
+        </div>
         <p className="hint">Private to Meridian Foods. Vendors never sign in here.</p>
       </div>
     </div>

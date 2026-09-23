@@ -36,7 +36,7 @@ export function SignInForm() {
   return (
     <form className={s.fwrap} onSubmit={submit}>
       <h2 style={{ fontSize: 20 }}>Sign in</h2>
-      <p className="text-xs text-muted-foreground" style={{ marginTop: 4, fontSize: 12 }}>Use your Meridian Foods work email.</p>
+      <p className="text-muted-foreground" style={{ marginTop: 4, fontSize: 12 }}>Use your Meridian Foods work email.</p>
       <div style={{ marginTop: 22 }}>
         <label htmlFor="em">Work email</label>
         <Input id="em" type="email" placeholder="you@meridianfoods.in" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />

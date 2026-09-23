@@ -17,7 +17,7 @@
 .rail a:hover .tip { opacity: 1; }
 .grow { flex: 1; }
 .main { flex: 1; min-width: 0; overflow: auto; display: flex; flex-direction: column; }
-@media (max-width: 900px) { .rail { display: none; } .org { display: none; } }
+@media (max-width: 900px) { .rail { display: none; } .org, .kbdhint { display: none; } }
 /* Theme icon: sun in dark mode, moon in light */
 .sun { display: none; }
 :global(:root[data-theme="dark"]) .sun { display: block; }

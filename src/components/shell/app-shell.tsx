@@ -13,7 +13,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
         <div className="brand"><span className="brand-mark" />QuoteLens</div>
         <span className={s.org}>Meridian Foods Pvt Ltd</span>
         <div className={s.spacer} />
-        <span className="hint"><span className="kbd">⌘K</span></span>
+        <span className={`hint ${s.kbdhint}`}><span className="kbd">⌘K</span></span>
         <ThemeToggle className={s.iconbtn} />
         <div className={s.user}>
           <span className="avatar">{initials}</span>

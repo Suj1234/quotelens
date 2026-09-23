@@ -103,12 +103,16 @@
   .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 6px; }
   .card > .hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--hair2); }
   .card > .bd { padding: 14px; }
-  table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  /* line-height normal matches the prototype, which renders tables in quirks mode (no doctype) */
+  table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: normal; }
   table.t th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: .03em; padding: 8px 10px; border-bottom: 1px solid var(--hair); white-space: nowrap; }
   table.t td { padding: 8px 10px; border-bottom: 1px solid var(--hair2); vertical-align: top; }
   table.t tbody tr:last-child td { border-bottom: 0; }
   table.t tbody tr:hover td { background: var(--tint); }
   table.t td.num, table.t th.num { text-align: right; }
+  /* Headers are always Plex Sans (DESIGN.md §1.3); codes and numbers never break mid-token */
+  table.t th { font-family: var(--font-sans); }
+  table.t td.mono, table.t td.num { white-space: nowrap; }
   .status { display: inline-flex; align-items: center; gap: 6px; }
   .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
   .status.issued::before, .status.receiving::before { background: var(--indigo); }
@@ -120,6 +124,8 @@
 
 @media (max-width: 900px) {
   .page { padding-left: 16px; padding-right: 16px; }
+  /* DESIGN.md §6: tables scroll horizontally inside their box instead of squashing */
+  table.t { min-width: 680px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
