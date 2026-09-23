@@ -1,0 +1,2248 @@
+{
+ "fx": {
+  "USD": {
+   "rate": 83.15,
+   "date": "2026-09-23"
+  }
+ },
+ "tolerance_pct": 1.0,
+ "cells": [
+  {
+   "line_no": 1,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 70610,
+   "original": {
+    "value": 70610,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 1,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 67507.69,
+   "alt_expected_unit_price_inr_per_1000": 65820,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 65820,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 1,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 68360.0,
+   "original": {
+    "value": 1709.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 1,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 69675.54,
+   "original": {
+    "value": 837.95,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 1,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 55360.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 1318.1 g/pc = \u20b955360 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 2,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 55550,
+   "original": {
+    "value": 55550,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 2,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 55384.62,
+   "alt_expected_unit_price_inr_per_1000": 54000,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 54000,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 2,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 56760.0,
+   "original": {
+    "value": 1419.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 2,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 57475.77,
+   "original": {
+    "value": 691.23,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 2,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 43936.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 1046.1 g/pc = \u20b943936 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 3,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 38240,
+   "original": {
+    "value": 38240,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 3,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 36892.31,
+   "alt_expected_unit_price_inr_per_1000": 35970,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 35970,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 3,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 38680.0,
+   "original": {
+    "value": 967.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 3,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 39927.8,
+   "original": {
+    "value": 480.19,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 3,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 30412.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 724.1 g/pc = \u20b930412 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 4,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 31390,
+   "original": {
+    "value": 31390,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 4,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 33364.1,
+   "alt_expected_unit_price_inr_per_1000": 32530,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 32530,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 4,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 34280.0,
+   "original": {
+    "value": 857.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 4,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 33356.45,
+   "original": {
+    "value": 401.16,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 4,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 26191.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 623.6 g/pc = \u20b926191 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 5,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 27760,
+   "original": {
+    "value": 27760,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 5,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 27241.03,
+   "alt_expected_unit_price_inr_per_1000": 26560,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 26560,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 5,
+   "vendor_code": "westline",
+   "expected_state": "ambiguous",
+   "expected_unit_price_inr_per_1000": null,
+   "best_guess": 27960.0,
+   "original": {
+    "value": 699.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": null
+   },
+   "after_clarification": {
+    "bundle_size": 25,
+    "expected_state": "reviewed",
+    "expected_unit_price_inr_per_1000": 27960.0
+   },
+   "note": "bundle size NOT stated for this item; best guess 25/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 25. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification"
+  },
+  {
+   "line_no": 5,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 29262.98,
+   "original": {
+    "value": 351.93,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 5,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 22600.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 538.1 g/pc = \u20b922600 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 6,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 106280,
+   "original": {
+    "value": 106280,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 6,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 106953.85,
+   "alt_expected_unit_price_inr_per_1000": 104280,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 104280,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 6,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 106480.0,
+   "original": {
+    "value": 2662.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 6,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 106909.28,
+   "original": {
+    "value": 1285.74,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 6,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 84869.4,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 2020.7 g/pc = \u20b984869 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 7,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 41810,
+   "original": {
+    "value": 41810,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 7,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 41548.72,
+   "alt_expected_unit_price_inr_per_1000": 40510,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 40510,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 7,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 43960.0,
+   "original": {
+    "value": 1099.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 7,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 44526.83,
+   "original": {
+    "value": 535.5,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 7,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 34872.6,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 830.3 g/pc = \u20b934873 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 8,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 22320,
+   "original": {
+    "value": 22320,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 8,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 23507.69,
+   "alt_expected_unit_price_inr_per_1000": 22920,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 22920,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 8,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 23640.0,
+   "original": {
+    "value": 591.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 8,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 24338.84,
+   "original": {
+    "value": 292.71,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 8,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 18677.4,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 444.7 g/pc = \u20b918677 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 9,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 54260,
+   "original": {
+    "value": 54260,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 9,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 55025.64,
+   "alt_expected_unit_price_inr_per_1000": 53650,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 53650,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 9,
+   "vendor_code": "westline",
+   "expected_state": "ambiguous",
+   "expected_unit_price_inr_per_1000": null,
+   "best_guess": 54960.0,
+   "original": {
+    "value": 1374.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": null
+   },
+   "after_clarification": {
+    "bundle_size": 20,
+    "expected_state": "reviewed",
+    "expected_unit_price_inr_per_1000": 68700.0
+   },
+   "note": "bundle size NOT stated for this item; best guess 25/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 20. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification"
+  },
+  {
+   "line_no": 9,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 57717.74,
+   "original": {
+    "value": 694.14,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 9,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 43936.2,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 1046.1 g/pc = \u20b943936 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 10,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 36660,
+   "original": {
+    "value": 36660,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 10,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 35815.38,
+   "alt_expected_unit_price_inr_per_1000": 34920,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 34920,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 10,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 36200.0,
+   "original": {
+    "value": 905.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 10,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 38510.92,
+   "original": {
+    "value": 463.15,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 10,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 29059.8,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 691.9 g/pc = \u20b929060 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 11,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 84080,
+   "original": {
+    "value": 84080,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 11,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 84779.49,
+   "alt_expected_unit_price_inr_per_1000": 82660,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 82660,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 11,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 87240.0,
+   "original": {
+    "value": 2181.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 11,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 88388.45,
+   "original": {
+    "value": 1063.0,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 11,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 69980.4,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 1666.2 g/pc = \u20b969980 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 12,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 17220,
+   "original": {
+    "value": 17220,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 12,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 16779.49,
+   "alt_expected_unit_price_inr_per_1000": 16360,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 16360,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 12,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 18080.0,
+   "original": {
+    "value": 452.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 25
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 12,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 17945.43,
+   "original": {
+    "value": 215.82,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 12,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 14082.6,
+   "original": {
+    "value": 42,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b942/kg \u00d7 335.3 g/pc = \u20b914083 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 13,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 9440,
+   "original": {
+    "value": 9440,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 13,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 9641.03,
+   "alt_expected_unit_price_inr_per_1000": 9400,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 9400,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 13,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 9780.0,
+   "original": {
+    "value": 489.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 13,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 10180.89,
+   "original": {
+    "value": 122.44,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 13,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 7144.0,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 188.0 g/pc = \u20b97144 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 14,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 7140,
+   "original": {
+    "value": 7140,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 14,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 7415.38,
+   "alt_expected_unit_price_inr_per_1000": 7230,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 7230,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 14,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 7540.0,
+   "original": {
+    "value": 377.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 14,
+   "vendor_code": "orientpack",
+   "expected_state": "low_confidence",
+   "expected_unit_price_inr_per_1000": null,
+   "best_guess": 7510.11,
+   "original": {
+    "value": 90.32,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "row obscured in photo; any read with raw_confidence<0.6 is correct behaviour; if photo is legible and value read correctly \u2192 'inferred' also accepted"
+  },
+  {
+   "line_no": 14,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 5377.0,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 141.5 g/pc = \u20b95377 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 15,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 13850,
+   "original": {
+    "value": 13850,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 15,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 13733.33,
+   "alt_expected_unit_price_inr_per_1000": 13390,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 13390,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 15,
+   "vendor_code": "westline",
+   "expected_state": "ambiguous",
+   "expected_unit_price_inr_per_1000": null,
+   "best_guess": 14080.0,
+   "original": {
+    "value": 704.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": null
+   },
+   "after_clarification": {
+    "bundle_size": 50,
+    "expected_state": "reviewed",
+    "expected_unit_price_inr_per_1000": 14080.0
+   },
+   "note": "bundle size NOT stated for this item; best guess 50/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 50. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification"
+  },
+  {
+   "line_no": 15,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 14569.54,
+   "original": {
+    "value": 175.22,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 15,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 10298.0,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 271.0 g/pc = \u20b910298 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 16,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 4120,
+   "original": {
+    "value": 4120,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 16,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 4102.56,
+   "alt_expected_unit_price_inr_per_1000": 4000,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 4000,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 16,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 4200.0,
+   "original": {
+    "value": 210.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 16,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 4276.4,
+   "original": {
+    "value": 51.43,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 16,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 3047.6,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 80.2 g/pc = \u20b93048 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 17,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 3190,
+   "original": {
+    "value": 3190,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 17,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 3169.23,
+   "alt_expected_unit_price_inr_per_1000": 3090,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 3090,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 17,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 3140.0,
+   "original": {
+    "value": 157.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 17,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 3167.18,
+   "original": {
+    "value": 38.09,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 17,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 2264.8,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 59.6 g/pc = \u20b92265 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 18,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 18780,
+   "original": {
+    "value": 18780,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 18,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 19364.1,
+   "alt_expected_unit_price_inr_per_1000": 18880,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 18880,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 18,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 19320.0,
+   "original": {
+    "value": 966.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 18,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 20273.63,
+   "original": {
+    "value": 243.82,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 18,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 13756.0,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 362.0 g/pc = \u20b913756 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 19,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 10970,
+   "original": {
+    "value": 10970,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 19,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 11435.9,
+   "alt_expected_unit_price_inr_per_1000": 11150,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 11150,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 19,
+   "vendor_code": "westline",
+   "expected_state": "ambiguous",
+   "expected_unit_price_inr_per_1000": null,
+   "best_guess": 11580.0,
+   "original": {
+    "value": 579.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": null
+   },
+   "after_clarification": {
+    "bundle_size": 40,
+    "expected_state": "reviewed",
+    "expected_unit_price_inr_per_1000": 14475.0
+   },
+   "note": "bundle size NOT stated for this item; best guess 50/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 40. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification"
+  },
+  {
+   "line_no": 19,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 11506.3,
+   "original": {
+    "value": 138.38,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 19,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 8295.4,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 218.3 g/pc = \u20b98295 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 20,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 14050,
+   "original": {
+    "value": 14050,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 20,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 14276.92,
+   "alt_expected_unit_price_inr_per_1000": 13920,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 13920,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 20,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 14820.0,
+   "original": {
+    "value": 741.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 20,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 14531.29,
+   "original": {
+    "value": 174.76,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 20,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 10210.6,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 268.7 g/pc = \u20b910211 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 21,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 4900,
+   "original": {
+    "value": 4900,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 21,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 4892.31,
+   "alt_expected_unit_price_inr_per_1000": 4770,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 4770,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 21,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 4940.0,
+   "original": {
+    "value": 247.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 21,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 5164.45,
+   "original": {
+    "value": 62.11,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 21,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 3526.4,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 92.8 g/pc = \u20b93526 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 22,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 8910,
+   "original": {
+    "value": 8910,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 22,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 8994.87,
+   "alt_expected_unit_price_inr_per_1000": 8770,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 8770,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 22,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 9440.0,
+   "original": {
+    "value": 472.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 50
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 22,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 9913.97,
+   "original": {
+    "value": 119.23,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 22,
+   "vendor_code": "anand",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 6691.8,
+   "original": {
+    "value": 38,
+    "unit": "per_kg",
+    "currency": "INR"
+   },
+   "note": "\u20b938/kg \u00d7 176.1 g/pc = \u20b96692 per 1000; weight from RFx spec (rfx_spec basis)"
+  },
+  {
+   "line_no": 23,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 38610,
+   "original": {
+    "value": 38610,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 23,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 37312.82,
+   "alt_expected_unit_price_inr_per_1000": 36380,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 36380,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 23,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 40490.0,
+   "original": {
+    "value": 4049.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 100
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 23,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 41662.31,
+   "original": {
+    "value": 501.05,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 23,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 24,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 26770,
+   "original": {
+    "value": 26770,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 24,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 27097.44,
+   "alt_expected_unit_price_inr_per_1000": 26420,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 26420,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 24,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 27710.0,
+   "original": {
+    "value": 2771.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 100
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 24,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 27696.43,
+   "original": {
+    "value": 333.09,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 24,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 25,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 23840,
+   "original": {
+    "value": 23840,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 25,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 23035.9,
+   "alt_expected_unit_price_inr_per_1000": 22460,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 22460,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 25,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 24180.0,
+   "original": {
+    "value": 2418.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 100
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 25,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 25364.08,
+   "original": {
+    "value": 305.04,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 25,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 26,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 16700,
+   "original": {
+    "value": 16700,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 26,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 17600.0,
+   "alt_expected_unit_price_inr_per_1000": 17160,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 17160,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 26,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 18080.0,
+   "original": {
+    "value": 1808.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 100
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 26,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 18240.62,
+   "original": {
+    "value": 219.37,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 26,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 27,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 9460,
+   "original": {
+    "value": 9460,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 27,
+   "vendor_code": "kohinoor",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 9394.87,
+   "alt_expected_unit_price_inr_per_1000": 9160,
+   "alt_expected_state": "confirmed",
+   "original": {
+    "value": 9160,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 \u2192 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists"
+  },
+  {
+   "line_no": 27,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 9840.0,
+   "original": {
+    "value": 984.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 100
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 27,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 9780.93,
+   "original": {
+    "value": 117.63,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 27,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 28,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 15870,
+   "original": {
+    "value": 15870,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 28,
+   "vendor_code": "kohinoor",
+   "expected_state": "not_quoted",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "stated 'not in our range'"
+  },
+  {
+   "line_no": 28,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 15800.0,
+   "original": {
+    "value": 316.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 20
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 28,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 16507.77,
+   "original": {
+    "value": 198.53,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 28,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 29,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 6880,
+   "original": {
+    "value": 6880,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 29,
+   "vendor_code": "kohinoor",
+   "expected_state": "not_quoted",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "stated 'not in our range'"
+  },
+  {
+   "line_no": 29,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 6850.0,
+   "original": {
+    "value": 137.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 20
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 29,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 6903.94,
+   "original": {
+    "value": 83.03,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 29,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  },
+  {
+   "line_no": 30,
+   "vendor_code": "balaji",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 15790,
+   "original": {
+    "value": 15790,
+    "unit": "per_1000_pcs",
+    "currency": "INR"
+   },
+   "note": "quoted per 1000 nos; 3% total discount NOT applied (ledger)"
+  },
+  {
+   "line_no": 30,
+   "vendor_code": "kohinoor",
+   "expected_state": "not_quoted",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "stated 'not in our range'"
+  },
+  {
+   "line_no": 30,
+   "vendor_code": "westline",
+   "expected_state": "confirmed",
+   "expected_unit_price_inr_per_1000": 16300.0,
+   "original": {
+    "value": 326.0,
+    "unit": "per_bundle",
+    "currency": "INR",
+    "pack_size": 20
+   },
+   "note": "bundle size stated in the same paragraph/table \u2192 vendor_stated basis"
+  },
+  {
+   "line_no": 30,
+   "vendor_code": "orientpack",
+   "expected_state": "inferred",
+   "expected_unit_price_inr_per_1000": 16941.81,
+   "original": {
+    "value": 203.75,
+    "unit": "per_1000_pcs",
+    "currency": "USD"
+   },
+   "note": "USD\u00d783.15; FX assumption in ledger; FOB \u2192 freight excluded"
+  },
+  {
+   "line_no": 30,
+   "vendor_code": "anand",
+   "expected_state": "references_prior",
+   "expected_unit_price_inr_per_1000": null,
+   "note": "'rest same as last year' \u2014 prior pricing not on file"
+  }
+ ],
+ "questionnaire": [
+  {
+   "q_no": 1,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 2,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 3,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_number": 1100
+  },
+  {
+   "q_no": 4,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_number": 5
+  },
+  {
+   "q_no": 5,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_text_contains": "Britannia"
+  },
+  {
+   "q_no": 6,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 7,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_number": 5000
+  },
+  {
+   "q_no": 8,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_number": 7
+  },
+  {
+   "q_no": 9,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 10,
+   "vendor_code": "balaji",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 1,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 2,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 3,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_number": 850
+  },
+  {
+   "q_no": 4,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_number": 7
+  },
+  {
+   "q_no": 5,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_text_contains": "Marico"
+  },
+  {
+   "q_no": 6,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 7,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_number": 10000
+  },
+  {
+   "q_no": 8,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_number": 10
+  },
+  {
+   "q_no": 9,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 10,
+   "vendor_code": "kohinoor",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 1,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 2,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 3,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_number": 600
+  },
+  {
+   "q_no": 4,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_number": 10
+  },
+  {
+   "q_no": 5,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_text_contains": "Balaji Wafers"
+  },
+  {
+   "q_no": 6,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_bool": false
+  },
+  {
+   "q_no": 7,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_number": 8000
+  },
+  {
+   "q_no": 8,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_number": 12
+  },
+  {
+   "q_no": 9,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 10,
+   "vendor_code": "westline",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 1,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 2,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 3,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_number": 1400
+  },
+  {
+   "q_no": 4,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_number": 4
+  },
+  {
+   "q_no": 5,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_text_contains": "Nestle India"
+  },
+  {
+   "q_no": 6,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 7,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_number": 3000
+  },
+  {
+   "q_no": 8,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_number": 6
+  },
+  {
+   "q_no": 9,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 10,
+   "vendor_code": "orientpack",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 1,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 2,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 3,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_number": 250
+  },
+  {
+   "q_no": 4,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_number": 7
+  },
+  {
+   "q_no": 5,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_text_contains": "Local bakeries"
+  },
+  {
+   "q_no": 6,
+   "vendor_code": "anand",
+   "expected_state": "ambiguous",
+   "expected_bool": null
+  },
+  {
+   "q_no": 7,
+   "vendor_code": "anand",
+   "expected_state": "missing"
+  },
+  {
+   "q_no": 8,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_number": 10
+  },
+  {
+   "q_no": 9,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_bool": true
+  },
+  {
+   "q_no": 10,
+   "vendor_code": "anand",
+   "expected_state": "answered",
+   "expected_bool": true
+  }
+ ],
+ "vendor_terms": {
+  "balaji": {
+   "currency": "INR",
+   "validity_days": 60,
+   "freight_included": true,
+   "taxes_included": false,
+   "payment_days": 45,
+   "total_discount_pct": 3.0,
+   "total_discount_condition": "all 30 items awarded for full year",
+   "references_prior_pricing": false,
+   "cleared_questionnaire": true,
+   "lines_priced": 30
+  },
+  "kohinoor": {
+   "currency": "INR",
+   "validity_days": 30,
+   "freight_included": true,
+   "taxes_included": false,
+   "payment_days": 30,
+   "total_discount_pct": null,
+   "footnote_discount_pct": 2.5,
+   "footnote_condition": "payment within 10 days (rates printed net)",
+   "references_prior_pricing": false,
+   "cleared_questionnaire": true,
+   "lines_priced": 27,
+   "validity_short": true
+  },
+  "westline": {
+   "currency": "INR",
+   "validity_days": 60,
+   "freight_included": true,
+   "taxes_included": false,
+   "payment_days": 45,
+   "references_prior_pricing": false,
+   "cleared_questionnaire": false,
+   "disqualified_by": "Q6 BRC = No",
+   "lines_priced": 26,
+   "ambiguous_lines": [
+    5,
+    9,
+    15,
+    19
+   ]
+  },
+  "orientpack": {
+   "currency": "USD",
+   "validity_days": 60,
+   "freight_included": false,
+   "freight_terms": "FOB Chennai",
+   "taxes_included": false,
+   "payment_days": 45,
+   "references_prior_pricing": false,
+   "cleared_questionnaire": true,
+   "lines_priced": 29,
+   "low_confidence_lines": [
+    14
+   ]
+  },
+  "anand": {
+   "currency": "INR",
+   "validity_days": 60,
+   "freight_included": false,
+   "freight_terms": "freight extra at actuals",
+   "taxes_included": false,
+   "payment_days": 45,
+   "references_prior_pricing": true,
+   "references_prior_lines": [
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+   ],
+   "cleared_questionnaire": null,
+   "q6_ambiguous": true,
+   "q7_missing": true,
+   "lines_priced": 22
+  }
+ }
+}

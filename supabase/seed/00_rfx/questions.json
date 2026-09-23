@@ -1,0 +1,72 @@
+[
+ {
+  "q_no": 1,
+  "text": "Do you hold BIS or ISO 9001 certification for corrugated packaging manufacture?",
+  "answer_type": "yes_no",
+  "mandatory": true,
+  "disqualify_if": "no"
+ },
+ {
+  "q_no": 2,
+  "text": "Is corrugation done in-house (own corrugator), not outsourced?",
+  "answer_type": "yes_no",
+  "mandatory": true,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 3,
+  "text": "What is your monthly production capacity in tonnes?",
+  "answer_type": "number",
+  "mandatory": true,
+  "disqualify_if": "lt:200"
+ },
+ {
+  "q_no": 4,
+  "text": "What is your lead time for samples, in days?",
+  "answer_type": "number",
+  "mandatory": true,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 5,
+  "text": "Name FMCG or food clients you have supplied in the last 2 years.",
+  "answer_type": "text",
+  "mandatory": true,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 6,
+  "text": "Are you BRC/food-grade packaging compliant (or equivalent)?",
+  "answer_type": "yes_no",
+  "mandatory": true,
+  "disqualify_if": "no"
+ },
+ {
+  "q_no": 7,
+  "text": "What is your minimum order quantity per SKU per delivery, in pieces?",
+  "answer_type": "number",
+  "mandatory": false,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 8,
+  "text": "What is your lead time for regular orders, in days?",
+  "answer_type": "number",
+  "mandatory": true,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 9,
+  "text": "Can you supply both Hosur and Nelamangala plants?",
+  "answer_type": "yes_no",
+  "mandatory": true,
+  "disqualify_if": null
+ },
+ {
+  "q_no": 10,
+  "text": "Do you accept 45-day payment terms from invoice date?",
+  "answer_type": "yes_no",
+  "mandatory": true,
+  "disqualify_if": null
+ }
+]

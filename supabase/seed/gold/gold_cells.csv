@@ -1,0 +1,151 @@
+line_no,vendor,expected_state,expected_inr_per_1000,best_guess,orig_value,orig_unit,orig_currency,note
+1,balaji,confirmed,70610,,70610,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+1,kohinoor,inferred,67507.69,,65820,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+1,westline,confirmed,68360.0,,1709.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+1,orientpack,inferred,69675.54,,837.95,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+1,anand,inferred,55360.2,,42,per_kg,INR,₹42/kg × 1318.1 g/pc = ₹55360 per 1000; weight from RFx spec (rfx_spec basis)
+2,balaji,confirmed,55550,,55550,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+2,kohinoor,inferred,55384.62,,54000,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+2,westline,confirmed,56760.0,,1419.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+2,orientpack,inferred,57475.77,,691.23,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+2,anand,inferred,43936.2,,42,per_kg,INR,₹42/kg × 1046.1 g/pc = ₹43936 per 1000; weight from RFx spec (rfx_spec basis)
+3,balaji,confirmed,38240,,38240,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+3,kohinoor,inferred,36892.31,,35970,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+3,westline,confirmed,38680.0,,967.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+3,orientpack,inferred,39927.8,,480.19,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+3,anand,inferred,30412.2,,42,per_kg,INR,₹42/kg × 724.1 g/pc = ₹30412 per 1000; weight from RFx spec (rfx_spec basis)
+4,balaji,confirmed,31390,,31390,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+4,kohinoor,inferred,33364.1,,32530,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+4,westline,confirmed,34280.0,,857.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+4,orientpack,inferred,33356.45,,401.16,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+4,anand,inferred,26191.2,,42,per_kg,INR,₹42/kg × 623.6 g/pc = ₹26191 per 1000; weight from RFx spec (rfx_spec basis)
+5,balaji,confirmed,27760,,27760,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+5,kohinoor,inferred,27241.03,,26560,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+5,westline,ambiguous,,27960.0,699.0,per_bundle,INR,bundle size NOT stated for this item; best guess 25/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 25. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification
+5,orientpack,inferred,29262.98,,351.93,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+5,anand,inferred,22600.2,,42,per_kg,INR,₹42/kg × 538.1 g/pc = ₹22600 per 1000; weight from RFx spec (rfx_spec basis)
+6,balaji,confirmed,106280,,106280,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+6,kohinoor,inferred,106953.85,,104280,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+6,westline,confirmed,106480.0,,2662.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+6,orientpack,inferred,106909.28,,1285.74,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+6,anand,inferred,84869.4,,42,per_kg,INR,₹42/kg × 2020.7 g/pc = ₹84869 per 1000; weight from RFx spec (rfx_spec basis)
+7,balaji,confirmed,41810,,41810,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+7,kohinoor,inferred,41548.72,,40510,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+7,westline,confirmed,43960.0,,1099.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+7,orientpack,inferred,44526.83,,535.5,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+7,anand,inferred,34872.6,,42,per_kg,INR,₹42/kg × 830.3 g/pc = ₹34873 per 1000; weight from RFx spec (rfx_spec basis)
+8,balaji,confirmed,22320,,22320,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+8,kohinoor,inferred,23507.69,,22920,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+8,westline,confirmed,23640.0,,591.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+8,orientpack,inferred,24338.84,,292.71,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+8,anand,inferred,18677.4,,42,per_kg,INR,₹42/kg × 444.7 g/pc = ₹18677 per 1000; weight from RFx spec (rfx_spec basis)
+9,balaji,confirmed,54260,,54260,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+9,kohinoor,inferred,55025.64,,53650,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+9,westline,ambiguous,,54960.0,1374.0,per_bundle,INR,bundle size NOT stated for this item; best guess 25/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 20. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification
+9,orientpack,inferred,57717.74,,694.14,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+9,anand,inferred,43936.2,,42,per_kg,INR,₹42/kg × 1046.1 g/pc = ₹43936 per 1000; weight from RFx spec (rfx_spec basis)
+10,balaji,confirmed,36660,,36660,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+10,kohinoor,inferred,35815.38,,34920,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+10,westline,confirmed,36200.0,,905.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+10,orientpack,inferred,38510.92,,463.15,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+10,anand,inferred,29059.8,,42,per_kg,INR,₹42/kg × 691.9 g/pc = ₹29060 per 1000; weight from RFx spec (rfx_spec basis)
+11,balaji,confirmed,84080,,84080,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+11,kohinoor,inferred,84779.49,,82660,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+11,westline,confirmed,87240.0,,2181.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+11,orientpack,inferred,88388.45,,1063.0,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+11,anand,inferred,69980.4,,42,per_kg,INR,₹42/kg × 1666.2 g/pc = ₹69980 per 1000; weight from RFx spec (rfx_spec basis)
+12,balaji,confirmed,17220,,17220,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+12,kohinoor,inferred,16779.49,,16360,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+12,westline,confirmed,18080.0,,452.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+12,orientpack,inferred,17945.43,,215.82,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+12,anand,inferred,14082.6,,42,per_kg,INR,₹42/kg × 335.3 g/pc = ₹14083 per 1000; weight from RFx spec (rfx_spec basis)
+13,balaji,confirmed,9440,,9440,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+13,kohinoor,inferred,9641.03,,9400,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+13,westline,confirmed,9780.0,,489.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+13,orientpack,inferred,10180.89,,122.44,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+13,anand,inferred,7144.0,,38,per_kg,INR,₹38/kg × 188.0 g/pc = ₹7144 per 1000; weight from RFx spec (rfx_spec basis)
+14,balaji,confirmed,7140,,7140,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+14,kohinoor,inferred,7415.38,,7230,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+14,westline,confirmed,7540.0,,377.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+14,orientpack,low_confidence,,7510.11,90.32,per_1000_pcs,USD,row obscured in photo; any read with raw_confidence<0.6 is correct behaviour; if photo is legible and value read correctly → 'inferred' also accepted
+14,anand,inferred,5377.0,,38,per_kg,INR,₹38/kg × 141.5 g/pc = ₹5377 per 1000; weight from RFx spec (rfx_spec basis)
+15,balaji,confirmed,13850,,13850,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+15,kohinoor,inferred,13733.33,,13390,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+15,westline,ambiguous,,14080.0,704.0,per_bundle,INR,bundle size NOT stated for this item; best guess 50/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 50. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification
+15,orientpack,inferred,14569.54,,175.22,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+15,anand,inferred,10298.0,,38,per_kg,INR,₹38/kg × 271.0 g/pc = ₹10298 per 1000; weight from RFx spec (rfx_spec basis)
+16,balaji,confirmed,4120,,4120,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+16,kohinoor,inferred,4102.56,,4000,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+16,westline,confirmed,4200.0,,210.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+16,orientpack,inferred,4276.4,,51.43,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+16,anand,inferred,3047.6,,38,per_kg,INR,₹38/kg × 80.2 g/pc = ₹3048 per 1000; weight from RFx spec (rfx_spec basis)
+17,balaji,confirmed,3190,,3190,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+17,kohinoor,inferred,3169.23,,3090,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+17,westline,confirmed,3140.0,,157.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+17,orientpack,inferred,3167.18,,38.09,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+17,anand,inferred,2264.8,,38,per_kg,INR,₹38/kg × 59.6 g/pc = ₹2265 per 1000; weight from RFx spec (rfx_spec basis)
+18,balaji,confirmed,18780,,18780,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+18,kohinoor,inferred,19364.1,,18880,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+18,westline,confirmed,19320.0,,966.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+18,orientpack,inferred,20273.63,,243.82,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+18,anand,inferred,13756.0,,38,per_kg,INR,₹38/kg × 362.0 g/pc = ₹13756 per 1000; weight from RFx spec (rfx_spec basis)
+19,balaji,confirmed,10970,,10970,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+19,kohinoor,inferred,11435.9,,11150,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+19,westline,ambiguous,,11580.0,579.0,per_bundle,INR,bundle size NOT stated for this item; best guess 50/bundle from same-ply pattern (ambiguous). True size per vendor's clarification reply = 40. Before clarification: 'ambiguous' with best_guess within tolerance = correct; after clarification reply is ingested: value per after_clarification
+19,orientpack,inferred,11506.3,,138.38,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+19,anand,inferred,8295.4,,38,per_kg,INR,₹38/kg × 218.3 g/pc = ₹8295 per 1000; weight from RFx spec (rfx_spec basis)
+20,balaji,confirmed,14050,,14050,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+20,kohinoor,inferred,14276.92,,13920,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+20,westline,confirmed,14820.0,,741.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+20,orientpack,inferred,14531.29,,174.76,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+20,anand,inferred,10210.6,,38,per_kg,INR,₹38/kg × 268.7 g/pc = ₹10211 per 1000; weight from RFx spec (rfx_spec basis)
+21,balaji,confirmed,4900,,4900,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+21,kohinoor,inferred,4892.31,,4770,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+21,westline,confirmed,4940.0,,247.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+21,orientpack,inferred,5164.45,,62.11,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+21,anand,inferred,3526.4,,38,per_kg,INR,₹38/kg × 92.8 g/pc = ₹3526 per 1000; weight from RFx spec (rfx_spec basis)
+22,balaji,confirmed,8910,,8910,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+22,kohinoor,inferred,8994.87,,8770,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+22,westline,confirmed,9440.0,,472.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+22,orientpack,inferred,9913.97,,119.23,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+22,anand,inferred,6691.8,,38,per_kg,INR,₹38/kg × 176.1 g/pc = ₹6692 per 1000; weight from RFx spec (rfx_spec basis)
+23,balaji,confirmed,38610,,38610,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+23,kohinoor,inferred,37312.82,,36380,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+23,westline,confirmed,40490.0,,4049.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+23,orientpack,inferred,41662.31,,501.05,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+23,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+24,balaji,confirmed,26770,,26770,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+24,kohinoor,inferred,27097.44,,26420,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+24,westline,confirmed,27710.0,,2771.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+24,orientpack,inferred,27696.43,,333.09,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+24,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+25,balaji,confirmed,23840,,23840,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+25,kohinoor,inferred,23035.9,,22460,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+25,westline,confirmed,24180.0,,2418.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+25,orientpack,inferred,25364.08,,305.04,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+25,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+26,balaji,confirmed,16700,,16700,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+26,kohinoor,inferred,17600.0,,17160,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+26,westline,confirmed,18080.0,,1808.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+26,orientpack,inferred,18240.62,,219.37,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+26,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+27,balaji,confirmed,9460,,9460,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+27,kohinoor,inferred,9394.87,,9160,per_1000_pcs,INR,printed rate is NET of 2.5% early-payment discount (footnote); Meridian pays at 45 days so payable = printed/0.975 → 'inferred' with discount_treatment assumption. Printed value with state 'confirmed' is accepted as alt (flagged_ok) only if a discount_treatment review item/ledger entry exists
+27,westline,confirmed,9840.0,,984.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+27,orientpack,inferred,9780.93,,117.63,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+27,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+28,balaji,confirmed,15870,,15870,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+28,kohinoor,not_quoted,,,,,,stated 'not in our range'
+28,westline,confirmed,15800.0,,316.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+28,orientpack,inferred,16507.77,,198.53,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+28,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+29,balaji,confirmed,6880,,6880,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+29,kohinoor,not_quoted,,,,,,stated 'not in our range'
+29,westline,confirmed,6850.0,,137.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+29,orientpack,inferred,6903.94,,83.03,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+29,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file
+30,balaji,confirmed,15790,,15790,per_1000_pcs,INR,quoted per 1000 nos; 3% total discount NOT applied (ledger)
+30,kohinoor,not_quoted,,,,,,stated 'not in our range'
+30,westline,confirmed,16300.0,,326.0,per_bundle,INR,bundle size stated in the same paragraph/table → vendor_stated basis
+30,orientpack,inferred,16941.81,,203.75,per_1000_pcs,USD,USD×83.15; FX assumption in ledger; FOB → freight excluded
+30,anand,references_prior,,,,,,'rest same as last year' — prior pricing not on file

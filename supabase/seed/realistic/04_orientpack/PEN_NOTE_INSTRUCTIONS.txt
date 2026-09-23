@@ -1,0 +1,7 @@
+Before photographing the printed rate card (OrientPack_Rate_Card_PRINT_ME.pdf), write in blue/black pen, by hand, in the margin near the bottom:
+
+   "FOB Chennai - freight extra. Valid 60 days. - R.K. 1/10"
+
+and put a small tick mark next to 3-4 random rows. Rest your thumb over the line 14 price when you shoot.
+This gives the extractor real handwriting (a term that is NOT in the printed text) and a real obstruction.
+Expected: extraction picks up 'freight extra' from the handwritten note into response_terms.freight_terms_raw (bonus, not required by gold).

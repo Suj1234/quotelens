@@ -1,0 +1,93 @@
+{
+ "realistic_five": {
+  "note": "Prices identical to core; gold/gold.json applies unchanged. Differences are presentation only: clutter, text-formatted numbers, notes, stamps, strikethrough, Hinglish.",
+  "balaji": {
+   "file": "01_balaji/Qtn SBP-0912 Meridian.xlsx",
+   "traps": [
+    "rows 4 hidden",
+    "rates for items 4 & 11 stored as text '13,710/-' (Indian grouping)",
+    "item 7 rate cell text '<n> (revised)' with a cell comment",
+    "item 19 number stored as text",
+    "stray NOTE row after item 15",
+    "empty Sheet3",
+    "GST column mixes '18%' and 18"
+   ],
+   "expected": "all 30 prices parse to the same numbers as gold; 'revised' text must not change the value"
+  },
+  "kohinoor": {
+   "file": "02_kohinoor/KC_Quotation_1187_Meridian.pdf",
+   "traps": [
+    "logo block, stamp, signature scribble (vision noise)",
+    "item 17 old value struck through, corrected value printed beside it in blue + footnote **",
+    "footnote about net-of-discount rates",
+    "Times font, Indian date 29/09/2026"
+   ],
+   "expected": "item 17 = corrected value (gold); footnote discount_treatment as in gold"
+  },
+  "westline": {
+   "file": "03_westline/Westline offer Meridian Foods Sept26.docx",
+   "traps": [
+    "'Rs 1,709/-' number style",
+    "'per bundle of 25 nos'",
+    "bundle size missing for items 5, 9, 15, 19",
+    "Hinglish phrasing",
+    "table style Light Grid"
+   ],
+   "expected": "same as gold"
+  },
+  "orientpack": {
+   "file": "04_orientpack/IMG_20261001_114532.jpg",
+   "traps": [
+    "rotated 90 degrees (portrait photo)",
+    "darker, blurrier"
+   ],
+   "expected": "auto-orient then same as gold; line 14 low_confidence"
+  },
+  "anand": {
+   "file": "05_anand/anand_email_realistic.txt",
+   "traps": [
+    "'Rs.42/- per kg'",
+    "'aprox', 'questionaire' typos",
+    "quoted RFx thread below must be stripped (its terms are the BUYER's, not the vendor's)",
+    "'Sent from my iPhone'"
+   ],
+   "expected": "same as gold; quoted block must not be extracted as vendor terms"
+  }
+ },
+ "extra_samples": {
+  "whatsapp_quote_sunrise_packers.png": {
+   "vendor": "new vendor (not invited) \u2014 create on assign",
+   "expected": "classify quotation; 8 items extracted from chat bubbles with sizes only; item 15 has two values (first, then 'final' reduced) \u2192 keep final, flag conflict or note; unit per 1000 INR; validity 15 days \u2192 validity_short; payment 30 days; lines map by size",
+   "lines": [
+    16,
+    17,
+    21,
+    13,
+    14,
+    22,
+    19,
+    15
+   ]
+  },
+  "Kohinoor_quotation_SCANNED.pdf": {
+   "expected": "image-only PDF (no text layer) \u2192 Gemini vision path; same 27 prices as gold within tolerance; skew must not break it"
+  },
+  "wrong_category_IT_quote.xlsx": {
+   "expected": "classify quotation (it has prices) but every item \u2192 none_of_these \u2192 Unmatched items; grid unchanged; no crash"
+  },
+  "balaji_revised_offer_email.txt": {
+   "expected": "second response from same vendor; items 7, 16, 23 \u2192 conflict review items (old vs revised); on confirm, revised values replace; other 27 untouched",
+   "revised": {
+    "7": 41410,
+    "16": 3970,
+    "23": 38910
+   }
+  },
+  "OrientPack_Product_Brochure.pdf": {
+   "expected": "classify supporting or not_relevant; contains_prices=false; no extraction"
+  },
+  "sunrise_packers_email_partial.txt": {
+   "expected": "per-piece prices \u00d71000; 5 of 30 lines; ex-works + transport per trip (cannot be converted to per-1000 without trip size \u2192 freight_treatment review); ISO 'applied' \u2192 Q1 ambiguous/no; BRC no \u2192 disqualified"
+  }
+ }
+}

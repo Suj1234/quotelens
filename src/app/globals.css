@@ -1,26 +1,95 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/* Theme: data-theme on <html>; no attribute = follow OS (DESIGN.md §1.2) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* DESIGN.md §1 tokens — values copied from design/prototype.html */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #F6F5F1; --surface: #FFFFFF; --ink: #1C1E22; --ink2: #3F434A; --muted: #6E727A; --faint: #9EA2A9;
+  --hair: #DEDCD5; --hair2: #ECEAE4; --tint: #F1F0EB; --tint2: #E9E8E2;
+  --accent: #0F6663; --accent-ink: #0B4E4B; --accent-tint: #E2EEEC;
+  --amber: #955A0A; --amber-bg: #FAF0DB; --green: #2B7A4B; --green-bg: #E5F1E9;
+  --indigo: #4757A6; --indigo-bg: #E7EAF6; --red: #A93A2E; --red-bg: #F7E6E3;
+  --shadow: 0 12px 32px rgba(20,22,26,.10);
+  --rail: 56px; --sheet: 400px; --drawer: 480px;
+
+  /* shadcn variables mapped onto our tokens (never shadcn defaults) */
+  --background: var(--paper); --foreground: var(--ink);
+  --card: var(--surface); --card-foreground: var(--ink);
+  --popover: var(--surface); --popover-foreground: var(--ink);
+  --primary: var(--accent); --primary-foreground: #fff;
+  --secondary: var(--tint); --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--ink);
+  --destructive: var(--red);
+  --border: var(--hair); --input: var(--hair); --ring: var(--accent);
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #16181B; --surface: #1D2024; --ink: #EAE9E4; --ink2: #C8C7C1; --muted: #9A9DA5; --faint: #6F727A;
+    --hair: #31343A; --hair2: #282A2F; --tint: #24272C; --tint2: #2C2F35;
+    --accent: #57B3AE; --accent-ink: #86CFCA; --accent-tint: #1F3231; --amber: #E2A650; --amber-bg: #3A2E18;
+    --green: #72C08C; --green-bg: #1D3326; --indigo: #9DA8EA; --indigo-bg: #272C47; --red: #E48D81; --red-bg: #3F2420;
+    --shadow: 0 12px 32px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #16181B; --surface: #1D2024; --ink: #EAE9E4; --ink2: #C8C7C1; --muted: #9A9DA5; --faint: #6F727A;
+  --hair: #31343A; --hair2: #282A2F; --tint: #24272C; --tint2: #2C2F35;
+  --accent: #57B3AE; --accent-ink: #86CFCA; --accent-tint: #1F3231; --amber: #E2A650; --amber-bg: #3A2E18;
+  --green: #72C08C; --green-bg: #1D3326; --indigo: #9DA8EA; --indigo-bg: #272C47; --red: #E48D81; --red-bg: #3F2420;
+  --shadow: 0 12px 32px rgba(0,0,0,.45);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-heading: var(--font-sans);
+
+  --color-paper: var(--paper); --color-surface: var(--surface); --color-ink: var(--ink); --color-ink2: var(--ink2);
+  --color-faint: var(--faint); --color-hair: var(--hair); --color-hair2: var(--hair2);
+  --color-tint: var(--tint); --color-tint2: var(--tint2);
+  --color-accent-ink: var(--accent-ink); --color-accent-tint: var(--accent-tint);
+  --color-amber: var(--amber); --color-amber-bg: var(--amber-bg); --color-green: var(--green); --color-green-bg: var(--green-bg);
+  --color-indigo: var(--indigo); --color-indigo-bg: var(--indigo-bg); --color-red: var(--red); --color-red-bg: var(--red-bg);
+
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--tint); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--tint); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
+
+  /* DESIGN.md §1.4: 3px chips, 5px buttons/inputs, 6px cards — never larger */
+  --radius-sm: 3px; --radius-md: 5px; --radius-lg: 6px; --radius-xl: 6px; --radius-2xl: 6px; --radius-3xl: 6px; --radius-4xl: 6px;
+  --shadow-sheet: var(--shadow);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 13.5px/1.5 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
+  h1, h2, h3 { font-weight: 600; text-wrap: balance; letter-spacing: -.005em; }
+  h1 { font-size: 22px; line-height: 1.2; } h2 { font-size: 15px; } h3 { font-size: 13px; }
+  a { color: var(--accent-ink); }
+  .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .num { text-align: right; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .hint { font-size: 11.5px; color: var(--faint); }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }
