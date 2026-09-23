@@ -122,7 +122,55 @@
   .kbd { font-family: var(--font-mono); font-size: 10.5px; border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; color: var(--muted); }
 }
 
+
+/* design/prototype.html components used from P1 on */
+@layer components {
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 500; border: 1px solid var(--hair); color: var(--ink2); background: var(--surface); white-space: nowrap; }
+  .chip.amber { color: var(--amber); background: var(--amber-bg); border-color: transparent; }
+  .chip.green { color: var(--green); background: var(--green-bg); border-color: transparent; }
+  .chip.indigo { color: var(--indigo); background: var(--indigo-bg); border-color: transparent; }
+  .chip.red { color: var(--red); background: var(--red-bg); border-color: transparent; }
+  .chip.teal { color: var(--accent-ink); background: var(--accent-tint); border-color: transparent; }
+  .chip.grey { color: var(--muted); background: var(--tint); border-color: transparent; }
+  .pbar { height: 4px; background: var(--tint2); border-radius: 2px; overflow: hidden; width: 110px; display: inline-block; vertical-align: middle; }
+  .pbar > i { display: block; height: 100%; background: var(--indigo); }
+  .filerow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--hair2); border-radius: 5px; font-size: 12.5px; }
+  .filerow .ext { font-family: var(--font-mono); font-size: 10px; padding: 2px 5px; border: 1px solid var(--hair); border-radius: 3px; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; font-size: 12.5px; margin: 0; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+  .vrow { display: grid; grid-template-columns: 1.3fr 1fr 1fr .8fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--hair2); }
+  .vrow:last-child { border-bottom: 0; }
+  .vrow .nm { font-weight: 600; }
+  .vrow .sub { font-size: 12px; color: var(--muted); }
+  .pipe { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .stage { border: 1px solid var(--hair); border-radius: 5px; padding: 9px 11px; background: var(--surface); position: relative; overflow: hidden; }
+  .stage .nm { font-weight: 500; display: flex; justify-content: space-between; align-items: center; text-transform: capitalize; gap: 6px; }
+  .stage .st { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .stage.done { border-color: var(--green); }
+  .stage.done .st { color: var(--green); }
+  .stage.running { border-color: var(--accent); }
+  .stage.running::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 40%; background: var(--accent); animation: ql-slide 1s linear infinite; }
+  .stage.error { border-color: var(--red); }
+  .stage.error .st { color: var(--red); }
+  .rfxhead { padding: 18px 28px 0; border-bottom: 1px solid var(--hair); background: var(--surface); }
+  .rfxhead .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .rfxhead .code { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .rfxhead .code a { border: 1px solid var(--hair); border-radius: 4px; padding: 1px 7px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink2); background: var(--surface); text-decoration: none; }
+  .rfxhead h1 { margin-top: 4px; }
+  .rfxhead .meta { display: flex; gap: 12px; align-items: center; color: var(--muted); margin-top: 6px; flex-wrap: wrap; font-size: 12.5px; }
+  .rfxtabs { display: flex; gap: 4px; margin-top: 14px; }
+  .rfxtabs a { padding: 8px 12px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; display: flex; gap: 6px; align-items: center; }
+  .rfxtabs a .cnt { font-family: var(--font-mono); font-size: 11px; background: var(--tint); padding: 0 5px; border-radius: 3px; color: var(--ink2); }
+  .rfxtabs a.active { color: var(--ink); border-color: var(--ink); }
+}
+@keyframes ql-slide { from { left: -40%; } to { left: 100%; } }
+
 @media (max-width: 900px) {
+  .grid2, .vrow { grid-template-columns: 1fr; }
+  .pipe { grid-template-columns: repeat(2, 1fr); }
+  .rfxhead { padding-left: 16px; padding-right: 16px; }
   .page { padding-left: 16px; padding-right: 16px; }
   /* DESIGN.md §6: tables scroll horizontally inside their box instead of squashing */
   table.t { min-width: 680px; }

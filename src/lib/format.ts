@@ -10,3 +10,19 @@ export function relativeDay(iso: string, now = new Date()): string {
 
 const WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 export const countWord = (n: number) => WORDS[n] ?? String(n);
+
+/** Indian grouping (1,04,280) for INR, western grouping for other currencies (DESIGN.md §1.3). */
+export function money(value: number | null | undefined, currency: string | null = "INR", decimals?: number): string {
+  if (value === null || value === undefined) return "—";
+  const code = currency ?? "INR";
+  const d = decimals ?? (Number.isInteger(value) ? 0 : 2);
+  const n = value.toLocaleString(code === "INR" ? "en-IN" : "en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const sym = ({ INR: "₹", USD: "$", EUR: "€" } as Record<string, string>)[code] ?? `${code} `;
+  return `${sym}${n}`;
+}
+
+// DESIGN §1.3: "29 Oct 2026", "29 Oct" in tight cells (en-GB would print "Sept"). IST, since the buyer is in India.
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const ist = (iso: string) => new Date(new Date(iso).getTime() + 330 * 60_000);
+export const shortDate = (iso: string) => { const d = ist(iso); return `${String(d.getUTCDate()).padStart(2, "0")} ${MON[d.getUTCMonth()]}`; };
+export const longDate = (iso: string) => `${shortDate(iso)} ${ist(iso).getUTCFullYear()}`;

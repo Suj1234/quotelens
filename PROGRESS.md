@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P1, next task P1-T6 (extract)
+## Current: Phase P1 ✅ checkpoint — next task P2-T1 (decision layer: OpenRouter/Jev adapter)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -14,9 +14,14 @@
 - [x] P1-T3 Gemini client — `src/lib/ai/gemini.ts` `generateJSON` (Zod → `responseJsonSchema`, validate, one retry with the validation error, one retry on 429/5xx after 2 s, `MODEL_INVALID`/`MODEL_ERROR`), `generateText`, `inlineFile`; `src/lib/log.ts` `logModelCall`/`audit`. Live: strong model read the Kohinoor PDF (vendor, 2 pages, the * footnote verbatim); calls land in `model_calls`. 4 unit tests (mocked provider) green.
 - [x] P1-T4 Response intake — `src/lib/responses.ts` (`createResponse`: inbound mock communication → response → each file raw to bucket + row → derived text/image/page count), `POST /api/responses` (multipart), `POST /api/rfx/{id}/seed-responses[?set=realistic]` (replaces earlier seed responses and their outputs; leaves other sources alone). MER-0419 has 5 seeded responses: Balaji xlsx+cert, Kohinoor pdf+profile, Westline docx+profile, OrientPack photo+questionnaire, Anand email text.
 - [x] P1-T5 Classify — decision layer interface `src/lib/ai/decision/index.ts` + Gemini emulation provider (P-DECIDE §10.4, per-option probabilities, renormalise, margin confidence); `src/lib/pipeline/classify.ts` (one `decide()` per response over all files + email body; P-CAPTION for PDFs/images; top < 0.50 → unknown; `not_a_quote` review items). MER-0419: Balaji xlsx/Kohinoor pdf/Westline docx/OrientPack photo/Anand email → quotation (p 1.00); certificate + profiles → supporting; OrientPack questionnaire PDF → questionnaire.
+- [x] P1-T6 Extract — `src/lib/pipeline/extract.ts` (P-EXTRACT verbatim + input-format note; Zod `ExtractionResult`; text/PDF/image sources; >60k-char chunking; >20-page PDF split; terms merged file > email with disagreements noted). Response Detail page `/rfx/{id}/responses/{rid}` (files + kind chips, terms read, extracted items with price/unit as written, pack, where, read bar) and Responses tab `/rfx/{id}/responses` with Load seeded responses (clean/realistic).
+  **Extraction counts on MER-0419 (clean set):** Balaji 30/30 priced (cells G8…G37, 3% conditional total discount) · Kohinoor 27/27 (validity 30 d, 2.5% early-payment footnote with ÷0.975 rule) · Westline 30/30 (items 5, 9, 15, 19 have no pack size; the other 26 do) · OrientPack 30 items, 29 priced — line 14 `unit_price null`, `raw_confidence 0.2` (thumb shadow), USD, FOB Chennai · Anand 2 rate lines (₹42/kg, ₹38/kg) + 1 unpriced "rest same as last year" item; terms `references_prior_pricing = true`, freight extra.
+- [x] P1-T7 Pipeline runner — `src/lib/pipeline/run.ts` (`runStage`: status running→done/error, `stage_errors`, `summary[stage]` + timings, `audit_events pipeline.stage`; `runAll` chain stops at first error), `POST /api/responses/{id}/stage/{stage}`, `POST /api/responses/{id}/run-all` (NDJSON stream), pipeline strip with Run all / Retry per stage and elapsed time. Verified in the browser: Run all on Kohinoor → classify 6.1 s, extract 24.4 s; stages not built yet stay `pending`.
 ## In progress
 ## Open questions (for Sabarish)
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - Add `NEXT_PUBLIC_APP_URL=https://quotelens-seven.vercel.app` in Vercel env (needed from P5 for links in emails; picked up on the next deploy).
 ## Known issues
+- Extraction wording varies run to run: one Kohinoor run copied the page-1 footnote into every item's `notes` and folded the Size/Ply columns into `vendor_description`. Numbers unaffected; revisit in P2 if mapping suffers.
+- Westline items 5/9 and 15/19 come out as two items from one sentence with descriptions like "items 5" and "9" — the item number is in the description/snippet; P2-T2's "item N" rule must also read the snippet.
 - P0 checkpoint: sign-in and RFx list compared with the prototype at 1440 px (match; prototype renders in quirks mode, see DECISIONS) and checked at 375/768/1440/2560 px on production — no sideways page scroll, tables scroll inside their card on phones.
