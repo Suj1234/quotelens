@@ -246,11 +246,55 @@
   .tl .ev .ts { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
   .tl .ev .dir { font-family: var(--font-mono); color: var(--faint); }
   .lock { padding: 9px 12px; background: var(--tint); border: 1px solid var(--hair); border-radius: 5px; font-size: 12.5px; color: var(--muted); }
+  /* prototype: sheet (Ask, Add response) — DESIGN §1.4 400px */
+  .sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--sheet), 100vw); background: var(--surface); border-left: 1px solid var(--hair); z-index: 30; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+  .sheet > .hd { padding: 14px 16px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: center; }
+  .sheet > .bd { padding: 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+  .sheet > .ft { border-top: 1px solid var(--hair); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  /* prototype: ask answer card (DESIGN §2.13) */
+  .qa { border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); padding: 14px 16px; }
+  .qa .q { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+  .qa .a { font-size: 13.5px; line-height: 1.55; max-width: 70ch; }
+  .qa .how { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .qa .how button { color: var(--accent-ink); font-weight: 500; }
+  .qa pre { margin: 8px 0 0; padding: 10px; background: var(--tint); border-radius: 5px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; color: var(--ink2); }
+  .qa .excl { margin-top: 8px; font-size: 12px; color: var(--amber); }
+  .qa .rows { margin-top: 10px; border: 1px solid var(--hair2); border-radius: 5px; overflow: auto; max-height: 260px; }
+  .qa .rows table { font-size: 11.5px; min-width: 0; }
+  .qa .rows td, .qa .rows th { white-space: nowrap; }
+  .qa .acts { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+  /* prototype: inline bar chart (DESIGN §2.15) */
+  .bar { display: flex; align-items: center; gap: 8px; font-size: 11.5px; margin: 4px 0; }
+  .bar .lbl { width: 120px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .trk { flex: 1; height: 10px; background: var(--tint2); border-radius: 2px; overflow: hidden; }
+  .bar .fill { display: block; height: 100%; background: var(--accent); }
+  .bar .v { font-family: var(--font-mono); width: 80px; text-align: right; }
+  /* prototype: suggestion chips, drop zone, co-pilot */
+  .sugg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sugg button { border: 1px solid var(--hair); border-radius: 14px; padding: 3px 10px; font-size: 12px; color: var(--ink2); background: var(--surface); text-align: left; }
+  .sugg button:hover { border-color: var(--ink); }
+  .drop { border: 1px dashed var(--hair); border-radius: 6px; padding: 22px; text-align: center; color: var(--muted); background: var(--tint); cursor: pointer; display: block; }
+  .drop:hover, .drop.over { border-color: var(--accent); }
+  .split { display: grid; grid-template-columns: minmax(340px, 460px) 1fr; gap: 16px; align-items: start; }
+  .chat { display: flex; flex-direction: column; min-height: 520px; max-height: calc(100vh - 220px); }
+  .chat .log { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { font-size: 13px; }
+  .msg .from { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; font-weight: 500; }
+  .msg.me { border-left: 2px solid var(--ink); padding-left: 12px; }
+  .msg.cp { border-left: 2px solid var(--accent); padding-left: 12px; }
+  .msg .patch { margin-top: 8px; border: 1px solid var(--hair); border-radius: 5px; padding: 7px 10px; background: var(--tint); font-size: 12px; }
+  .chat .composer { border-top: 1px solid var(--hair); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .chat textarea { width: 100%; min-height: 64px; resize: vertical; }
+  .note { padding: 10px 12px; border: 1px solid var(--hair); border-left: 3px solid var(--accent); border-radius: 5px; background: var(--surface); font-size: 12.5px; }
+  .note.warn { border-left-color: var(--amber); }
+  textarea.ta { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 7px 9px; width: 100%; }
+  textarea.ta:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 @keyframes ql-slide { from { left: -40%; } to { left: 100%; } }
 
 @media (max-width: 900px) {
-  .grid2, .vrow, .rqcard { grid-template-columns: 1fr; }
+  .grid2, .vrow, .rqcard, .split { grid-template-columns: 1fr; }
+  :root { --sheet: 100vw; }
   .cmpwrap { padding-left: 16px; padding-right: 16px; }
   .pipe { grid-template-columns: repeat(2, 1fr); }
   .rfxhead { padding-left: 16px; padding-right: 16px; }

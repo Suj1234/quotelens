@@ -40,7 +40,7 @@ export function chartSpec(plan: { needs_chart: boolean; intent: string; chart: {
   if (rows.length === 1) {
     const money = totals.length >= 2 ? totals : numeric.filter((c) => !/(^|_)(line_no|rank|count|n|pct|percent)$/i.test(c));
     if (money.length < 2) return null;
-    return { type, title, x: "label", series: [{ name: "value", y: "value" }], data: money.map((c) => ({ label: c.replaceAll("_", " "), value: Number(rows[0][c]) })) };
+    return { type, title, x: "label", series: [{ name: "value", y: "value" }], data: money.map((c) => ({ label: c.replace(/_inr$/, "").replaceAll("_", " "), value: Number(rows[0][c]) })) };
   }
   const x = plan.chart.x && columns.includes(plan.chart.x) ? plan.chart.x : columns.find((c) => !numeric.includes(c)) ?? columns[0];
   const y = plan.chart.y && numeric.includes(plan.chart.y) ? plan.chart.y

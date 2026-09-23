@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CellState, Grid, GridCell } from "@/lib/comparison";
 import { inrShort, money } from "@/lib/format";
+import { AskButton } from "@/components/ask/ask-sheet";
 
 type View = "unit" | "landed" | "orig";
 const COUNTED: CellState[] = ["confirmed", "inferred", "reviewed"];
@@ -14,7 +15,7 @@ const LEGEND: [CellState, string][] = [
 const inr = (v: number) => Math.round(v).toLocaleString("en-IN");
 
 /** DESIGN §2.6–2.8: sticky grid, vendor headers, state-rendered cells, lowest-eligible edge, legend. */
-export function PricesGrid({ grid, onOpen, selected, onBasis }: { rfxId: string; grid: Grid; onOpen?: (line: number, vendor: string) => void; selected?: string | null; onBasis?: (b: "unit" | "landed") => void }) {
+export function PricesGrid({ grid, onOpen, selected, onBasis, approver }: { rfxId: string; grid: Grid; approver?: boolean; onOpen?: (line: number, vendor: string) => void; selected?: string | null; onBasis?: (b: "unit" | "landed") => void }) {
   const [view, setViewState] = useState<View>("unit");
   const setView = (v: View) => { setViewState(v); onBasis?.(v === "landed" ? "landed" : "unit"); };
   const [inclDq, setInclDq] = useState(false);
@@ -39,6 +40,8 @@ export function PricesGrid({ grid, onOpen, selected, onBasis }: { rfxId: string;
         <label className="text-muted-foreground" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
           <input type="checkbox" checked={inclDq} onChange={(e) => setInclDq(e.target.checked)} /> show disqualified vendors
         </label>
+        <span style={{ flex: 1 }} />
+        {approver && <AskButton />}
       </div>
       <div className="gridbox">
         <table className="cmp">

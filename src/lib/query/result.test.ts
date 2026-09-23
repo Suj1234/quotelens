@@ -18,7 +18,7 @@ describe("chartSpec (§13.6)", () => {
   const plan = { needs_chart: true, intent: "savings", chart: { type: "bar" as const, x: null, y: null, title: "Q1 vs single vendor" } };
   it("charts a one-row comparison as bars of its money columns", () => {
     const c = chartSpec(plan, [{ q1_total_inr: 4.4e7, single_vendor_total_inr: 4.6e7, saving_pct: 4.3 }], ["q1_total_inr", "single_vendor_total_inr", "saving_pct"]);
-    expect(c?.data).toEqual([{ label: "q1 total inr", value: 4.4e7 }, { label: "single vendor total inr", value: 4.6e7 }]);
+    expect(c?.data).toEqual([{ label: "q1 total", value: 4.4e7 }, { label: "single vendor total", value: 4.6e7 }]);
     expect(chartSpec({ ...plan, needs_chart: false }, [{ a_total: 1, b_total: 2 }], ["a_total", "b_total"])).not.toBeNull();
   });
   it("charts rows by label and a value column; no chart when not asked", () => {

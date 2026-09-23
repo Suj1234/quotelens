@@ -4,6 +4,7 @@ import { getRfx } from "@/lib/rfx-detail";
 import { db } from "@/lib/db";
 import { longDate, shortDate } from "@/lib/format";
 import { RfxTabs } from "@/components/rfx/rfx-tabs";
+import { AskButton, AskProvider } from "@/components/ask/ask-sheet";
 
 const LABEL = { draft: "Draft", issued: "Issued", receiving: "Receiving", reviewing: "Reviewing", awarded: "Awarded", closed: "Closed" };
 
@@ -13,7 +14,7 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
   const { id } = await params;
   const [rfx, { count: openItems }] = await Promise.all([getRfx(id), db().from("review_items").select("id", { count: "exact", head: true }).eq("rfx_id", id).eq("status", "open")]);
   return (
-    <>
+    <AskProvider rfxId={id}>
       <div className="rfxhead">
         <div className="top">
           <div>
@@ -26,6 +27,8 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
               {rfx.response_deadline && <><span>·</span><span>Deadline {longDate(rfx.response_deadline)}</span></>}
             </div>
           </div>
+          {/* DESIGN §2.3: header buttons are the buyer's; the approver asks from the Comparison toolbar. Sync inbox arrives with Gmail (P6). */}
+          {user.role !== "approver" && <div style={{ display: "flex", gap: 8, alignItems: "center" }}><AskButton /></div>}
         </div>
         {/* DESIGN §4: the approver's tabs are Decide · Comparison · Award (Decide/Award arrive in P7); the buyer's Overview (P5) and Award (P7) likewise. */}
         <RfxTabs id={id} tabs={user.role === "approver"
@@ -33,6 +36,6 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
           : [{ slug: "responses", label: "Responses" }, { slug: "review", label: "Review", count: openItems ?? 0 }, { slug: "comparison", label: "Comparison" }]} />
       </div>
       {children}
-    </>
+    </AskProvider>
   );
 }

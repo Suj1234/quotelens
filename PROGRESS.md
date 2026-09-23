@@ -69,14 +69,14 @@
   | 11 | `GET /api/ask/history?rfx=` last 20 (TRD §16) | ✓ `GET /api/ask/history?rfx=` → 20 items newest first, with asker name and stored column order; bad rfx → 400 |
   | 12 | Both roles can ask; `maxDuration = 120` (DESIGN §4, TRD §21) | ✓ curl: Priya and Sujit both 200 with computed answers; logged out 401; empty question 400 "Type a question first."; maxDuration 120 |
   | 13 | Done-when: Q1 on MER-0419 → 30 rows, total, exclusions (Westline disqualified, Anand pending Q6, unsure cells count), SQL (CLAUDE.md P4-T2) | ✓ Q1 on MER-0419: 30 rows, ₹4,53,38,297, exclusions Westline (failed Q6 BRC) · Anand (Q6 unclear) · 1 unsure cell (OrientPack L14), SQL returned; 4.5–9.4 s |
-  | 14 | Buyer: "Ask" (chat icon) in RFx header → 400px side sheet; approver: "Ask" in Comparison toolbar → same sheet; no Sync inbox yet (DESIGN §2.3/§3.7) | open |
-  | 15 | Sheet: stacked answer cards, 3 suggestion chips, textarea, Ask, history list (DESIGN §3.7, TRD §17.9) | open |
-  | 16 | Card: question, answer, amber exclusions, How I computed this + Show query `<pre>`, 260px table box paginated, inline bar chart (no library), unresolved notice + Include best guesses → both totals, Export (DESIGN §2.13/§2.15, TRD §17.9, PRD #25–26) | open |
-  | 17 | No dead "Save as scenario" button; DECISIONS says it lands with P7-T1 | open |
+  | 14 | Buyer: "Ask" (chat icon) in RFx header → 400px side sheet; approver: "Ask" in Comparison toolbar → same sheet; no Sync inbox yet (DESIGN §2.3/§3.7) | ✓ browser 1440 px: Sujit — header shows Ask (chat icon), sheet 400 px wide (measured); Priya — no header buttons, Ask in the Comparison toolbar opens the same sheet; no Sync inbox |
+  | 15 | Sheet: stacked answer cards, 3 suggestion chips, textarea, Ask, history list (DESIGN §3.7, TRD §17.9) | ✓ browser: stacked cards, 3 chips (asked ones drop out), textarea (Enter asks, Shift+Enter newline), Ask button, 'Earlier questions · 20' list from /api/ask/history (opening one adds its card) |
+  | 16 | Card: question, answer, amber exclusions, How I computed this + Show query `<pre>`, 260px table box paginated, inline bar chart (no library), unresolved notice + Include best guesses → both totals, Export (DESIGN §2.13/§2.15, TRD §17.9, PRD #25–26) | ✓ browser on Q1/Q2: answer, amber 'Excluded: …', How I computed this + Show query → <pre>, 260 px table (nowrap, scrolls), pager 'Rows 26–30 of 30', Q2 inline bars (₹4.58 cr vs ₹4.53 cr, no library), '13 cells unresolved · ₹73.2 L at stake' + Include best guesses → Without/With toggle with both totals. Export arrives with P4-T4 |
+  | 17 | No dead "Save as scenario" button; DECISIONS says it lands with P7-T1 | ✓ no Save-as-scenario button rendered; DECISIONS records it lands with P7-T1 |
   | 18 | All PRD §13 questions computed on MER-0419 through the UI (Q1–Q8 + shortest validity, line 22, Anand 5-ply per-kg) with answer / rows / total / SQL summary recorded | open |
   | 19 | Q1–Q8 asked twice; both runs computed and equivalent | open |
   | 20 | Each answer ≤ 15 s; timings recorded (CLAUDE.md §10) | open |
-  | 21 | Off-topic/unsafe → "I couldn't form a safe query for that; try rephrasing"; network error → toast with code (TRD §13.1, §19) | open |
+  | 21 | Off-topic/unsafe → "I couldn't form a safe query for that; try rephrasing"; network error → toast with code (TRD §13.1, §19) | ✓ weather question → safe-query answer (script + curl); fetch forced to fail in the browser → toast 'Couldn't reach the server — check the connection and ask again (NETWORK)', question kept in the box; API errors toast '{error} ({code})' |
   | 22 | `GET /api/export/comparison?rfx=&format=xlsx|csv&basis=` — xlsx line × vendor, state fills (DESIGN colours), legend + ledger sheet; csv tidy rows (TRD §16, PRD #28) | open |
   | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | open |
   | 24 | Export button in Comparison toolbar and on each answer card (DESIGN §2.8/§2.13) | open |

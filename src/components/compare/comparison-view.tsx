@@ -12,7 +12,7 @@ export function ComparisonView({ rfxId, grid, canReview }: { rfxId: string; grid
   const close = useCallback(() => setSel(null), []);
   return (
     <>
-      <PricesGrid rfxId={rfxId} grid={grid} selected={sel} onOpen={(l, v) => setSel(`${l}:${v}`)} onBasis={setBasis} />
+      <PricesGrid rfxId={rfxId} grid={grid} approver={!canReview} selected={sel} onOpen={(l, v) => setSel(`${l}:${v}`)} onBasis={setBasis} />
       {sel && <ProvenanceDrawer key={sel} rfxId={rfxId} cellKey={sel} basis={basis} canReview={canReview} onClose={close} />}
     </>
   );
