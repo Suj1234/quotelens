@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P0 checkpoint (visual check vs prototype), next task P1-T1
+## Current: Phase P0 ✅ complete — next task P1-T1 (storage helpers)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -14,4 +14,4 @@
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - Add `NEXT_PUBLIC_APP_URL=https://quotelens-seven.vercel.app` in Vercel env (needed from P5 for links in emails; picked up on the next deploy).
 ## Known issues
-- Side-by-side check vs prototype at 1440px not yet done for sign-in and RFx list (do at P0 end, once data is seeded).
+- P0 checkpoint: sign-in and RFx list compared with the prototype at 1440 px (match; prototype renders in quirks mode, see DECISIONS) and checked at 375/768/1440/2560 px on production — no sideways page scroll, tables scroll inside their card on phones.
