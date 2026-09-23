@@ -8,3 +8,10 @@ export function currencyCode(raw: string | null | undefined): string | null {
   if (/^[a-z]{3}$/.test(s)) return s.toUpperCase();
   return null;
 }
+
+export type FxRate = { rate: number; date: string; source: string };
+/** TRD §11.3: settings.fx_rates lookup. INR is 1; a missing rate is null (cell → ambiguous, never a silent 1). */
+export function fxRate(rates: Record<string, FxRate>, code: string): FxRate | null {
+  if (code === "INR") return { rate: 1, date: "", source: "base" };
+  return rates[code] ?? null;
+}
