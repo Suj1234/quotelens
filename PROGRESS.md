@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P1, next task P1-T3 (Gemini client)
+## Current: Phase P1, next task P1-T4 (response intake)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -11,6 +11,7 @@
 - [x] P0-T6 Model check — key works (32 Gemini models visible). FAST=`gemini-3.5-flash-lite`, STRONG=`gemini-3.8-flash`; both return valid schema JSON on text, the Kohinoor PDF and the OrientPack photo (`npm run check:models`). Details in DECISIONS.md.
 - [x] P1-T1 Storage helpers — `src/lib/storage.ts` put/get/list/signedUrl with TRD §5 paths; round-trip + signed-URL fetch verified against Supabase.
 - [x] P1-T2 Preprocessors — `src/lib/preprocess/` xlsx (cell refs, text numbers verbatim, comments, hidden rows marked, empty sheets dropped, 2,000-cell cap), docx (`[p N]`, `[table t row r]`), email/txt/eml (quoted blocks, `On … wrote:`, `-- ` and `Sent from my` removed; `[l N]`), image (EXIF rotate, ≤2000 px, normalise), pdf (page count, >20 pages split). 13 unit tests on the realistic seed files green.
+- [x] P1-T3 Gemini client — `src/lib/ai/gemini.ts` `generateJSON` (Zod → `responseJsonSchema`, validate, one retry with the validation error, one retry on 429/5xx after 2 s, `MODEL_INVALID`/`MODEL_ERROR`), `generateText`, `inlineFile`; `src/lib/log.ts` `logModelCall`/`audit`. Live: strong model read the Kohinoor PDF (vendor, 2 pages, the * footnote verbatim); calls land in `model_calls`. 4 unit tests (mocked provider) green.
 ## In progress
 ## Open questions (for Sabarish)
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
