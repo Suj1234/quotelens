@@ -25,6 +25,8 @@
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - Add `NEXT_PUBLIC_APP_URL=https://quotelens-seven.vercel.app` in Vercel env (needed from P5 for links in emails; picked up on the next deploy).
 ## Known issues
+- P1 visual check vs prototype (Responses, 1440 px): layout, rows, pipeline strip, Files/Terms cards and items table match. Differences, all waiting on later tasks: header status stays "Issued" (flags P2-T7 moves it to receiving/reviewing); "30/30 priced", questionnaire "cleared" chip and the Mapped column need P2; Overview/Review/Comparison/Award tabs and Sync inbox/Ask buttons arrive with their phases; "Add response" needs the Inbox sheet (P5). One deliberate deviation: response detail is its own page (TRD §3 route) instead of an expanded row (DESIGN §3.5) — see DECISIONS.
+- `npm run pipeline:seed` and `npm run eval` point at scripts that land in P2-T8; running them now fails with "file not found".
 - Realistic Balaji: `references_prior_pricing = true` because of the cell comment "Revised from 13200 after paper cost increase" — a false positive (the price is stated). P2-T7 flags must decide "prices depend on a quote not on file" with the decision layer, not copy this field.
 - Extraction wording varies run to run: one Kohinoor run copied the page-1 footnote into every item's `notes` and folded the Size/Ply columns into `vendor_description`. Numbers unaffected; revisit in P2 if mapping suffers.
 - Westline items 5/9 and 15/19 come out as two items from one sentence with descriptions like "items 5" and "9" — the item number is in the description/snippet; P2-T2's "item N" rule must also read the snippet.
