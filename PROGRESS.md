@@ -47,9 +47,9 @@
   | 4 | Review queue: filters, evidence, proposed value + p, actions by type, keyboard J/K/C, bulk bar, group by vendor/type, clarification note (TRD §17.8, §12.3, DESIGN §2.11/§3.6, PRD #16–17) | ✓ test rule 4: no rfx filter, other id only, other id added, and a join that leaves one view unscoped — all rejected |
   | 5 | Every outcome-changing action in the ledger with before/after; audit event per action (PRD #18, TRD §12.3) | ✓ test rule 5 (4,010-char query rejected) |
   | 6 | Tabs Questionnaire (click → evidence), Documents, Ledger (filter, When), Timeline (TRD §17.9, PRD #23) | ✓ 9 tests green: Q1 (2 CTEs + row_number/min over partition) and Q6 accepted; extract/cast/quoted alias/best-guess view accepted; best-guess rewrite tests |
-  | 7 | Unmatched items panel, unmatched senders, assign vendor, IT quote + WhatsApp don't crash (TRD §16, CLAUDE P3-T5) | ✓ Balaji grid/ledger/answers unchanged by the IT quote; WhatsApp → 8 items, new vendor assigned |
-  | 8 | Roles: approver tabs Comparison only, read-only queue, API 403 (DESIGN §4) | ✓ local + prod |
-  | 9 | Response Detail: flags chips, counts, Go to Review Queue (n) (TRD §17.7) | ✓ |
+  | 7 | Unmatched items panel, unmatched senders, assign vendor, IT quote + WhatsApp don't crash (TRD §16, CLAUDE P3-T5) | ✓ `0006_ask.sql` applied; Westline L5/9/15/19 read 27,960 / 54,960 / 14,080 / 11,580 in the view (state still ambiguous); security_invoker, revoked from anon/authenticated |
+  | 8 | Roles: approver tabs Comparison only, read-only queue, API 403 (DESIGN §4) | ✓ `src/lib/query/ask.ts` + `POST /api/ask`: history 4 (per user), P-SQL strong (LOW thinking) + Zod, guard + one repair (guard or Postgres error, reasons kept in plan.repairs), safe-query text on failure (weather question → fallback in 2 s, logged), 500-row cap, TS aggregates + unresolved_cells (13 on MER-0419), P-NARRATE fast with a number check, chart_spec, `queries` row with every applicable §6.17 column incl. error; response shape per §13.1 |
+  | 9 | Response Detail: flags chips, counts, Go to Review Queue (n) (TRD §17.7) | ✓ Q1 re-run via base_query_id → SQL reads v_comparison_bestguess, NOT IN list lost ambiguous/low_confidence; totals without/with returned (₹4,53,38,297 both — the only best guesses in scope are Westline's, disqualified; 0 cells filled). Q6 with best guesses → ₹73,16,208 at stake on 13 cells |
   | — | Deferred by plan: Export (P4-T4), Ask panel (P4), Outbox/Sync inbox (P5/P6), lock bar (P7), Settings link on assumption cards (P8), 2-minute screen capture (needs Sabarish) | open, by phase |
 ## In progress
 - **Phase 4 requirement checklist** (definition of done; sources: handoff §4, TRD §6.17/§6.21/§9.8–9.9/§13/§16/§17.9, PRD §8 Stage 7/§13, DESIGN §2.3/§2.13/§2.15/§3.7/§4). ✓ only with evidence.
@@ -62,13 +62,13 @@
   | 5 | Guard: ≤ 4,000 chars (TRD §13.4) | open |
   | 6 | Guard unit tests: one per rule incl. `users`, `line_quotes`, other rfx id, missing rfx_id; accepts Q1 (CTE + window) and Q6 SQL | open |
   | 7 | Migration 0006: `v_comparison_bestguess` (same columns, best guess folded into unit/landed/annual values, state unchanged, security_invoker, same grants) (TRD §13.2) | open |
-  | 7a | Result columns keep the SQL's order (the §6.21 function returns `jsonb`, which sorts keys) and a model-written `LIMIT` doesn't break the function's appended `limit 500` (found while reading 0002) | open |
+  | 7a | Result columns keep the SQL's order (the §6.21 function returns `jsonb`, which sorts keys) and a model-written `LIMIT` doesn't break the function's appended `limit 500` (found while reading 0002) | ✓ `run_readonly_rows` (0006): json keeps column order (checked: vendor, line_no, unit_price came back in that order); query wrapped so its own LIMIT works; same timeout/read-only/grants; a data-modifying CTE is refused by Postgres |
   | 8 | `POST /api/ask` per TRD §13.1 steps 1–9 (history 4, P-SQL strong + Zod, guard + 1 repair, safe-query fallback text + log, 500-row cap + timing, TS aggregates incl. unresolved_cells, P-NARRATE fast, chart_spec, `queries` row incl. `error`, response shape) | open |
   | 9 | `include_best_guess` → same SQL rewritten onto `v_comparison_bestguess`; both totals returned (TRD §13.2) | open |
-  | 10 | Follow-ups use history ("and on landed cost?" → landed_price) (TRD §13.3) | open |
-  | 11 | `GET /api/ask/history?rfx=` last 20 (TRD §16) | open |
-  | 12 | Both roles can ask; `maxDuration = 120` (DESIGN §4, TRD §21) | open |
-  | 13 | Done-when: Q1 on MER-0419 → 30 rows, total, exclusions (Westline disqualified, Anand pending Q6, unsure cells count), SQL (CLAUDE.md P4-T2) | open |
+  | 10 | Follow-ups use history ("and on landed cost?" → landed_price) (TRD §13.3) | ✓ "and on landed cost?" after Q1 → same query re-planned on landed_price (30 rows, annual_landed_value_inr) |
+  | 11 | `GET /api/ask/history?rfx=` last 20 (TRD §16) | ✓ `GET /api/ask/history?rfx=` → 20 items newest first, with asker name and stored column order; bad rfx → 400 |
+  | 12 | Both roles can ask; `maxDuration = 120` (DESIGN §4, TRD §21) | ✓ curl: Priya and Sujit both 200 with computed answers; logged out 401; empty question 400 "Type a question first."; maxDuration 120 |
+  | 13 | Done-when: Q1 on MER-0419 → 30 rows, total, exclusions (Westline disqualified, Anand pending Q6, unsure cells count), SQL (CLAUDE.md P4-T2) | ✓ Q1 on MER-0419: 30 rows, ₹4,53,38,297, exclusions Westline (failed Q6 BRC) · Anand (Q6 unclear) · 1 unsure cell (OrientPack L14), SQL returned; 4.5–9.4 s |
   | 14 | Buyer: "Ask" (chat icon) in RFx header → 400px side sheet; approver: "Ask" in Comparison toolbar → same sheet; no Sync inbox yet (DESIGN §2.3/§3.7) | open |
   | 15 | Sheet: stacked answer cards, 3 suggestion chips, textarea, Ask, history list (DESIGN §3.7, TRD §17.9) | open |
   | 16 | Card: question, answer, amber exclusions, How I computed this + Show query `<pre>`, 260px table box paginated, inline bar chart (no library), unresolved notice + Include best guesses → both totals, Export (DESIGN §2.13/§2.15, TRD §17.9, PRD #25–26) | open |

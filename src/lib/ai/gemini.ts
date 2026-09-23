@@ -44,10 +44,11 @@ async function call(tier: Tier, contents: Content[], config: Record<string, unkn
  * On invalid output, retry once with the validation error appended; then fail visibly (CLAUDE.md rule 5).
  */
 export async function generateJSON<S extends z.ZodType>(opts: Ctx & {
-  tier: Tier; system?: string; parts: Part[]; schema: S; temperature?: number;
+  tier: Tier; system?: string; parts: Part[]; schema: S; temperature?: number; thinking?: "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
 }): Promise<z.infer<S>> {
   const config = {
     temperature: opts.temperature ?? 0.1,
+    ...(opts.thinking ? { thinkingConfig: { thinkingLevel: opts.thinking } } : {}),
     systemInstruction: opts.system,
     responseMimeType: "application/json",
     responseJsonSchema: z.toJSONSchema(opts.schema),

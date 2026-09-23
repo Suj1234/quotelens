@@ -43,6 +43,8 @@ describe("guardSql (TRD §13.4)", () => {
     const sql = `select vendor, extract(day from validity_until::timestamp - current_date::timestamp) as days_left, count(*)::int as "Lines priced"
       from v_vendor_status vs where vs.rfx_id = '${RFX}' group by vendor, validity_until order by "Lines priced" desc`;
     expect(guardSql(sql, RFX)).toEqual({ ok: true });
+    // regression: an alias followed by ", (expr)" is not a function call
+    expect(guardSql(`select c.unit_price as unit_price_val, (c.unit_price * c.annual_qty) as v from v_comparison as c where c.rfx_id = '${RFX}'`, RFX)).toEqual({ ok: true });
     expect(guardSql(`select sum(annual_value_unit) as total from v_comparison_bestguess where rfx_id = '${RFX}'`, RFX)).toEqual({ ok: true });
   });
 

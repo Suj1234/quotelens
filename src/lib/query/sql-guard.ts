@@ -7,7 +7,7 @@ const COMPARISON_COLS = ["rfx_code", "line_no", "sku", "description", "ply", "it
 export const VIEWS: Record<string, string[]> = {
   v_comparison: COMPARISON_COLS,
   v_comparison_bestguess: COMPARISON_COLS,
-  v_vendor_status: ["rfx_id", "vendor_id", "vendor", "vendor_code", "status", "disqualified_reason", "lines_priced", "lines_total", "cleared_questionnaire", "validity_until", "freight_included"],
+  v_vendor_status: ["rfx_id", "vendor_id", "vendor", "vendor_code", "status", "disqualified_reason", "lines_priced", "lines_total", "cleared_questionnaire", "validity_until", "freight_included", "validity_days"],
   v_questionnaire: ["rfx_id", "q_no", "question", "answer_type", "disqualify_if", "vendor", "vendor_code", "answer_bool", "answer_number", "answer_text", "probability", "state", "passes"],
   v_assumptions: ["rfx_id", "kind", "description", "basis", "made_by", "created_at", "vendor", "line_no"],
 };
@@ -59,8 +59,10 @@ export function guardSql(sql: string, rfxId: string): GuardResult {
 
   // Tokenise outside string literals; double-quoted identifiers are checked like bare ones (a quoted alias after AS is fine).
   const code = s.replace(/'(?:[^']|'')*'/g, " '' ");
+  // call = a "(" follows the word directly (whitespace only), so "x AS a, (b * c)" is not a call to a().
   const tokens = [...code.matchAll(/"([^"]*)"|([a-z_][a-z0-9_$]*)|(\()/gi)].map((m) => ({
     word: (m[1] ?? m[2] ?? "(").toLowerCase(), quoted: m[1] !== undefined, paren: !!m[3],
+    call: !m[3] && /^\s*\(/.test(code.slice(m.index + m[0].length)),
   }));
   const words = tokens.filter((t) => !t.paren);
 
@@ -70,9 +72,9 @@ export function guardSql(sql: string, rfxId: string): GuardResult {
   const ctes = new Set<string>();
   const aliases = new Set<string>();
   for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i], next = tokens[i + 1], after = tokens[i + 2];
+    const t = tokens[i], next = tokens[i + 1];
     if (t.word === "as" && next && !next.paren) aliases.add(next.word);
-    if (next?.word === "as" && after?.paren && !t.paren) ctes.add(t.word); // name AS ( … )
+    if (next?.word === "as" && next.call && !t.paren) ctes.add(t.word); // name AS ( … )
   }
   // FROM / JOIN targets must be a view or a CTE of this query; the following bare word is a table alias.
   for (let i = 0; i < tokens.length; i++) {
@@ -89,8 +91,7 @@ export function guardSql(sql: string, rfxId: string): GuardResult {
     const t = tokens[i];
     if (t.paren) continue;
     const w = t.word;
-    const call = tokens[i + 1]?.paren;
-    if (call && !KEYWORDS.has(w) && !FUNCTIONS.has(w) && !ctes.has(w)) return fail(`The function ${w}() is not allowed.`);
+    if (t.call && !KEYWORDS.has(w) && !FUNCTIONS.has(w) && !ctes.has(w)) return fail(`The function ${w}() is not allowed.`);
     if (KEYWORDS.has(w) || FUNCTIONS.has(w) || w in VIEWS || columns.has(w) || ctes.has(w) || aliases.has(w)) continue;
     if (t.quoted && tokens[i - 1]?.word === "as") continue;
     return fail(`Unknown identifier "${w}". Use only the views and their columns, and write aliases with AS.`);
