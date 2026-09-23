@@ -1,0 +1,141 @@
+import "server-only";
+import { z } from "zod";
+import { bool, choice, decide, type Question } from "@/lib/ai/decision";
+import { generateJSON, inlineFile, type Part } from "@/lib/ai/gemini";
+import { db } from "@/lib/db";
+import { cleanEmail } from "@/lib/preprocess/email";
+import { get } from "@/lib/storage";
+import type { ResponseFile, ResponseRow, RfxQuestion } from "@/types/db";
+import { clearStageReviews, insertReviews } from "./reviews";
+
+// TRD §9.7 P-QA-EXTRACT (verbatim, with the question list and the input note filled in).
+const P_QA = `The buyer asked a supplier these questions:
+{questions}
+From the supplier's text below, extract the supplier's answer to each question if present: the verbatim answer text, a normalised yes/no (for yes_no), a number (for number), and where it appears (line/page + snippet). If a question is not answered, return found=false.
+Do not infer answers from unrelated statements; only from explicit answers or clearly equivalent statements (e.g. "ISO 9001:2015 certified" answers a certification question).
+Return ONLY JSON matching the schema, one entry per question.
+The supplier's documents follow (spreadsheets as "[row N] A1=…", documents as "[p N]", emails as "[l N]"; PDFs and images attached).`;
+
+const TEXT_CAP = 12_000; // TRD §8.5
+const YES = "yes", NO = "no", UNCLEAR = "unclear or pending", NONE = "not answered";
+
+const QaResult = z.object({
+  answers: z.array(z.object({
+    q_no: z.number().int(), found: z.boolean(), answer_raw: z.string().nullable(), answer_bool: z.boolean().nullable(),
+    answer_number: z.number().nullable(), answer_text: z.string().nullable(),
+    location: z.object({ type: z.string(), page: z.number().optional(), line: z.number().optional(), sheet: z.string().optional(), ref: z.string().optional(), snippet: z.string() }).nullable(),
+    confidence: z.number().min(0).max(1),
+  })),
+});
+
+export type QuestionnaireSummary = { answered: number; ambiguous: number; missing: number; failing: number[]; provider: string | null; sources: string[] };
+
+/** TRD §8.5 — Q&A from questionnaire files, quotation files and the email body → questionnaire_answers. */
+export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSummary> {
+  if (!resp.vendor_id) throw new Error("Response has no vendor yet; assign one first.");
+  const [{ data: files, error: fe }, { data: qs, error: qe }, { data: prior, error: pe }] = await Promise.all([
+    db().from("response_files").select("*").eq("response_id", resp.id).in("file_kind", ["questionnaire", "quotation"]).order("created_at"),
+    db().from("rfx_questions").select("*").eq("rfx_id", resp.rfx_id).order("q_no"),
+    db().from("questionnaire_answers").select("question_id, state").eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id),
+  ]);
+  if (fe || qe || pe) throw fe ?? qe ?? pe;
+  const questions = qs as RfxQuestion[];
+  await clearStageReviews(resp.id, "questionnaire");
+
+  // Questionnaire files first so the cap never cuts them.
+  const ordered = (files as ResponseFile[]).sort((a, b) => Number(b.file_kind === "questionnaire") - Number(a.file_kind === "questionnaire"));
+  const parts: Part[] = [];
+  const sources: string[] = [];
+  let budget = TEXT_CAP;
+  for (const f of ordered) {
+    if (f.derived_text_path) {
+      if (budget <= 0) continue;
+      const text = (await get("derived", f.derived_text_path)).toString("utf8").slice(0, budget);
+      budget -= text.length;
+      parts.push({ text: `### ${f.original_name}\n${text}` });
+    } else if (f.derived_image_paths?.length) {
+      parts.push({ text: `### ${f.original_name} (image)` }, inlineFile(await get("derived", f.derived_image_paths[0]), "image/png"));
+    } else {
+      parts.push({ text: `### ${f.original_name} (PDF)` }, inlineFile(await get("raw", f.storage_path), "application/pdf"));
+    }
+    sources.push(f.original_name);
+  }
+  if (resp.email_text && budget > 0) { parts.push({ text: `### email body\n${cleanEmail(resp.email_text).slice(0, budget)}` }); sources.push("email body"); }
+
+  const qList = questions.map((q) => `Q${q.q_no} (${q.answer_type}): ${q.text}`).join(" | ");
+  const qa = parts.length
+    ? await generateJSON({ tier: "strong", purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id, schema: QaResult, temperature: 0,
+        parts: [{ text: P_QA.replace("{questions}", qList) }, ...parts] })
+    : { answers: [] };
+  const byNo = new Map(qa.answers.map((a) => [a.q_no, a]));
+
+  // One decide() per vendor: yes/no → choice (yes / no / unclear or pending / not answered); number & text → "stated" boolean.
+  const found = questions.filter((q) => byNo.get(q.q_no)?.found);
+  const dq: Record<string, Question> = {};
+  for (const q of found) {
+    dq[`q${q.q_no}`] = q.answer_type === "yes_no"
+      ? { type: "choice", options: [YES, NO, UNCLEAR, NONE], instruction: `How does the supplier answer Q${q.q_no} ("${q.text}")? ${YES} = confirms, even with a caveat or condition; ${NO} = denies; ${UNCLEAR} = neither confirms nor denies, e.g. still in process, planned, or expected later; ${NONE} = the text doesn't address it.` }
+      : { type: "boolean", statement: `The supplier explicitly states ${q.answer_type === "number" ? "a number" : "an answer"} for Q${q.q_no} ("${q.text}").` };
+  }
+  const state = found.map((q) => {
+    const a = byNo.get(q.q_no)!;
+    return `Q${q.q_no} (${q.answer_type}): ${q.text}\n  Supplier's answer: "${(a.answer_raw ?? "").slice(0, 300)}"${a.location?.snippet ? ` (source: "${a.location.snippet.slice(0, 150)}")` : ""}`;
+  }).join("\n");
+  const d = found.length ? await decide(state, dq, { purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id }) : null;
+
+  const reviewed = new Set((prior ?? []).filter((p) => p.state === "reviewed").map((p) => p.question_id));
+  const rows = questions.filter((q) => !reviewed.has(q.id)).map((q) => {
+    const a = byNo.get(q.q_no);
+    const base = { rfx_id: resp.rfx_id, question_id: q.id, vendor_id: resp.vendor_id, response_id: resp.id, answer_raw: a?.answer_raw ?? null, location: a?.location ?? null, provider: d?.provider ?? null, reviewed_by: null, reviewed_at: null };
+    const missing = { ...base, state: "missing", answer_bool: null, answer_number: null, answer_text: null, probability: null, passes: null };
+    if (!a?.found || !d) return missing;
+    if (q.answer_type === "yes_no") {
+      const c = choice(d, `q${q.q_no}`);
+      const [py, pn] = [c.probabilities[YES] ?? 0, c.probabilities[NO] ?? 0];
+      if (c.answer === NONE) return { ...missing, answer_raw: a.answer_raw, provider: d.provider };
+      const pTrue = py + pn > 0 ? round(py / (py + pn)) : 0.5;
+      if (c.answer === UNCLEAR || (pTrue >= 0.4 && pTrue <= 0.6)) {
+        return { ...base, state: "ambiguous", answer_bool: null, answer_number: null, answer_text: a.answer_raw, probability: pTrue, passes: null };
+      }
+      const yes = pTrue > 0.5;
+      return { ...base, state: "answered", answer_bool: yes, answer_number: null, answer_text: a.answer_raw, probability: pTrue, passes: passes(q.disqualify_if, { bool: yes }) };
+    }
+    const stated = bool(d, `q${q.q_no}`);
+    const num = q.answer_type === "number" ? a.answer_number : null;
+    if (stated < 0.5 || (q.answer_type === "number" && num === null)) return { ...missing, answer_raw: a.answer_raw, provider: d.provider, probability: round(stated) };
+    return { ...base, state: "answered", answer_bool: null, answer_number: num, answer_text: a.answer_text ?? a.answer_raw, probability: round(stated), passes: passes(q.disqualify_if, { num }) };
+  });
+  if (rows.length) {
+    const { error } = await db().from("questionnaire_answers").upsert(rows, { onConflict: "question_id,vendor_id" });
+    if (error) throw error;
+  }
+
+  await insertReviews(resp, "questionnaire", rows.filter((r) => r.state === "ambiguous").map((r) => {
+    const q = questions.find((x) => x.id === r.question_id)!;
+    return {
+      type: "questionnaire_ambiguous", question_id: q.id, title: `Q${q.q_no} answer unclear: ${q.text}`, detail: r.answer_raw, probability: r.probability,
+      evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw },
+    };
+  }));
+
+  return {
+    answered: rows.filter((r) => r.state === "answered").length, ambiguous: rows.filter((r) => r.state === "ambiguous").length,
+    missing: rows.filter((r) => r.state === "missing").length,
+    failing: rows.filter((r) => r.passes === false).map((r) => questions.find((q) => q.id === r.question_id)!.q_no),
+    provider: d?.provider ?? null, sources,
+  };
+}
+
+/** disqualify_if: "no" | "yes" | "lt:N" | "lte:N" | "gt:N" | "gte:N" → does the answer pass? Null when there is no rule. */
+export function passes(rule: string | null, a: { bool?: boolean; num?: number | null }): boolean | null {
+  if (!rule) return true;
+  if (rule === "no") return a.bool !== false;
+  if (rule === "yes") return a.bool !== true;
+  const m = rule.match(/^(lt|lte|gt|gte):(-?\d+(?:\.\d+)?)$/);
+  if (!m || a.num === null || a.num === undefined) return null;
+  const n = Number(m[2]);
+  const fails = { lt: a.num < n, lte: a.num <= n, gt: a.num > n, gte: a.num >= n }[m[1] as "lt"];
+  return !fails;
+}
+
+const round = (p: number) => Math.round(p * 1000) / 1000;
