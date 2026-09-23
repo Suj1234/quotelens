@@ -1,7 +1,7 @@
 # Progress
 ## Current: Phase P2 ✅ checkpoint — waiting for Sabarish's eval review; next task P3-T1 (comparison grid)
 ## Deploy URL: https://quotelens-seven.vercel.app
-## Eval (latest): clean MER-0419 **150/150** (correct 150, flagged_ok 0, wrong 0, missing 0), questionnaire 48/50 · realistic MER-0417 **150/150**, questionnaire 41/50 — 2026-09-24 00:40
+## Eval (latest): clean MER-0419 **150/150**, questionnaire **50/50** (twice) · realistic MER-0417 **150/150**, questionnaire 42–43/50 (the 7 misses = OrientPack sent no questionnaire) — 2026-09-24 01:30
 ## Done
 - [x] P0-T1 Scaffold — Next 16.3.6 + Tailwind v4 + shadcn (radix-nova, sonner instead of toast), all listed deps, DESIGN tokens in globals.css, IBM Plex via next/font, `.env.example`, vitest config. `npm run dev` shows a page.
 - [x] P0-T2 Supabase — migrations 0001 (TRD §6.1–6.20 verbatim + RLS lock-down), 0002 (§6.21 views + `run_readonly_query`), 0003 (buckets); validated on embedded Postgres; `src/lib/db.ts`, `src/types/db.ts`. Applied 2026-09-23 with `npm run db:migrate`; `db:check`: rfx count ran, 4 private buckets, `run_readonly_query` OK. Publishable key blocked from `users` and views (42501).
@@ -31,10 +31,9 @@
 - [x] P2-T8 Eval runner — `src/lib/eval/run.ts` (TRD §18 + README §5: correct / flagged_ok incl. Kohinoor alt with a discount_treatment item / wrong / missing; ambiguous best guess must be within tolerance; OrientPack 14 legible read accepted; reviewed cells judged on the approved value), gold key read from bucket `seed` (works on Vercel for the P8 page), writes `eval_runs`. `scripts/run-eval.ts` (`--rfx`), `scripts/run-seed-pipeline.ts` (`--set clean|realistic`, `--rfx`, `--from STAGE` to skip reloading). Verdict unit test. Fixed the seed reload's delete order (review items / ledger before cells).
   **Full `npm run pipeline:seed` from scratch** — clean (MER-0419): 150/150, questionnaire 48–49/50, 83 s wall for 5 responses in parallel; slowest single stage = Balaji extract 33 s. Realistic (MER-0417): 150/150, questionnaire 41/50 (OrientPack's realistic reply has no questionnaire PDF → 7 × missing is correct behaviour; Anand Q8/Q9 as in clean).
 - [x] **P2 checkpoint** — 37 tests, lint, build green; pushed `13a1ff0`, Vercel redeployed. **Production check:** Westline on MER-0419 → Re-run all stages: classify 2.9 s · extract 22.0 s · map 2.7 s · normalise 2.0 s · questionnaire 5.5 s · flags done; Mapped column shows L5/L9 with the amber `unit?` chip (DESIGN §3.5), compared with the prototype at 1440 px.
+- [x] **P2 review follow-up (Sabarish's answers, 2026-09-24)** — ranges read at the end worse for the buyer (gold Anand Q8 → 12); caveated yes = yes; `questionnaire_missing` review card (migration 0005) when mandatory answers are missing; related-figure misreads blocked (P-QA-EXTRACT v2 + decision state leads with the supplier's own text; v1 archived in `prompts/archive/`). Clean questionnaire 48 → **50/50** (stable over two runs); realistic 41 → 42–43/50 and no wrong answers left (Q4 misread gone). Prices unchanged at 150/150 on both sets.
 ## In progress
 ## Open questions (for Sabarish)
-- **Questionnaire, Anand Q8** "10-12 days for regular orders": we store 12 (the gold key says 10). Should a range be read as its lower or upper end? Left as the model read it; easy to change with one prompt line.
-- **Questionnaire, Anand Q9** "Only Nelamangala regularly; Hosur on request": we mark it *unclear* (review item), gold says *yes with caveat*. Q9 doesn't disqualify, so it doesn't change who is cleared. Kept the honest flag rather than tuning toward the key.
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - Add `NEXT_PUBLIC_APP_URL=https://quotelens-seven.vercel.app` in Vercel env (needed from P5 for links in emails; picked up on the next deploy).
@@ -43,7 +42,7 @@
 - Browser console shows 404s for prefetched links to `/rfx/new` and `/rfx/{id}` (overview) — those pages arrive in P5-T1/P5-T4.
 - P1 visual check vs prototype (Responses, 1440 px): layout, rows, pipeline strip, Files/Terms cards and items table match. Differences, all waiting on later tasks: header status stays "Issued" (flags P2-T7 moves it to receiving/reviewing); "30/30 priced", questionnaire "cleared" chip and the Mapped column need P2; Overview/Review/Comparison/Award tabs and Sync inbox/Ask buttons arrive with their phases; "Add response" needs the Inbox sheet (P5). One deliberate deviation: response detail is its own page (TRD §3 route) instead of an expanded row (DESIGN §3.5) — see DECISIONS.
 - Realistic Balaji "Revised from 13200" comment: extraction still sets `references_prior_pricing = true`, but the terms decision reads it as p ≈ 0 and flags writes `false` back (fixed in P2-T5/T7).
-- Realistic OrientPack: the fast questionnaire model reads "lead time 6 days ex-works" as Q4 (sample lead time). Not disqualifying; see DECISIONS.
+- Realistic OrientPack (blurry rotated photo): Q10 "Payment 45 days" sometimes comes out `missing` instead of *yes* (1 run in 2) — fails safe (review card, no false "no").
 - Gemini emulation gives mapping p = 1.00 on every seed item, so the 0.60–0.85 "Mapping needs a look" path is only exercised by unit logic, not by the seed data.
 - Extraction wording varies run to run: one Kohinoor run copied the page-1 footnote into every item's `notes` and folded the Size/Ply columns into `vendor_description`. Numbers unaffected; revisit in P2 if mapping suffers.
 - P0 checkpoint: sign-in and RFx list compared with the prototype at 1440 px (match; prototype renders in quirks mode, see DECISIONS) and checked at 375/768/1440/2560 px on production — no sideways page scroll, tables scroll inside their card on phones.

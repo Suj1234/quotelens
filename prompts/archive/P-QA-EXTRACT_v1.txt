@@ -1,0 +1,6 @@
+The buyer asked a supplier these questions:
+{questions}
+From the supplier's text below, extract the supplier's answer to each question if present: the verbatim answer text, a normalised yes/no (for yes_no), a number (for number), and where it appears (line/page + snippet). If a question is not answered, return found=false.
+Do not infer answers from unrelated statements; only from explicit answers or clearly equivalent statements (e.g. "ISO 9001:2015 certified" answers a certification question).
+Return ONLY JSON matching the schema, one entry per question.
+The supplier's documents follow (spreadsheets as "[row N] A1=…", documents as "[p N]", emails as "[l N]"; PDFs and images attached).

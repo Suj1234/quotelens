@@ -6,13 +6,15 @@ import { db } from "@/lib/db";
 import { cleanEmail } from "@/lib/preprocess/email";
 import { get } from "@/lib/storage";
 import type { ResponseFile, ResponseRow, RfxQuestion } from "@/types/db";
-import { clearStageReviews, insertReviews } from "./reviews";
+import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
 
-// TRD §9.7 P-QA-EXTRACT (verbatim, with the question list and the input note filled in).
+// TRD §9.7 P-QA-EXTRACT + two rules (v2, 2026-09-24; v1 in prompts/archive/): exact-question answers only, and a fixed reading of ranges.
 const P_QA = `The buyer asked a supplier these questions:
 {questions}
 From the supplier's text below, extract the supplier's answer to each question if present: the verbatim answer text, a normalised yes/no (for yes_no), a number (for number), and where it appears (line/page + snippet). If a question is not answered, return found=false.
 Do not infer answers from unrelated statements; only from explicit answers or clearly equivalent statements (e.g. "ISO 9001:2015 certified" answers a certification question).
+Answer only the question asked: a related figure is not an answer (a regular-order lead time does not answer a sample lead-time question; an MOQ does not answer a capacity question) — return found=false.
+If the supplier gives a range, keep it verbatim in answer_raw and set answer_number to the end that is worse for the buyer: the upper end for lead times, minimum order quantities and prices; the lower end for capacities.
 Return ONLY JSON matching the schema, one entry per question.
 The supplier's documents follow (spreadsheets as "[row N] A1=…", documents as "[p N]", emails as "[l N]"; PDFs and images attached).`;
 
@@ -74,12 +76,13 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const dq: Record<string, Question> = {};
   for (const q of found) {
     dq[`q${q.q_no}`] = q.answer_type === "yes_no"
-      ? { type: "choice", options: [YES, NO, UNCLEAR, NONE], instruction: `How does the supplier answer Q${q.q_no} ("${q.text}")? ${YES} = confirms, even with a caveat or condition; ${NO} = denies; ${UNCLEAR} = neither confirms nor denies, e.g. still in process, planned, or expected later; ${NONE} = the text doesn't address it.` }
-      : { type: "boolean", statement: `The supplier explicitly states ${q.answer_type === "number" ? "a number" : "an answer"} for Q${q.q_no} ("${q.text}").` };
+      ? { type: "choice", options: [YES, NO, UNCLEAR, NONE], instruction: `How does the supplier answer Q${q.q_no} ("${q.text}")? ${YES} = confirms, even partly or with a caveat or condition (e.g. "yes, on request", "only X regularly, Y on request", "yes if paid in 45 days"); ${NO} = denies; ${UNCLEAR} = neither confirms nor denies, e.g. still in process, planned, or expected later; ${NONE} = the text doesn't address it.` }
+      : { type: "boolean", statement: `The supplier explicitly states ${q.answer_type === "number" ? "a number" : "an answer"} for Q${q.q_no} ("${q.text}"), and it is about exactly that — not a related figure such as a different lead time or quantity.` };
   }
   const state = found.map((q) => {
     const a = byNo.get(q.q_no)!;
-    return `Q${q.q_no} (${q.answer_type}): ${q.text}\n  Supplier's answer: "${(a.answer_raw ?? "").slice(0, 300)}"${a.location?.snippet ? ` (source: "${a.location.snippet.slice(0, 150)}")` : ""}`;
+    // The supplier's own words lead; the extractor's reading is secondary (it can pick the wrong figure off a photo).
+    return `Q${q.q_no} (${q.answer_type}): ${q.text}\n  Supplier's text: "${(a.location?.snippet ?? a.answer_raw ?? "").slice(0, 300)}"${a.location?.snippet && a.answer_raw ? `\n  Extractor's reading (may be wrong; the supplier's text wins): "${a.answer_raw.slice(0, 200)}"` : ""}`;
   }).join("\n");
   const d = found.length ? await decide(state, dq, { purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id }) : null;
 
@@ -110,13 +113,22 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
     if (error) throw error;
   }
 
-  await insertReviews(resp, "questionnaire", rows.filter((r) => r.state === "ambiguous").map((r) => {
+  const reviews: ReviewInput[] = rows.filter((r) => r.state === "ambiguous").map((r) => {
     const q = questions.find((x) => x.id === r.question_id)!;
     return {
       type: "questionnaire_ambiguous", question_id: q.id, title: `Q${q.q_no} answer unclear: ${q.text}`, detail: r.answer_raw, probability: r.probability,
       evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw },
     };
-  }));
+  });
+  // Missing mandatory answers make the vendor "not cleared" (view 0004) — say so once, so the buyer can ask the vendor.
+  const missingMandatory = rows.filter((r) => r.state === "missing").map((r) => questions.find((q) => q.id === r.question_id)!).filter((q) => q.mandatory);
+  if (missingMandatory.length) {
+    reviews.push({
+      type: "questionnaire_missing", title: `Questionnaire not returned: ${missingMandatory.length} mandatory ${missingMandatory.length === 1 ? "answer" : "answers"} missing`,
+      detail: missingMandatory.map((q) => `Q${q.q_no} ${q.text}`).join(" · "), proposed_value: missingMandatory.length, evidence: { sources },
+    });
+  }
+  await insertReviews(resp, "questionnaire", reviews);
 
   return {
     answered: rows.filter((r) => r.state === "answered").length, ambiguous: rows.filter((r) => r.state === "ambiguous").length,

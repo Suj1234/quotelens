@@ -1,0 +1,5 @@
+yes_no choice instruction:
+How does the supplier answer Q${q.q_no} ("${q.text}")? ${YES} = confirms, even with a caveat or condition; ${NO} = denies; ${UNCLEAR} = neither confirms nor denies, e.g. still in process, planned, or expected later; ${NONE} = the text doesn't address it.
+
+number/text boolean statement:
+The supplier explicitly states ${q.answer_type === "number" ? "a number" : "an answer"} for Q${q.q_no} ("${q.text}").
