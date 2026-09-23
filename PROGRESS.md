@@ -37,7 +37,7 @@
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - ~~Add `NEXT_PUBLIC_APP_URL` in Vercel env~~ — done by Sabarish 2026-09-24 (used from P5; any deploy after that picks it up).
-- Confirm Fluid Compute is on: Vercel → project quotelens → Settings → Functions → Fluid Compute = Enabled (lets pipeline steps run up to 300 s instead of 60 s; redeploy if you had to switch it on).
+- ~~Confirm Fluid Compute is on~~ — confirmed Enabled by Sabarish 2026-09-24 (screenshot). Function Region shows "Overridden" because `vercel.json` pins `hnd1` (Tokyo, next to Supabase) — intended.
 ## Known issues
 - Pipeline strip: during Re-run all, later stages keep showing last run's "done" until their turn comes (they should read pending). Cosmetic; fix with the P3 UI pass.
 - Browser console shows 404s for prefetched links to `/rfx/new` and `/rfx/{id}` (overview) — those pages arrive in P5-T1/P5-T4.
