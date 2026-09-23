@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P2, next task P2-T2 (candidate shortlist)
+## Current: Phase P2, next task P2-T3 (map stage)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -20,6 +20,7 @@
   **Production check:** run-all on Vercel for Westline — classify 4.2 s, extract 27.0 s, 30/30 items, NDJSON streamed; 32 s wall.
 - [x] P1-T7 Pipeline runner — `src/lib/pipeline/run.ts` (`runStage`: status running→done/error, `stage_errors`, `summary[stage]` + timings, `audit_events pipeline.stage`; `runAll` chain stops at first error), `POST /api/responses/{id}/stage/{stage}`, `POST /api/responses/{id}/run-all` (NDJSON stream), pipeline strip with Run all / Retry per stage and elapsed time. Verified in the browser: Run all on Kohinoor → classify 6.1 s, extract 24.4 s; stages not built yet stay `pending`.
 - [x] P2-T1 Decision layer — `providers/jev.ts` (OpenRouter → Jev adapter: boolean→noul, choice→choice with o0..oN keys, score→score; 8 s timeout, retry on 429/5xx, two documented endpoints) + routing in `decide()` (`auto` → Jev only when `OPENROUTER_API_KEY` is set; `jev` same; `gemini` never calls Jev; any Jev error → Gemini, failure logged). No key yet → the adapter stays inert. 4 unit tests (mocked SDK/fetch): choice probabilities sum to 1, Jev mapping, fallback, gemini-only.
+- [x] P2-T2 Candidate shortlist — `src/lib/pipeline/shortlist.ts` (pure): size ±5% (TRD regex, also `×` and spaces), ply, item type words, Jaccard, our-SKU substring, explicit `item N` (+0.5), bare row number (+0.15 weak prior), ranges `items 1 to 12`. Reads the description/SKU first and the location snippet second (Westline's "items 5 and 9" sentence). 6 tests on the real line sheet green.
 ## In progress
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
