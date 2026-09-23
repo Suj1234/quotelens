@@ -1,0 +1,33 @@
+/* Values from design/prototype.html `.signin` (DESIGN.md §3.1) */
+.signin { min-height: 100%; display: grid; grid-template-columns: 1.15fr minmax(360px, 460px); }
+.visual { background: var(--surface); border-right: 1px solid var(--hair); padding: 44px 56px; display: flex; }
+.vis { display: flex; flex-direction: column; max-width: 640px; width: 100%; min-height: 100%; }
+.vis h1 { font-size: 30px; margin-top: 44px; max-width: 20ch; }
+.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; margin-top: 34px; }
+.step { display: grid; grid-template-columns: 30px 1fr; gap: 4px 12px; font-size: 13px; }
+.ico { grid-row: 1 / 3; width: 30px; height: 30px; border-radius: 6px; background: var(--accent-tint); color: var(--accent-ink); display: grid; place-items: center; }
+.ico svg { width: 16px; height: 16px; }
+.step b { font-weight: 600; }
+.step span { color: var(--muted); }
+.mini { margin-top: 34px; border: 1px solid var(--hair); border-radius: 6px; overflow: hidden; font-size: 12.5px; background: var(--paper); }
+.row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; border-bottom: 1px solid var(--hair2); }
+.row > span { padding: 9px 12px; text-align: right; }
+.row > span:first-child { text-align: left; }
+.head { background: var(--tint); font-size: 11px; color: var(--muted); letter-spacing: .03em; }
+.min { box-shadow: inset 3px 0 0 var(--accent); }
+.amb { color: var(--amber); background: var(--amber-bg); font-family: var(--font-sans); font-size: 11px; }
+.nq { color: var(--faint); font-family: var(--font-sans); font-size: 11px; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--hair2) 6px 7px); }
+.cap { padding: 8px 12px; font-size: 11.5px; color: var(--muted); }
+.form { padding: 44px 48px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; background: var(--paper); }
+.fwrap { max-width: 340px; margin-top: 44px; }
+.fwrap label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+.demo { margin-top: 26px; border-top: 1px solid var(--hair); padding-top: 14px; }
+.demo :global(.eyebrow) { margin-bottom: 8px; }
+.demo button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: 5px; text-align: left; }
+.demo button:hover { background: var(--tint); }
+.error { margin-top: 10px; font-size: 12px; color: var(--red); }
+@media (max-width: 900px) {
+  .signin { grid-template-columns: 1fr; }
+  .visual { display: none; }
+  .form { padding: 44px 16px; }
+}
