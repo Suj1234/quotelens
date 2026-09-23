@@ -9,13 +9,14 @@ import { money } from "@/lib/format";
 import { guardSql, rewriteBestGuess } from "./sql-guard";
 import { aggregates, chartSpec, primaryTotal, unverifiedNumbers, type Row } from "./result";
 
-// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and three guard notes (DECISIONS P4-T2).
+// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price (v1, v2 in prompts/archive/).
 const P_SQL = `You convert a procurement buyer's question into ONE PostgreSQL SELECT over these read-only views. Return JSON only.
 
 Views:
 v_comparison(rfx_code, line_no, sku, description, ply, item_type, delivery_location, monthly_qty, annual_qty, vendor, vendor_code, state, unit_price, landed_price, original_value, original_unit, original_currency, mapping_probability, annual_value_unit, annual_value_landed, rfx_id, rfx_line_id, vendor_id)
   -- one row per line × vendor. state ∈ confirmed|inferred|reviewed|low_confidence|ambiguous|not_quoted|references_prior|excluded|conflict.
   -- unit_price/landed_price are INR per 1000 pieces; null when not priced.
+  -- unsure cells (low_confidence, ambiguous, references_prior, conflict) always have unit_price null; list them by state, not by price.
 v_vendor_status(rfx_id, vendor_id, vendor, vendor_code, status, disqualified_reason, lines_priced, lines_total, cleared_questionnaire, validity_until, freight_included, validity_days)
 v_questionnaire(rfx_id, q_no, question, answer_type, disqualify_if, vendor, vendor_code, answer_bool, answer_number, answer_text, probability, state, passes)
 v_assumptions(rfx_id, kind, description, basis, made_by, created_at, vendor, line_no)
@@ -33,6 +34,7 @@ Guard notes (a query that breaks these is rejected):
 - Write every column and table alias with AS.
 - Filter every view you read on rfx_id = '{rfx_id}', or join it on rfx_id to a view that is filtered.
 - If the question cannot be answered from these views, return "sql": "".
+- A request to export or download an earlier answer is answered by returning that answer's query again (the app offers the file).
 
 Return JSON:
 {
@@ -204,6 +206,10 @@ export async function ask(o: { rfxId: string; question: string; userId: string; 
     }
   }
 
+  // Unsure cells that are rows of this result (the money riding on them is only facts about *these* rows).
+  const inRows = rows.length && "line_no" in rows[0] && rows.some((r) => typeof r.state === "string" && UNSURE.includes(r.state as string))
+    ? unsure.filter((c) => rows.some((r) => Number(r.line_no) === c.line_no && UNSURE.includes(r.state as string) && Object.values(r).some((v) => v === c.vendor || v === grid.vendors.find((x) => x.code === c.vendor)?.name)))
+    : [];
   const aggs = aggregates(rows);
   const total = primaryTotal(aggs.totals);
   let answer = SAFE_FAIL, unverified: string[] = [];
@@ -213,10 +219,8 @@ export async function ask(o: { rfxId: string; question: string; userId: string; 
       row_count: aggs.row_count, distinct_vendors: aggs.vendors,
       totals: Object.fromEntries(Object.entries(aggs.totals).map(([k, v]) => [k, money(Math.round(v))])),
       // Money riding on unsure cells, at the system's best guess where it has one (the views can't see best guesses).
-      ...(/state\s+in\s*\([^)]*'(ambiguous|low_confidence|references_prior|conflict)'/i.test(sql ?? "") ? {
-        unsure_cells_value_at_best_guess: money(Math.round(atStake(scoped.length ? scoped : unsure))),
-        unsure_cells_with_a_best_guess: (scoped.length ? scoped : unsure).filter((c) => c.best_guess !== null).length,
-      } : {}),
+      ...(rows.length === 0 ? { result: "no rows matched the query" } : {}),
+      ...(inRows.length ? { unsure_cells_in_result: inRows.length, unsure_cells_value_at_best_guess: money(Math.round(atStake(inRows))), unsure_cells_with_a_best_guess: inRows.filter((c) => c.best_guess !== null).length } : {}),
       ...(bestGuess ? { total_without_best_guesses: money(Math.round(bestGuess.total_without ?? 0)), total_with_best_guesses: money(Math.round(bestGuess.total_with ?? 0)), best_guess_cells_filled: bestGuess.cells } : {}),
       excluded: exclusions.map((e) => e.vendor ? `${e.vendor}: ${e.reason}` : `${e.cells} ${e.reason}`),
     };

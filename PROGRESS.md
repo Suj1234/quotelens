@@ -73,9 +73,9 @@
   | 15 | Sheet: stacked answer cards, 3 suggestion chips, textarea, Ask, history list (DESIGN §3.7, TRD §17.9) | ✓ browser: stacked cards, 3 chips (asked ones drop out), textarea (Enter asks, Shift+Enter newline), Ask button, 'Earlier questions · 20' list from /api/ask/history (opening one adds its card) |
   | 16 | Card: question, answer, amber exclusions, How I computed this + Show query `<pre>`, 260px table box paginated, inline bar chart (no library), unresolved notice + Include best guesses → both totals, Export (DESIGN §2.13/§2.15, TRD §17.9, PRD #25–26) | ✓ browser on Q1/Q2: answer, amber 'Excluded: …', How I computed this + Show query → <pre>, 260 px table (nowrap, scrolls), pager 'Rows 26–30 of 30', Q2 inline bars (₹4.58 cr vs ₹4.53 cr, no library), '13 cells unresolved · ₹73.2 L at stake' + Include best guesses → Without/With toggle with both totals. Export arrives with P4-T4 |
   | 17 | No dead "Save as scenario" button; DECISIONS says it lands with P7-T1 | ✓ no Save-as-scenario button rendered; DECISIONS records it lands with P7-T1 |
-  | 18 | All PRD §13 questions computed on MER-0419 through the UI (Q1–Q8 + shortest validity, line 22, Anand 5-ply per-kg) with answer / rows / total / SQL summary recorded | open |
-  | 19 | Q1–Q8 asked twice; both runs computed and equivalent | open |
-  | 20 | Each answer ≤ 15 s; timings recorded (CLAUDE.md §10) | open |
+  | 18 | All PRD §13 questions computed on MER-0419 through the UI (Q1–Q8 + shortest validity, line 22, Anand 5-ply per-kg) with answer / rows / total / SQL summary recorded | ✓ all 11 asked through the Ask sheet as Priya on MER-0419 (table 'Ask results' below); all computed, SQL generated at run time |
+  | 19 | Q1–Q8 asked twice; both runs computed and equivalent | ✓ Q1–Q8 asked twice through the UI (runs 21:39 and 21:51): Q1 30 rows ₹4,53,38,297 both; Q2 ₹4,97,191 (1.08 %) vs Balaji ₹4,58,35,488 both; Q3 0 lines both; Q4 ranking unchanged (Kohinoor, Balaji, OrientPack) both; Q5 hybrid ₹4,20,18,677 'better' both; Q7 83.15, ±₹13,99,785 both. Differences found and fixed: Q8 refused in run A (fixed by P-SQL v2 export note; then computed 2/2 = Q1's 30 rows), Q6 returned 0 rows in run B (P-SQL v3; then 13 rows 4/4 incl. one more UI run). Column names vary run to run (vendor / winning_vendor / cheapest_vendor) |
+  | 20 | Each answer ≤ 15 s; timings recorded (CLAUDE.md §10) | ✓ UI timings 3.4–10.2 s, all ≤ 15 s (Q5 10.2 s and Q7 9.9 s in run A, 4.8 s in run B); earlier default-thinking runs took 14–43 s → LOW thinking (DECISIONS). One curl-run outlier 19.3 s (slow first model call + repair) — model latency varies |
   | 21 | Off-topic/unsafe → "I couldn't form a safe query for that; try rephrasing"; network error → toast with code (TRD §13.1, §19) | ✓ weather question → safe-query answer (script + curl); fetch forced to fail in the browser → toast 'Couldn't reach the server — check the connection and ask again (NETWORK)', question kept in the box; API errors toast '{error} ({code})' |
   | 22 | `GET /api/export/comparison?rfx=&format=xlsx|csv&basis=` — xlsx line × vendor, state fills (DESIGN colours), legend + ledger sheet; csv tidy rows (TRD §16, PRD #28) | ✓ `src/lib/export.ts` + route: MER-0419 xlsx = Comparison (30 lines × 5 vendors, headers ✓/✗/?, totals row), 'Legend & notes' (9 states with meanings + counts, vendor questionnaire status), 'Ledger' (8 folded rows); csv = 150 tidy rows (line, vendor, state, unit, landed, best guess, as written, annual value) |
   | 23 | `GET /api/export/query/{id}?format=csv|xlsx` (TRD §13.6/§16) | ✓ `/api/export/query/{id}` xlsx (Answer sheet in the query's column order + Question sheet with answer, how, exclusions, SQL) and csv; Q1 → 30 rows |
@@ -84,6 +84,55 @@
   | 26 | Tests + lint + build green; pipeline:seed 150/150; push | open |
   | 27 | Production: Q1 as Priya and as Sujit, computed with SQL shown; one export downloads | open |
   | 28 | This table fully ticked with evidence | open |
+  **Ask results on MER-0419 (UI, as Priya, 2026-09-24; answer · rows · total · SQL shape · time):**
+  | Q | Answer (computed) | Rows | Total | SQL | Time (run A / B) |
+  |---|---|---|---|---|---|
+  | Q1 cheapest qualified per line | Kohinoor, Balaji, OrientPack win lines; excluded Westline (failed Q6 BRC), Anand (Q6 unclear), 1 unsure cell (OrientPack L14) | 30 | ₹4,53,38,297 | v_comparison ⋈ v_vendor_status, cleared = true, row_number() over line | 4.9 / 4.1 s |
+  | Q2 saving vs single vendor | ₹4,97,191 (1.08 %) cheaper than Sri Balaji (only vendor pricing all 30) at ₹4,58,35,488; bar chart of both totals | 1 | ₹4,58,35,488 vs ₹4,53,38,297 | per-line min vs per-vendor sums with count = 30 | 5.4 / 5.2 s |
+  | Q3 single qualified quote | none — every line has ≥ 2 qualified quotes (checked with a direct SQL count) | 0 | — | count(*) over line having = 1 | 6.6 / 3.8 s |
+  | Q4 landed vs unit ranking | ranking unchanged: Kohinoor ₹4.39 cr, Balaji ₹4.58 cr, OrientPack ₹4.67 → ₹4.71 cr landed | 3 | — | sums + dense_rank() on both bases | 4.6 / 4.7 s |
+  | Q5 5-ply qualified + 3-ply overall | ₹4,20,18,677 — better than Q1 by ₹33,19,620 (7.32 %) | 1 | ₹4,20,18,677 | two per-line mins by ply, union, vs Q1 | 10.2 / 4.8 s |
+  | Q6 unsure cells + money | 13 cells (Westline 4 ambiguous, OrientPack L14 low, Anand 8 prior); ₹73,16,208 at best guess on 4 cells; Include best guesses fills the Westline values | 13 | ₹73.2 L at stake | state in unsure set | 4.5 / 4.7 s (after v3) |
+  | Q7 OrientPack USD ±3 % | ledger: USD→INR 83.15 (manual, 23 Sep 2026); base ₹4,66,59,502, ±₹13,99,785 → ₹4,80,59,287 / ₹4,52,59,716 | 1–2 | — | v_assumptions (fx_rate) + sums × 1.03 / 0.97 | 9.9 / 4.8 s |
+  | Q8 export Q1 | re-issues Q1 (30 rows, ₹4,53,38,297); Export/CSV buttons on the card download it | 30 | ₹4,53,38,297 | same as Q1 | 6.5 / 4.1 s |
+  | Shortest validity | Kohinoor, 30 days, valid until 24 Oct 2026 (others 60) | 5 | — | v_vendor_status order by validity_days | 3.4 s |
+  | Who didn't quote line 22 | nobody — all five quoted line 22 (checked directly) | 0 | — | v_comparison line 22, state not priced | 4.3 s |
+  | Why is Anand's 5-ply so cheap | ₹42 per kg converted with *our* spec weight per piece (ledger rows "₹/kg × 1318.1 g per piece from our spec (not the vendor's)") vs other vendors' prices | 40 | — | v_comparison ⋈ v_assumptions (weight_per_piece) | 8.3 s |
+  | Off-topic (weather) | "I couldn't form a safe query for that; try rephrasing" | 0 | — | planner returned no SQL | 2.0 s |
+- **Phase 5 requirement checklist** (sources: handoff §5, TRD §6.3–6.7/§9.1–9.3/§15.1–15.2/§16/§17.3–17.6/§22 item 2, PRD §8 Stages 1–3, DESIGN §2.3/§2.16/§3.3–3.5/§4). Test RFx rule: create/issue tests only on a throwaway "TEST co-pilot run" RFx, never MER-0418.
+  | # | Requirement (source) | Status / evidence |
+  |---|---|---|
+  | 29 | `/rfx/new` creates a draft (`POST /api/rfx`); `/rfx/new?id=` opens a draft; buyer only (approver redirect, API 403) (TRD §16/§17.3) | open |
+  | 29a | New RFx codes continue the series (MER-0420…), unique (found: codes are hand-seeded) | open |
+  | 30 | DESIGN §3.3 layout/copy: eyebrow "DRAFT · code", h1 "New RFx", sub-line, "Save draft", primary "Issue to N vendors" disabled until lines+terms+questionnaire; split 340–460 px | rest | open |
+  | 31 | Co-pilot card: header + status "terms pending · questionnaire pending", SUJIT/CO-PILOT log with 2 px rules, patch box, 4 chips, placeholder, hint "Attach xlsx / csv", Send (DESIGN §3.3) | open |
+  | 32 | `POST /api/rfx/{id}/copilot`: P-COPILOT §9.1 + `CopilotTurn` Zod; applies rfx_patch; transcript in `rfx.copilot_transcript`; ≤ 3 questions; never invents lines; audit per applied suggestion (TRD §9.1, PRD Stage 1) | open |
+  | 33 | Attachments xlsx/csv/txt → preprocessors → P-LINESHEET; `rfx_lines.xlsx` → exactly 30 lines matching `rfx_lines.csv` (script) (TRD §9.2, CLAUDE P5-T1) | open |
+  | 34 | "standard terms" → delivered, freight incl., 45 d, 60 d, 12 months, INR, per 1000 pcs (TRD §9.1) | open |
+  | 35 | Questionnaire request → 8–12 questions with types, mandatory, suggested disqualifiers; editable (TRD §9.1) | open |
+  | 36 | Tabs Lines [n] / Terms / Questionnaire [n] / Vendors [n], editable, `PATCH /api/rfx/{id}` draft-only (409 otherwise); Lines columns + add/remove + empty state + footer hint; Vendors from address book or name + email (TRD §17.3, DESIGN §3.3) | open |
+  | 37 | Every change survives a reload | open |
+  | 38 | Issue confirm dialog lists what is sent and to whom (TRD §17.3) | open |
+  | 39 | `POST /api/rfx/{id}/issue`: freeze v1 + status issued; line-sheet XLSX (exceljs) + questionnaire PDF (react-pdf) to `outbound`; P-DISPATCH per vendor incl. the exact sentence; `sendEmail()` queued → sent (mock, sent_at, attachments, Reply-To tag); invited_at; audits `rfx.frozen` + `dispatch.sent`; frozen → PATCH 409 (TRD §15.1–15.2, §9.3, PRD Stage 2) | open |
+  | 39a | Dispatch email signs with the buyer's name, title and email (P-DISPATCH {buyer_title}; users table has no title) | open |
+  | 40 | Outbox page: outbound list, Open → email block (DESIGN §2.16), downloadable attachments; XLSX read back = 30 lines, PDF has 10 questions (TRD §15.2) | open |
+  | 41 | Done-when (throwaway RFx): 5 outbox entries, each with both attachments | open |
+  | 42 | "Add response" quiet button per vendor row → 400 px sheet per DESIGN §3.5 (drop zone, OR PASTE THE EMAIL BODY, textarea, Use seed file, Submit and run, hint) → `POST /api/responses` + run-all → Response Detail with pipeline running | open |
+  | 43 | `/rfx/{id}/portal/{vendorId}`: mailbox look (From Sujit Menon, subject, body, attachments), Reply form (files + text), source='portal'; a portal reply runs the pipeline and its cells reach the grid (TRD §17.6) | open |
+  | 44 | Files > 4.5 MB: clear error or direct upload; never silent (Vercel limit) | open |
+  | 45 | Portal reply to the throwaway RFx doesn't touch MER-0419; MER-0419 still 150/150 afterwards | open |
+  | 45a | Seed reload resets the reloaded vendors' invitation status (found: Westline left at `clarification_sent` from P3 testing) | open |
+  | 46 | `/rfx/{id}/overview` = buyer default; `/rfx/{id}` → overview (buyer) / comparison (approver); buyer tabs Overview · Responses · Review [n] · Comparison (DESIGN §2.3/§4) | open |
+  | 47 | DESIGN §3.4: computed lead, "Needs you" card + "Open the queue", "The event" card, Vendors table (Vendor · Sent as · Received · Priced n/30 · Valid to + amber chip · Questionnaire chip · Needs you), Vendor communications timeline (direction, time, subject, attachments, message id, status) | open |
+  | 48 | Per vendor "Portal (mock)" + "Open response"; Load seeded responses in mock mode; no Go to Review/Comparison buttons (DESIGN §0.8, recorded); unmatched panel when any (TRD §17.4) | open |
+  | 49 | Header meta "Reviewing · 5 of 5 responded" (DESIGN §2.3) | open |
+  | 50 | Empty/early states: draft RFx (link to New RFx), issued with 0 replies | open |
+  | 51 | Production: TRD §22 item 2 flow end to end on a throwaway RFx; then delete it with a script | open |
+  | 52 | Production approver: no New RFx / Issue / Add response; no Overview tab; APIs 403 | open |
+  | 53 | Tests + lint + build green; pipeline:seed 150/150 clean; push | open |
+  | 54 | Final state: MER-0419 seeded with 14 open review items; MER-0417 realistic; MER-0418 untouched draft (v0, no comms, not invited); RFx list shows exactly these three | open |
+  | 55 | Side by side with the prototype at 1440 px: Ask sheet, New RFx, Overview, Responses + Add response sheet, Outbox, Portal | open |
+  | 56 | This table fully ticked with evidence | open |
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
