@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P0 ✅ complete — next task P1-T1 (storage helpers)
+## Current: Phase P1, next task P1-T3 (Gemini client)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -9,6 +9,8 @@
 - [x] P0-T4 Seed — `scripts/seed.ts` (users, 5 vendors, MER-0417/0418/0419 with 30 lines, 10 questions, 5 invited vendors + reply tags, settings defaults, dataset → bucket `seed`). App shell (top bar, rail, theme toggle, sign-out) and RFx list `/rfx` per DESIGN §2.1–2.2, §3.2. Build/lint/types/tests green. Ran twice (idempotent): 2 users, 5 vendors, 3 RFx, 90 lines, 30 questions, 15 invitations, 7 settings, 34 dataset files in bucket `seed`. `/rfx` lists MER-0417/0418/0419 for both users; New RFx button buyer-only.
 - [x] P0-T5 Deploy — GitHub `Suj1234/quotelens`, Vercel Hobby project `quotelens`, functions pinned to `hnd1` (Tokyo, next to Supabase ap-northeast-1). Verified on production: sign-in renders, logged-out `/rfx` → `/`, wrong password 401, Sujit and Priya sign in and see MER-0417/0418/0419; `x-vercel-id` shows `hnd1`.
 - [x] P0-T6 Model check — key works (32 Gemini models visible). FAST=`gemini-3.5-flash-lite`, STRONG=`gemini-3.8-flash`; both return valid schema JSON on text, the Kohinoor PDF and the OrientPack photo (`npm run check:models`). Details in DECISIONS.md.
+- [x] P1-T1 Storage helpers — `src/lib/storage.ts` put/get/list/signedUrl with TRD §5 paths; round-trip + signed-URL fetch verified against Supabase.
+- [x] P1-T2 Preprocessors — `src/lib/preprocess/` xlsx (cell refs, text numbers verbatim, comments, hidden rows marked, empty sheets dropped, 2,000-cell cap), docx (`[p N]`, `[table t row r]`), email/txt/eml (quoted blocks, `On … wrote:`, `-- ` and `Sent from my` removed; `[l N]`), image (EXIF rotate, ≤2000 px, normalise), pdf (page count, >20 pages split). 13 unit tests on the realistic seed files green.
 ## In progress
 ## Open questions (for Sabarish)
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
