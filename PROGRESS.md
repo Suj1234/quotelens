@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P2, P2 checkpoint (deploy + production check)
+## Current: Phase P2 ✅ checkpoint — waiting for Sabarish's eval review; next task P3-T1 (comparison grid)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): clean MER-0419 **150/150** (correct 150, flagged_ok 0, wrong 0, missing 0), questionnaire 48/50 · realistic MER-0417 **150/150**, questionnaire 41/50 — 2026-09-24 00:40
 ## Done
@@ -30,6 +30,7 @@
 - [x] P2-T7 Flags stage — `src/lib/pipeline/flags.ts`: flags from the decided terms (reused from normalise, decided afresh if normalise didn't run) + deterministic checks: `references_prior_pricing`, `freight_excluded`, `validity_short`, `currency_not_inr`, `total_discount_present`, `partial_quote` (any `not_quoted` cell). Writes the decision into the interpreted `response_terms` columns (so the realistic-Balaji "Revised from 13200" comment no longer reads as prior pricing), review items `validity_short` / `missing_line` (+ deduped freight/prior/discount), `rfx_vendors.status` invited → responded, RFx issued → receiving → reviewing when nobody is left waiting. **MER-0419:** Balaji [total_discount_present] · Kohinoor [validity_short, total_discount_present, partial_quote] · Westline [] · OrientPack [freight_excluded, currency_not_inr] · Anand [references_prior_pricing, freight_excluded]; RFx → reviewing. ~1.3 s.
 - [x] P2-T8 Eval runner — `src/lib/eval/run.ts` (TRD §18 + README §5: correct / flagged_ok incl. Kohinoor alt with a discount_treatment item / wrong / missing; ambiguous best guess must be within tolerance; OrientPack 14 legible read accepted; reviewed cells judged on the approved value), gold key read from bucket `seed` (works on Vercel for the P8 page), writes `eval_runs`. `scripts/run-eval.ts` (`--rfx`), `scripts/run-seed-pipeline.ts` (`--set clean|realistic`, `--rfx`, `--from STAGE` to skip reloading). Verdict unit test. Fixed the seed reload's delete order (review items / ledger before cells).
   **Full `npm run pipeline:seed` from scratch** — clean (MER-0419): 150/150, questionnaire 48–49/50, 83 s wall for 5 responses in parallel; slowest single stage = Balaji extract 33 s. Realistic (MER-0417): 150/150, questionnaire 41/50 (OrientPack's realistic reply has no questionnaire PDF → 7 × missing is correct behaviour; Anand Q8/Q9 as in clean).
+- [x] **P2 checkpoint** — 37 tests, lint, build green; pushed `13a1ff0`, Vercel redeployed. **Production check:** Westline on MER-0419 → Re-run all stages: classify 2.9 s · extract 22.0 s · map 2.7 s · normalise 2.0 s · questionnaire 5.5 s · flags done; Mapped column shows L5/L9 with the amber `unit?` chip (DESIGN §3.5), compared with the prototype at 1440 px.
 ## In progress
 ## Open questions (for Sabarish)
 - **Questionnaire, Anand Q8** "10-12 days for regular orders": we store 12 (the gold key says 10). Should a range be read as its lower or upper end? Left as the model read it; easy to change with one prompt line.
@@ -38,6 +39,8 @@
 - Recommended: reset the Supabase database password (it appeared once in a script error during setup) and update `DATABASE_URL` in `.env.local`.
 - Add `NEXT_PUBLIC_APP_URL=https://quotelens-seven.vercel.app` in Vercel env (needed from P5 for links in emails; picked up on the next deploy).
 ## Known issues
+- Pipeline strip: during Re-run all, later stages keep showing last run's "done" until their turn comes (they should read pending). Cosmetic; fix with the P3 UI pass.
+- Browser console shows 404s for prefetched links to `/rfx/new` and `/rfx/{id}` (overview) — those pages arrive in P5-T1/P5-T4.
 - P1 visual check vs prototype (Responses, 1440 px): layout, rows, pipeline strip, Files/Terms cards and items table match. Differences, all waiting on later tasks: header status stays "Issued" (flags P2-T7 moves it to receiving/reviewing); "30/30 priced", questionnaire "cleared" chip and the Mapped column need P2; Overview/Review/Comparison/Award tabs and Sync inbox/Ask buttons arrive with their phases; "Add response" needs the Inbox sheet (P5). One deliberate deviation: response detail is its own page (TRD §3 route) instead of an expanded row (DESIGN §3.5) — see DECISIONS.
 - Realistic Balaji "Revised from 13200" comment: extraction still sets `references_prior_pricing = true`, but the terms decision reads it as p ≈ 0 and flags writes `false` back (fixed in P2-T5/T7).
 - Realistic OrientPack: the fast questionnaire model reads "lead time 6 days ex-works" as Q4 (sample lead time). Not disqualifying; see DECISIONS.
