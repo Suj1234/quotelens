@@ -1,6 +1,7 @@
 import "server-only";
 import { getSetting } from "@/lib/settings";
 import { geminiDecide } from "./providers/gemini";
+import { jevDecide } from "./providers/jev";
 
 // TRD §10.1
 export type ChoiceQ = { type: "choice"; options: string[]; instruction?: string };
@@ -24,10 +25,17 @@ export type DecideCtx = { rfx_id?: string | null; response_id?: string | null; p
 
 /** Every typed decision goes through here (CLAUDE.md rule 4). */
 export async function decide(state: string, questions: Record<string, Question>, ctx: DecideCtx): Promise<DecisionResult> {
+  const s = state.slice(0, 6000);
   const provider = await getSetting("decision_provider");
-  // ponytail: Gemini emulation only until P2-T1 adds the OpenRouter → Jev adapter (auto/jev fall back to Gemini).
-  void provider;
-  return geminiDecide(state.slice(0, 6000), questions, ctx);
+  // TRD §10.1 routing: auto → Jev when a key is present; jev → Jev; either falls back to Gemini on any error.
+  if (provider !== "gemini" && process.env.OPENROUTER_API_KEY) {
+    try {
+      return await jevDecide(s, questions, ctx);
+    } catch (e) {
+      console.warn(`[ai] decide(${ctx.purpose}): Jev failed, falling back to Gemini: ${(e as Error).message.slice(0, 200)}`);
+    }
+  }
+  return geminiDecide(s, questions, ctx);
 }
 
 export const choice = (r: DecisionResult, id: string) => r.answers[id] as ChoiceA;

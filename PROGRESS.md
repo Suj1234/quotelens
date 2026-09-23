@@ -1,5 +1,5 @@
 # Progress
-## Current: Phase P1 ✅ checkpoint — next task P2-T1 (decision layer: OpenRouter/Jev adapter)
+## Current: Phase P2, next task P2-T2 (candidate shortlist)
 ## Deploy URL: https://quotelens-seven.vercel.app
 ## Eval (latest): — (P2-T8)
 ## Done
@@ -19,6 +19,7 @@
   **Realistic set (loaded on MER-0417, classify+extract):** Balaji 30/30 — all gold prices found incl. text cells `84,080/-` and `41810 (revised)` · Kohinoor 27/27 — hand-corrected item 17 read as 3,090 (not struck 3,210) · Westline 30/30 · OrientPack 29/30 priced, line 14 null @ 0.2 · Anand quoted RFx thread stripped, 2 rates + 1 prior-pricing line.
   **Production check:** run-all on Vercel for Westline — classify 4.2 s, extract 27.0 s, 30/30 items, NDJSON streamed; 32 s wall.
 - [x] P1-T7 Pipeline runner — `src/lib/pipeline/run.ts` (`runStage`: status running→done/error, `stage_errors`, `summary[stage]` + timings, `audit_events pipeline.stage`; `runAll` chain stops at first error), `POST /api/responses/{id}/stage/{stage}`, `POST /api/responses/{id}/run-all` (NDJSON stream), pipeline strip with Run all / Retry per stage and elapsed time. Verified in the browser: Run all on Kohinoor → classify 6.1 s, extract 24.4 s; stages not built yet stay `pending`.
+- [x] P2-T1 Decision layer — `providers/jev.ts` (OpenRouter → Jev adapter: boolean→noul, choice→choice with o0..oN keys, score→score; 8 s timeout, retry on 429/5xx, two documented endpoints) + routing in `decide()` (`auto` → Jev only when `OPENROUTER_API_KEY` is set; `jev` same; `gemini` never calls Jev; any Jev error → Gemini, failure logged). No key yet → the adapter stays inert. 4 unit tests (mocked SDK/fetch): choice probabilities sum to 1, Jev mapping, fallback, gemini-only.
 ## In progress
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
