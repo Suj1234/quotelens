@@ -18,6 +18,7 @@ export interface Rfx {
   freight_included_requested: boolean; payment_terms_days: number; validity_days_requested: number;
   contract_months: number; response_deadline: string | null; delivery_locations: string[];
   cover_note: string | null; copilot_transcript: unknown[]; created_at: string; updated_at: string | null;
+  terms_set: boolean; // migration 0008
 }
 
 export interface RfxLine {

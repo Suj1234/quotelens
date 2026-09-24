@@ -26,6 +26,8 @@ const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct
 const ist = (iso: string) => new Date(new Date(iso).getTime() + 330 * 60_000);
 export const shortDate = (iso: string) => { const d = ist(iso); return `${String(d.getUTCDate()).padStart(2, "0")} ${MON[d.getUTCMonth()]}`; };
 export const longDate = (iso: string) => `${shortDate(iso)} ${ist(iso).getUTCFullYear()}`;
+/** "24 Sep 03:48" (IST) for timelines and outboxes. */
+export const dateTime = (iso: string) => { const d = ist(iso); return `${shortDate(iso)} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 
 /** Large sums in prose/headers (DESIGN §1.3): ₹4.39 cr, ₹38.2 L, else ₹ with Indian grouping. */
 export function inrShort(v: number): string {

@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { createVendor } from "@/lib/vendors";
 import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { runAll } from "@/lib/pipeline/run";
@@ -51,14 +52,7 @@ export async function assignVendor(responseId: string, body: { vendor_id?: strin
   if (!resp) throw new AppError("NOT_FOUND", "Response not found", undefined, 404);
   let vendorId = body.vendor_id ?? null;
   if (!vendorId) {
-    const name = body.new_vendor?.name?.trim(), email = body.new_vendor?.email?.trim();
-    if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) throw new AppError("BAD_INPUT", "Give the new vendor a name and a valid email.", undefined, 400);
-    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 16) || "vendor";
-    const { data: taken } = await db().from("vendors").select("short_code").like("short_code", `${base}%`);
-    const code = taken?.length ? `${base}${taken.length + 1}` : base;
-    const { data: v, error } = await db().from("vendors").insert({ name, email, short_code: code, created_by: "user" }).select("id").single();
-    if (error) throw error;
-    vendorId = v.id as string;
+    vendorId = (await createVendor(body.new_vendor?.name, body.new_vendor?.email)).id;
   } else {
     const { data: v } = await db().from("vendors").select("id").eq("id", vendorId).maybeSingle();
     if (!v) throw new AppError("BAD_INPUT", "That vendor doesn't exist.", undefined, 400);
