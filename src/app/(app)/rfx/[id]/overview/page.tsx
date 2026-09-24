@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
 import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { RowLink } from "@/components/rfx/row-link";
+import { SyncPoller } from "@/components/comms/sync-inbox";
 
 const UNIT: Record<string, string> = { per_1000_pcs: "per 1000 pcs", per_piece: "per piece", per_kg: "per kg", per_box: "per box" };
 const word = (n: number) => countWord(n).toLowerCase();
@@ -33,6 +34,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
   const { data: allVendors } = o.strays.length ? await db().from("vendors").select("id, name").order("name") : { data: [] };
   return (
     <div className="page">
+      {o.mode === "mock" && <SyncPoller rfxId={id} />}
       <div className="grid2" style={{ gridTemplateColumns: "1.25fr 1fr", alignItems: "start" }}>
         <div>
           <div className="eyebrow">Where this stands</div>
@@ -76,7 +78,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
             <tbody>
               {o.vendors.map((v) => {
                 const cells = <>
-                  <td><b>{v.name}</b><div className="text-muted-foreground" style={{ fontSize: 11 }}>{v.city ?? ""}</div></td>
+                  <td><b>{v.name}</b>{(v.status === "clarification_sent" || v.status === "clarified") && <> <span className={`chip ${v.status === "clarified" ? "green" : "amber"}`} style={{ height: 15 }}>{v.status.replace("_", " ")}</span></>}<div className="text-muted-foreground" style={{ fontSize: 11 }}>{v.city ?? ""}</div></td>
                   <td className="text-muted-foreground">{v.sentAs ?? "—"}</td>
                   <td className="mono">{v.received ? shortDate(v.received) : "—"}</td>
                   <td className="num mono">{v.received ? `${v.priced}/${v.lines}` : "—"}</td>
@@ -115,16 +117,26 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
         <div className="hd"><b>Vendor communications</b><span style={{ display: "flex", gap: 10, alignItems: "center" }}><span className="hint">every send and receive, with ids</span>{o.comms.some((c) => c.direction === "outbound") && <Link href={`/rfx/${id}/outbox`} style={{ fontSize: 12 }}>Outbox</Link>}</span></div>
         <div className="bd tl">
           {o.comms.length === 0 && <div className="text-muted-foreground" style={{ fontSize: 12 }}>No emails yet.</div>}
-          {o.comms.map((c) => (
-            <div className="ev" key={c.id}>
-              <span className="ts">{dateTime(c.at)}</span>
-              <span className="dir">{c.direction === "outbound" ? "→" : "←"}</span>
-              <div>
-                <div>{c.direction === "outbound" ? `${c.vendor ?? c.to} · ${c.subject ?? ""}` : `${c.vendor ?? c.from ?? "Unknown sender"} · ${c.attachments.map((a) => a.name).join(" + ") || "email body only"}`}{c.direction === "outbound" && c.attachments.length ? ` · ${c.attachments.map((a) => a.name).join(", ")}` : ""}</div>
-                <div className="text-muted-foreground" style={{ fontSize: 11 }}>{c.kind.replace("_", " ")} · {c.mode} · {c.status}{c.message_id ? <> · <span className="mono">{c.message_id}</span></> : null}</div>
+          {o.comms.map((c) => {
+            // The email this one answers (In-Reply-To), linked to its row in this timeline.
+            const answers = c.in_reply_to ? o.comms.find((x) => x.message_id === c.in_reply_to) : null;
+            const files = c.attachments.map((a) => a.url ? <a key={a.name} href={a.url} download={a.name} className="mono" style={{ fontSize: 11.5 }}>{a.name}</a> : <span key={a.name} className="mono" style={{ fontSize: 11.5 }}>{a.name}</span>);
+            return (
+              <div className="ev" key={c.id} id={`comm-${c.id}`}>
+                <span className="ts">{dateTime(c.at)}</span>
+                <span className="dir">{c.direction === "outbound" ? "→" : "←"}</span>
+                <div>
+                  <div>{c.direction === "outbound" ? `${c.vendor ?? c.to} · ${c.subject ?? ""}` : `${c.vendor ?? c.from ?? "Unknown sender"} · ${c.subject ?? (c.kind === "vendor_reply" ? "reply" : c.kind)}`}</div>
+                  <div className="text-muted-foreground" style={{ fontSize: 11, display: "flex", gap: 8, flexWrap: "wrap" }}>{files.length ? files : c.direction === "inbound" ? <span>email body only</span> : null}</div>
+                  <div className="text-muted-foreground" style={{ fontSize: 11 }}>
+                    {c.kind.replace("_", " ")} · {c.mode} · {c.status}{c.message_id ? <> · <span className="mono">{c.message_id}</span></> : null}
+                    {c.in_reply_to && <> · in reply to {answers ? <a href={`#comm-${answers.id}`}>{answers.direction === "outbound" ? "our" : "their"} {answers.kind === "clarification" ? "clarification" : answers.kind === "rfx_dispatch" ? "RFx email" : "email"} of {dateTime(answers.at)}</a> : <span className="mono">{c.in_reply_to}</span>}</>}
+                    {c.response_id && <> · <Link href={`/rfx/${id}/responses/${c.response_id}`}>response</Link></>}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

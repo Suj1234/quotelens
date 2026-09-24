@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { longDate, shortDate } from "@/lib/format";
 import { RfxTabs } from "@/components/rfx/rfx-tabs";
 import { AskButton, AskProvider } from "@/components/ask/ask-sheet";
+import { SyncInboxButton } from "@/components/comms/sync-inbox";
 
 const LABEL = { draft: "Draft", issued: "Issued", receiving: "Receiving", reviewing: "Reviewing", awarded: "Awarded", closed: "Closed" };
 
@@ -36,8 +37,8 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
               {rfx.response_deadline && <><span>·</span><span>Deadline {longDate(rfx.response_deadline)}</span></>}
             </div>
           </div>
-          {/* DESIGN §2.3: header buttons are the buyer's; the approver asks from the Comparison toolbar. Sync inbox arrives with Gmail (P6). */}
-          {user.role !== "approver" && <div style={{ display: "flex", gap: 8, alignItems: "center" }}><AskButton /></div>}
+          {/* DESIGN §2.3: header buttons are the buyer's (Sync inbox · Ask); the approver asks from the Comparison toolbar. */}
+          {user.role !== "approver" && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{rfx.status !== "draft" && <SyncInboxButton rfxId={id} />}<AskButton /></div>}
         </div>
         {/* DESIGN §4: the approver's tabs are Decide · Comparison · Award (Decide/Award arrive in P7); the buyer's Overview (P5) and Award (P7) likewise. */}
         <RfxTabs id={id} tabs={user.role === "approver"

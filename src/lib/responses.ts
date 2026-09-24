@@ -20,6 +20,9 @@ const pending = () => Object.fromEntries(STAGES.map((s) => [s, "pending"]));
 export async function createResponse(input: {
   rfxId: string; vendorId: string | null; source: Source; emailText?: string | null; files: IncomingFile[]; actor: string;
   subject?: string; fromAddr?: string;
+  // Mailbox replies (P6): the message's own ids; clarification replies link to the request and the reply they correct (TRD §8.7).
+  messageId?: string | null; inReplyTo?: string | null; toAddr?: string | null;
+  clarification?: { request_id: string | null; n: number | null; supersedes: string | null };
 }): Promise<string> {
   const { rfxId, vendorId, source, files } = input;
   const emailText = input.emailText?.trim() || null;
@@ -28,13 +31,16 @@ export async function createResponse(input: {
   const vendor = vendorId ? (await db().from("vendors").select("email, name").eq("id", vendorId).single()).data : null;
   const comm = await db().from("communications").insert({
     rfx_id: rfxId, vendor_id: vendorId, direction: "inbound", kind: "vendor_reply", mode: source === "gmail" ? "gmail" : "mock",
-    from_addr: input.fromAddr ?? vendor?.email ?? null, subject: input.subject ?? null, body_text: emailText,
+    from_addr: input.fromAddr ?? vendor?.email ?? null, to_addr: input.toAddr ?? null, subject: input.subject ?? null, body_text: emailText,
+    message_id: input.messageId ?? null, in_reply_to: input.inReplyTo ?? null,
     received_at: new Date().toISOString(), status: "received",
   }).select("id").single();
   if (comm.error) throw comm.error;
 
   const resp = await db().from("responses").insert({
     rfx_id: rfxId, vendor_id: vendorId, source, communication_id: comm.data.id, email_text: emailText, pipeline_status: pending(),
+    is_clarification: !!input.clarification, supersedes_response_id: input.clarification?.supersedes ?? null,
+    summary: input.clarification ? { clarification: { request_id: input.clarification.request_id, n: input.clarification.n } } : {},
   }).select("id").single();
   if (resp.error) throw resp.error;
   const responseId = resp.data.id as string;
@@ -53,7 +59,7 @@ export async function createResponse(input: {
   }
 
   await db().from("communications").update({ response_id: responseId, attachments }).eq("id", comm.data.id);
-  await audit({ rfx_id: rfxId, actor: input.actor, event: "response.received", entity_type: "response", entity_id: responseId, payload: { source, files: files.length, email_text: !!emailText } });
+  await audit({ rfx_id: rfxId, actor: input.actor, event: "response.received", entity_type: "response", entity_id: responseId, payload: { source, files: files.length, email_text: !!emailText, clarification: !!input.clarification, message_id: input.messageId ?? null } });
   console.log(`[stage:intake] response ${responseId} (${source}): ${files.length} files${emailText ? " + email text" : ""}`);
   return responseId;
 }

@@ -1,34 +1,36 @@
 import { requireUser } from "@/lib/auth";
-import { listComms } from "@/lib/comms";
 import { db } from "@/lib/db";
+import { vendorInbox } from "@/lib/email/mailbox";
 import { dateTime } from "@/lib/format";
 import { EmailBlock } from "@/components/comms/email-block";
 import { PortalReply } from "@/components/comms/portal-reply";
 
-// TRD §17.6 Vendor Portal Simulator (mock mode): the RFx as this vendor received it, and a reply box.
+// TRD §17.6 Vendor Portal Simulator, now the vendor's mock mailbox (P6): every email we sent them, newest first,
+// each with Reply. A reply waits unread until the buyer syncs the inbox — the same path a Gmail reply would take.
 export default async function PortalPage({ params }: PageProps<"/rfx/[id]/portal/[vendorId]">) {
   await requireUser(["buyer", "admin"]);
   const { id, vendorId } = await params;
-  const [{ data: v }, comms] = await Promise.all([
-    db().from("vendors").select("name, email").eq("id", vendorId).maybeSingle(),
-    listComms(id, { direction: "outbound", vendorId, kind: "rfx_dispatch" }),
-  ]);
-  const mail = comms.at(-1);
+  const [{ data: v }, inbox] = await Promise.all([db().from("vendors").select("name, email").eq("id", vendorId).maybeSingle(), vendorInbox(id, vendorId)]);
+  const name = v?.name ?? "the vendor";
   return (
     <div className="page" style={{ maxWidth: 860 }}>
-      <div className="eyebrow">Vendor portal (mock) · inbox of {v?.name ?? "vendor"}</div>
-      <p className="lead" style={{ marginTop: 6 }}>This is what <b>{v?.name ?? "the vendor"}</b> received. Reply as them — attach their quotation in any format or paste their email.</p>
-      {!mail ? (
-        <div className="empty" style={{ marginTop: 16 }}><b>Nothing sent to {v?.name ?? "this vendor"} yet.</b> Issue the RFx and its email appears here.</div>
-      ) : (
-        <>
-          <div className="card" style={{ marginTop: 16 }}>
-            <div className="hd"><b>From Sujit Menon</b><span className="hint mono">{dateTime(mail.at)}</span></div>
-            <div className="bd"><EmailBlock c={mail} /></div>
+      <div className="eyebrow">Vendor portal (mock) · mailbox of {name}{v?.email ? ` · ${v.email}` : ""}</div>
+      <p className="lead" style={{ marginTop: 6 }}>
+        {inbox.length ? <><b>{inbox.length} {inbox.length === 1 ? "email" : "emails"}</b> from Meridian Foods in {name}&apos;s mailbox. Reply as them — the reply waits in the buyer&apos;s inbox until someone clicks Sync inbox.</> : <>Nothing in {name}&apos;s mailbox yet.</>}
+      </p>
+      {!inbox.length && <div className="empty" style={{ marginTop: 16 }}><b>Nothing sent to {name} yet.</b> Issue the RFx or ask them a clarification and the email appears here.</div>}
+      {inbox.map((m) => (
+        <div className="card" style={{ marginTop: 16 }} key={m.id}>
+          <div className="hd">
+            <b>From Sujit Menon · {m.kind === "clarification" ? "clarification" : m.kind === "rfx_dispatch" ? "RFx" : m.kind.replace("_", " ")}</b>
+            <span style={{ display: "flex", gap: 8, alignItems: "center" }}>{m.replied && <span className="chip green">replied</span>}<span className="hint mono">{dateTime(m.at)}</span></span>
           </div>
-          <PortalReply rfxId={id} vendorId={vendorId} vendorName={v?.name ?? "Vendor"} subject={mail.subject ?? ""} />
-        </>
-      )}
+          <div className="bd">
+            <EmailBlock c={m} />
+            <PortalReply rfxId={id} vendorId={vendorId} vendorName={v?.name ?? "Vendor"} mailboxId={m.mailbox_id} subject={m.subject ?? ""} to={m.reply_to ?? m.from ?? ""} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

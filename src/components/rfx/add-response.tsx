@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-const LIMIT = 4.4 * 1024 * 1024; // leave room for the form fields under Vercel's 4.5 MB body limit
+export const LIMIT = 4.4 * 1024 * 1024; // leave room for the form fields under Vercel's 4.5 MB body limit
+export const tooLarge = (files: File[]) => `${files.length === 1 ? files[0].name : "These files"} ${files.length === 1 ? "is" : "are"} over 4.5 MB — the upload limit here. Send a smaller photo or scan, split the files, or paste the email text.`;
 
 /** Upload files and/or pasted text as one vendor reply, then open Response Detail with the six stages running. */
 export async function submitReply(o: { rfxId: string; vendorId: string; files: File[]; text: string; source: "mock_upload" | "mock_paste" | "portal"; useSeed?: boolean }): Promise<string> {
   const size = o.files.reduce((a, f) => a + f.size, 0);
-  if (size > LIMIT) throw new Error(`${o.files.length === 1 ? o.files[0].name : "These files"} ${o.files.length === 1 ? "is" : "are"} over 4.5 MB — the upload limit here. Send a smaller photo or scan, split the files, or paste the email text.`);
+  if (size > LIMIT) throw new Error(tooLarge(o.files));
   const form = new FormData();
   form.set("rfx_id", o.rfxId);
   form.set("vendor_id", o.vendorId);
