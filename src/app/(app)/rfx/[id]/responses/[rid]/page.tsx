@@ -136,7 +136,7 @@ export default async function ResponseDetailPage({ params, searchParams }: PageP
               </tbody>
             </table>
           </div>
-        ) : <div className="bd"><div className="empty">Items appear when extraction finishes.</div></div>}
+        ) : <div className="bd"><div className="empty"><b>No items read yet.</b> Items appear when extraction finishes.</div></div>}
       </div>
     </div>
   );

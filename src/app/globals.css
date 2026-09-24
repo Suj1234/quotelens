@@ -137,6 +137,11 @@
   .filerow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--hair2); border-radius: 5px; font-size: 12.5px; }
   .filerow .ext { font-family: var(--font-mono); font-size: 10px; padding: 2px 5px; border: 1px solid var(--hair); border-radius: 3px; color: var(--muted); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .card.bd { padding: 12px 14px; }
+  .stat .v { font-family: var(--font-mono); font-size: 24px; font-weight: 500; }
+  .stat .l { font-size: 12px; color: var(--muted); }
   .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; font-size: 12.5px; margin: 0; }
   .kv dt { color: var(--muted); }
   .kv dd { margin: 0; }
@@ -317,7 +322,7 @@
 @keyframes ql-slide { from { left: -40%; } to { left: 100%; } }
 
 @media (max-width: 900px) {
-  .grid2, .vrow, .rqcard, .split { grid-template-columns: 1fr; }
+  .grid2, .grid3, .vrow, .rqcard, .split { grid-template-columns: 1fr; }
   :root { --sheet: 100vw; }
   .cmpwrap { padding-left: 16px; padding-right: 16px; }
   .brief, .qgroups { grid-template-columns: 1fr; }
@@ -333,3 +338,18 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* P8 Settings page (DESIGN §3.10) */
+@layer components {
+  .radios { display: flex; flex-direction: column; gap: 8px; }
+  .radios label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+  .radios label.off { color: var(--muted); }
+  input.num-in { width: 90px; }
+  table.t.fx td { vertical-align: middle; }
+  .evalrows { max-height: 480px; overflow: auto; }
+  .evalrows table.t thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+}
+@layer components {
+  .skel { background: var(--tint); border-radius: 3px; animation: ql-pulse 1.4s ease-in-out infinite; }
+}
+@keyframes ql-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }

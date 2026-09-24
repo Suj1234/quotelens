@@ -67,7 +67,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
               <dt>Terms</dt><dd>{r.currency} {UNIT[r.quote_unit] ?? r.quote_unit} · {r.incoterm === "delivered" ? "delivered" : r.incoterm.replace("_", "-")}{r.freight_included_requested ? ", freight included" : ""} · {r.payment_terms_days} days · {r.validity_days_requested}-day validity</dd>
               <dt>Plants</dt><dd>{r.delivery_locations.join(", ")}</dd>
               <dt>Questionnaire</dt><dd>{o.questions} questions{o.disqualifying.length ? ` · ${o.disqualifying.join(", ")} disqualifying` : ""}</dd>
-              <dt>Transport</dt><dd>{o.mode === "mock" ? "Mock email" : o.mode === "gmail" ? "Gmail" : o.mode}</dd>
+              <dt>Transport</dt><dd>{o.mode === "mock" ? "Mock email" : o.mode === "gmail" ? "Gmail" : o.mode} · <Link href="/settings">change</Link></dd>
             </dl>
           </div>
         </div>

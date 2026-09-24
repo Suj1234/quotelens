@@ -80,10 +80,33 @@ export async function runEval(rfxId: string, opts: { save?: boolean } = {}): Pro
   for (const c of per_cell) (states[c.vendor] ??= {})[c.state ?? "missing"] = (states[c.vendor][c.state ?? "missing"] ?? 0) + 1;
 
   if (opts.save !== false) {
-    const { error } = await db().from("eval_runs").insert({ rfx_id: rfxId, totals, per_cell });
+    const { error } = await db().from("eval_runs").insert({ rfx_id: rfxId, totals, per_cell, per_question });
     if (error) throw error;
   }
   return { rfx_id: rfxId, totals, per_cell, per_question, states };
+}
+
+/** RFx the gold key can judge: those whose replies were loaded from a seed set (the gold key describes the seed pack). */
+export async function evalEligible(): Promise<{ id: string; code: string; title: string; set: string }[]> {
+  const [seeded, loads] = await Promise.all([
+    db().from("responses").select("rfx_id, rfx(code, title)").eq("source", "seed"),
+    db().from("audit_events").select("rfx_id, payload, created_at").eq("event", "seed.responses_loaded").order("created_at", { ascending: false }),
+  ]);
+  for (const q of [seeded, loads]) if (q.error) throw q.error;
+  const by = new Map<string, { id: string; code: string; title: string; set: string }>();
+  for (const r of seeded.data as unknown as { rfx_id: string; rfx: { code: string; title: string } }[]) {
+    if (by.has(r.rfx_id)) continue;
+    const set = (loads.data ?? []).find((l) => l.rfx_id === r.rfx_id)?.payload?.set ?? "clean"; // newest load wins
+    by.set(r.rfx_id, { id: r.rfx_id, code: r.rfx.code, title: r.rfx.title, set });
+  }
+  return [...by.values()].sort((a, b) => a.code.localeCompare(b.code));
+}
+
+export type StoredEval = { id: string; rfx_id: string; ran_at: string; totals: EvalTotals; per_cell: CellResult[]; per_question: EvalResult["per_question"] };
+export async function latestEval(rfxId: string): Promise<StoredEval | null> {
+  const { data, error } = await db().from("eval_runs").select("*").eq("rfx_id", rfxId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw error;
+  return data as StoredEval | null;
 }
 
 /** Plain-text table for the scripts (CLAUDE.md §7 wants the numbers pasted into PROGRESS.md). */

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,8 @@ import { SyncRepliedButton } from "@/components/comms/sync-inbox";
 
 const TYPE_ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
 const PRICE_TYPES = ["ambiguous_unit", "low_confidence_read", "conflict"];
+// DESIGN §3.6: assumptions driven by a global setting offer "Change in settings" (FX rate, freight default, discount default).
+const SETTINGS_TYPES = ["fx_assumption", "discount_treatment", "freight_treatment"];
 const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "validity_short", "missing_line"];
 const LABEL: Record<Action, string> = {
   confirm: "Confirm", override: "Override…", exclude: "Exclude", map: "Map to line…", ignore: "Ignore", "ask-vendor": "Ask vendor",
@@ -145,7 +148,10 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
               selected={picked.has(it.id)} onSelect={() => toggle(it.id)} />)}
           </section>
         ))}
-        {!shown.length && <div className="empty"><b>No items match.</b> Change the filters to see decided items or other vendors.</div>}
+        {!shown.length && (items.length && !open.length && status === "open"
+          ? <div className="empty"><b>The queue is clear.</b> Every item has a decision — switch the status filter to Decided to read them.</div>
+          : !items.length ? <div className="empty"><b>Nothing to review.</b> Items appear here when a response is processed and something needs your call.</div>
+          : <div className="empty"><b>No items match.</b> Change the filters to see decided items or other vendors.</div>)}
       </div>
     </>
   );
@@ -196,6 +202,7 @@ function Card({ it, rfxId, askable, canAct, locked, busy, current, onPick, run, 
         {!resolved && canAct && !mode && !asking && (
           <div className="acts">
             {it.actions.map((a) => <Button key={a} size="sm" variant={a === primary ? "default" : "outline"} disabled={busy} onClick={(e) => { e.stopPropagation(); click(a); }}>{label(a)}</Button>)}
+            {SETTINGS_TYPES.includes(it.type) && <Button asChild size="sm" variant="ghost"><Link href="/settings" onClick={(e) => e.stopPropagation()}>Change in settings</Link></Button>}
           </div>
         )}
         {!resolved && !canAct && <div className="hint" style={{ marginTop: 10 }}>{locked ? "Read-only — the RFx is awarded." : "Waiting for Sujit."}</div>}

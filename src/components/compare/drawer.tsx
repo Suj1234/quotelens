@@ -7,7 +7,7 @@ import { longDate, money } from "@/lib/format";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EvidenceBlock } from "./evidence";
 
-const STATE_LABEL: Record<string, [string, string]> = {
+export const STATE_LABEL: Record<string, [string, string]> = {
   confirmed: ["Confirmed", "grey"], inferred: ["Inferred", "indigo"], reviewed: ["Reviewed", "green"], low_confidence: ["Low-confidence", "amber"],
   ambiguous: ["Ambiguous", "amber"], not_quoted: ["Not quoted", "grey"], references_prior: ["References prior pricing", "grey"], excluded: ["Excluded", "grey"], conflict: ["Conflict", "red"],
 };

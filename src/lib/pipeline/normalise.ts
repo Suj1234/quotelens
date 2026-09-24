@@ -57,6 +57,12 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const freightIncluded = td.p.freight_excluded < 0.5;
   const freightPer1000 = rvQ.data?.freight_assumption_inr_per_1000 ?? freightDefault;
   const grossUpPct = terms.total_discount_pct && td.p.rates_net_of_discount >= 0.5 && td.p.buyer_misses_condition >= 0.5 ? terms.total_discount_pct : null;
+  // TRD §11.4: a total-level discount is shown gross by default; Settings → "net" takes it off every line of that vendor.
+  const netPct = !grossUpPct && terms.total_discount_pct && discountDefault === "net" ? terms.total_discount_pct : null;
+  const discountRow = () => ({ kind: "discount_treatment" as const, basis: "settings_default" as const, value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: discountDefault },
+    description: netPct
+      ? `${netPct}% total discount (${terms.total_discount_condition ?? "no condition stated"}) applied to every line — Settings: net.`
+      : `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
 
   // Idempotency: this stage owns the system's assumptions for this vendor, its open review items, and every cell
   // of this vendor except the ones a buyer already decided (reviewed / excluded) — those are never overwritten.
@@ -156,6 +162,11 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
         description: `Rates printed net of a ${grossUpPct}% discount (${terms.total_discount_condition ?? "conditional"}); buyer pays at ${rfx.payment_terms_days} days so the condition is not met → payable = printed ÷ ${round4(1 - grossUpPct / 100)}.` });
       v = grossUp(v, grossUpPct);
       chain.push({ step: "discount_gross_up", pct: grossUpPct, basis: "system_inferred", assumption_id: aid });
+      inferred = true;
+    }
+    if (netPct) {
+      v = applyLineDiscount(v, netPct);
+      chain.push({ step: "total_discount", pct: netPct, basis: "settings_default", assumption_id: vendorAssumption("discount", discountRow()) });
       inferred = true;
     }
 
@@ -275,12 +286,11 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   // (a stray file for a known vendor must not raise freight/discount cards or ledger rows).
   const wrote = !clar && cells.some((c) => c.extracted_item_id); // vendor-level terms belong to the main reply
   if (wrote && terms.total_discount_pct && !grossUpPct) {
-    vendorAssumption("discount", { kind: "discount_treatment", basis: "settings_default", value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: discountDefault },
-      description: `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
+    vendorAssumption("discount", discountRow());
   }
   if (wrote && terms.total_discount_pct) {
     reviews.push({ type: "discount_treatment", title: grossUpPct ? `Printed rates are net of a ${grossUpPct}% discount we won't earn` : `${terms.total_discount_pct}% discount on total${terms.total_discount_condition ? ` ${terms.total_discount_condition}` : ""}`,
-      detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
+      detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : netPct ? `Applied to every line (Settings: net). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
       proposed_value: terms.total_discount_pct, evidence: { terms: true } });
   }
   const refPriorLines = clar ? [] : cells.filter((c) => c.state === "references_prior");

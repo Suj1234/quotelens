@@ -31,6 +31,7 @@ const fmt = (v: number) => (Number.isInteger(v) ? v.toLocaleString("en-IN") : v.
 export function stepText(s: Step): string {
   switch (s.step) {
     case "line_discount": return `Less ${s.pct}% line discount`;
+    case "total_discount": return `Less ${s.pct}% total discount (Settings: apply to every line)`;
     case "discount_gross_up": return `÷ ${fmt(1 - (s.pct ?? 0) / 100)}: printed net of a ${s.pct}% discount we won't earn`;
     case "unit": return `${UNIT_LABEL[s.from ?? ""] ?? s.from} → per 1000 pcs: × ${fmt(s.factor ?? 1)} (${s.basis ?? "ratio"})`;
     case "currency": return s.from ? `${s.from} → ${s.to} at ${s.rate}${s.rate_date ? ` (${s.rate_date})` : ""}` : `Currency not stated; assumed ${s.to}`;
@@ -46,7 +47,7 @@ export function basisLabel(s: Step): string {
   if (s.step === "buyer_override") return "buyer entered";
   if (s.step === "clarification" || s.step === "clarified") return "vendor stated · clarification";
   if (s.step === "currency") return s.from ? "assumption · fx_rate" : "assumption";
-  if (s.step === "discount_gross_up") return "assumption · discount";
+  if (s.step === "discount_gross_up" || s.step === "total_discount") return "assumption · discount";
   if (s.basis_kind === "rfx_spec") return "RFx spec";
   if (s.basis_kind === "system_inferred") return "best guess";
   return "vendor stated";

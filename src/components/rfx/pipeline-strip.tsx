@@ -47,8 +47,11 @@ export function PipelineStrip({ responseId, canRun, autoRun, ...initial }: Props
     started.current = Date.now();
     setElapsed(0);
     const first = from ?? "classify";
-    setStatus((s) => ({ ...s, [first]: "running" }));
-    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => k !== first)));
+    // The stages this run will redo read pending until their turn (not last run's "done").
+    const redo = only ? [first] : STAGES.slice(STAGES.indexOf(first));
+    setStatus((s) => ({ ...s, ...Object.fromEntries(redo.map((x) => [x, "pending"])), [first]: "running" }));
+    setTimings((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !redo.includes(k as Stage))));
+    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !redo.includes(k as Stage))));
     try {
       const url = only ? `/api/responses/${responseId}/stage/${first}` : `/api/responses/${responseId}/run-all${from ? `?from=${from}` : ""}`;
       const res = await fetch(url, { method: "POST" });
