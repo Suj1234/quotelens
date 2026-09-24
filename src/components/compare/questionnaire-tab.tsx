@@ -9,7 +9,7 @@ export function QuestionnaireTab({ qa }: { qa: QaGrid }) {
   const row = sel && qa.rows.find((r) => r.q_no === sel.q);
   const a = row?.answers[sel!.v];
   const vendor = sel && qa.vendors.find((v) => v.code === sel.v);
-  if (!qa.vendors.length) return <div className="empty" style={{ marginBottom: 20 }}><b>No answers yet.</b> Each vendor&apos;s questionnaire answers appear here once their reply is processed.</div>;
+  if (qa.rows.every((r) => qa.vendors.every((v) => !r.answers[v.code]))) return <div className="empty" style={{ marginBottom: 20 }}><b>No answers yet.</b> Each vendor&apos;s questionnaire answers appear here once their reply is processed.</div>;
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <div style={{ overflow: "auto" }}>

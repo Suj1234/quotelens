@@ -19,12 +19,20 @@ export type TermsDecision = {
  */
 export async function decideTerms(resp: ResponseRow, rfx: Rfx, t: TermsRow, itemNotes: string[]): Promise<TermsDecision> {
   const line = (k: string, v: unknown) => (v === null || v === undefined || v === "" ? null : `${k}: ${v}`);
-  const state = [
-    "SUPPLIER TERMS (as read from the supplier's reply):",
+  const supplier = [
     line("Currency", t.currency), line("Validity", t.validity_days ? `${t.validity_days} days` : t.validity_until),
     line("Freight", t.freight_terms_raw), line("Taxes", t.tax_terms_raw), line("Payment", t.payment_terms_raw),
     line("Discount", t.total_discount_pct !== null ? `${t.total_discount_pct}% ${t.total_discount_condition ?? ""}` : t.total_discount_condition),
     line("Reference to earlier pricing", t.references_prior_pricing_text), line("Other notes", t.other_notes),
+  ].filter((x) => x !== null);
+  // Nothing the supplier wrote → nothing to decide (P8: a certificate-only reply was read as "prices same as before"
+  // and filled the vendor's 30 cells with references_prior). No model call; every flag false.
+  if (!supplier.length && !itemNotes.length) {
+    return { provider: "none", p: { references_prior_pricing: 0, freight_excluded: 0, taxes_excluded: 0, total_discount_conditional: 0, rates_net_of_discount: 0, buyer_misses_condition: 0 } };
+  }
+  const state = [
+    "SUPPLIER TERMS (as read from the supplier's reply):",
+    ...supplier,
     itemNotes.length ? `Remarks on individual items: ${itemNotes.slice(0, 12).map((n) => `"${n.slice(0, 200)}"`).join(" · ")}` : null,
     "",
     `BUYER'S RFx TERMS: pays ${rfx.payment_terms_days} days from invoice; asked for ${rfx.freight_included_requested ? "freight included, delivered to plant" : "freight quoted separately"}; quote unit ${rfx.quote_unit}.`,

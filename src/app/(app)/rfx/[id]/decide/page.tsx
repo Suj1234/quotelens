@@ -43,7 +43,7 @@ export default async function DecidePage({ params }: PageProps<"/rfx/[id]/decide
       <div className="brief">
         <div>
           <p className="lead">
-            {quoted ? <>{countWord(quoted)} vendor{quoted === 1 ? "" : "s"} quoted the {grid.lines.length} lines. {countWord(cleared)} cleared the questionnaire. </> : <>No prices yet. </>}
+            {quoted ? <>{countWord(quoted)} vendor{quoted === 1 ? "" : "s"} quoted the {grid.lines.length} lines. {countWord(cleared)} cleared the questionnaire. </> : <><b>No prices yet.</b> The vendors&apos; replies haven&apos;t been processed; the comparison and your questions work once they are. </>}
             {q1.allocated > 0 && <>Awarding each line to the <b>cheapest qualified vendor</b> comes to <b>{inrShort(q1.total)}</b> a year{q1.allocated < q1.lines ? ` for ${q1.allocated} of ${q1.lines} lines` : ""}. </>}
             {unsure > 0 && <>{unsure} cells are still unresolved on Sujit&apos;s side; totals exclude them and say so.</>}
           </p>
