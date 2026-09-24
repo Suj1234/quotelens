@@ -16,8 +16,17 @@ export type OverviewVendor = {
   needs: number; responseId: string | null; status: string;
 };
 
+const ACK: Record<string, string> = { freight_treatment: "freight", fx_assumption: "FX", discount_treatment: "discount" }; // DESIGN §3.6: Acknowledge
+
 /** "Item 5: price per bundle, bundle size not stated" ×4 → "4 × price per bundle, bundle size not stated (items 5, 9, 15, 19)". */
-export function groupNeeds(items: { vendor: string; type: string; title: string; line_no: number | null }[]): NeedsRow[] {
+export function groupNeeds(all: { vendor: string; type: string; title: string; line_no: number | null }[]): NeedsRow[] {
+  // Assumption cards only need an acknowledgement: one closing row instead of one row each (the prototype lists decisions only).
+  const ack = all.filter((i) => ACK[i.type]);
+  const items = all.filter((i) => !ACK[i.type]);
+  const ackRow: NeedsRow[] = ack.length ? [{
+    vendor: "Assumptions", count: ack.length,
+    text: `${ack.length} to acknowledge — ${Object.entries(ACK).map(([t, label]) => { const vs = [...new Set(ack.filter((a) => a.type === t).map((a) => a.vendor.split(" ")[0]))]; return vs.length ? `${label} (${vs.join(", ")})` : ""; }).filter(Boolean).join(", ")}`,
+  }] : [];
   const groups = new Map<string, typeof items>();
   for (const it of items) groups.set(`${it.vendor}|${it.type}`, [...(groups.get(`${it.vendor}|${it.type}`) ?? []), it]);
   return [...groups.values()].map((g) => {
@@ -27,7 +36,7 @@ export function groupNeeds(items: { vendor: string; type: string; title: string;
     const same = rest.every((r) => r === rest[0]);
     const where = lines.length ? ` (${/^item/i.test(g[0].title) ? "items" : "lines"} ${lines.slice(0, -1).join(", ")}${lines.length > 1 ? " and " : ""}${lines.at(-1)})` : "";
     return { vendor: g[0].vendor, text: same ? `${g.length} × ${rest[0]}${where}` : `${g.length} points: ${rest.slice(0, 2).join("; ")}${g.length > 2 ? "; …" : ""}`, count: g.length };
-  }).sort((a, b) => a.vendor.localeCompare(b.vendor));
+  }).sort((a, b) => a.vendor.localeCompare(b.vendor)).concat(ackRow);
 }
 
 export async function getOverview(rfxId: string) {

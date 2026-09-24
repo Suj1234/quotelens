@@ -132,7 +132,7 @@
   | 52 | Production approver: no New RFx / Issue / Add response; no Overview tab; APIs 403 | open |
   | 53 | Tests + lint + build green; pipeline:seed 150/150 clean; push | open |
   | 54 | Final state: MER-0419 seeded with 14 open review items; MER-0417 realistic; MER-0418 untouched draft (v0, no comms, not invited); RFx list shows exactly these three | open |
-  | 55 | Side by side with the prototype at 1440 px: Ask sheet, New RFx, Overview, Responses + Add response sheet, Outbox, Portal | open |
+  | 55 | Side by side with the prototype at 1440 px: Ask sheet, New RFx, Overview, Responses + Add response sheet, Outbox, Portal | ✓ prototype (file://design/prototype.html, same routes) vs app screenshots: Ask sheet, New RFx, Overview, Responses + Add response sheet, Outbox and Portal checked. Fixed from the comparison: co-pilot question list numbering, Needs-you vendor name once per group, assumption cards folded into one 'Assumptions · n to acknowledge' row (prototype lists decisions only), 'failed Q6' chip instead of a cut-off note, nowrap answer tables. Remaining differences recorded in DECISIONS (P5 visual check) |
   | 56 | This table fully ticked with evidence | open |
 ## Open questions (for Sabarish)
 - **P1 review (CLAUDE.md §6):** open https://quotelens-seven.vercel.app → MER-0419 → Responses → each vendor, and tell me any extracted item that looks wrong.
