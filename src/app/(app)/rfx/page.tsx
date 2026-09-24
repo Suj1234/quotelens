@@ -33,7 +33,7 @@ export default async function RfxListPage() {
         {buyer && <Button asChild variant="default"><Link href="/rfx/new">New RFx</Link></Button>}
       </div>
       {rows.length === 0 ? (
-        <div className="empty"><b>No RFx yet.</b> Run the seed script or create one.</div>
+        <div className="empty"><b>No RFx yet.</b> {buyer ? "Start one with New RFx — the co-pilot drafts the lines, terms and questionnaire with you." : "Events appear here once Sujit issues one."}</div>
       ) : (
         <div className="card" style={{ overflowX: "auto" }}>
           <table className="t">

@@ -18,6 +18,8 @@
 .grow { flex: 1; }
 .main { flex: 1; min-width: 0; overflow: auto; display: flex; flex-direction: column; }
 @media (max-width: 900px) { .rail { display: none; } .org, .kbdhint { display: none; } }
+/* DESIGN §6: the page never scrolls sideways — on phones the "Name · Role" label ellipsises instead (P8). */
+@media (max-width: 600px) { .user { min-width: 0; } .user button { flex-shrink: 1; min-width: 0; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; display: block; } }
 /* Theme icon: sun in dark mode, moon in light */
 .sun { display: none; }
 :global(:root[data-theme="dark"]) .sun { display: block; }
