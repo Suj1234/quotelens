@@ -30,7 +30,9 @@ export function PipelineStrip({ responseId, canRun, autoRun, ...initial }: Props
     return () => clearInterval(t);
   }, [busy]);
 
+  const seen = useRef(new Set<Stage>()); // stages this run has reported on
   function apply(ev: Ev) {
+    seen.current.add(ev.stage);
     const state: StageState = ev.status === "done" ? "done" : ev.status === "error" ? "error" : "pending";
     setStatus((s) => {
       const next = { ...s, [ev.stage]: state };
@@ -49,6 +51,8 @@ export function PipelineStrip({ responseId, canRun, autoRun, ...initial }: Props
     const first = from ?? "classify";
     // The stages this run will redo read pending until their turn (not last run's "done").
     const redo = only ? [first] : STAGES.slice(STAGES.indexOf(first));
+    const prev = { status, timings };
+    seen.current = new Set();
     setStatus((s) => ({ ...s, ...Object.fromEntries(redo.map((x) => [x, "pending"])), [first]: "running" }));
     setTimings((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !redo.includes(k as Stage))));
     setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !redo.includes(k as Stage))));
@@ -75,8 +79,10 @@ export function PipelineStrip({ responseId, canRun, autoRun, ...initial }: Props
       }
       router.refresh();
     } catch (e) {
-      toast.error((e as Error).message);
-      setStatus((s) => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v === "running" ? "pending" : v])));
+      toast.error(e instanceof TypeError ? "Couldn't reach the server — check the connection and Retry (NETWORK)" : (e as Error).message);
+      // The request itself failed: stages it never reported on show what they showed before the run.
+      setStatus((s) => Object.fromEntries(STAGES.map((k) => [k, seen.current.has(k) ? s[k] : prev.status[k] ?? "pending"])));
+      setTimings((t) => ({ ...prev.timings, ...Object.fromEntries(Object.entries(t).filter(([k]) => seen.current.has(k as Stage))) }));
     } finally {
       setBusy(false);
     }

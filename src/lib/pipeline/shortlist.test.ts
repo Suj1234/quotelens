@@ -47,3 +47,11 @@ test("item references and ranges", () => {
   expect(itemRange(item("item 9"), 30)).toBeNull();
   expect(itemRange(item("items 1 to 40"), 30)).toBeNull();
 });
+
+test("Realistic Balaji sheets: bare row columns, ply and BF only labelled in the extractor's notes → 5-ply vs 3-ply 1200x800 told apart", () => {
+  const sheet = (row: string, notes: string) => ({ vendor_description: "Corr. Sheet", vendor_sku: row.match(/SBP-\d+/)![0], notes, location: { snippet: row } });
+  const t = (it: ReturnType<typeof sheet>) => shortlist(it, LINES).map((c) => c.line_no);
+  expect(t(sheet("[row 36] B36=23 C36=SBP-1023 D36=Corr. Sheet E36=1200x800 F36=5 G36=32 H36=38610", "Size: 1200x800 mm, Ply: 5, B.F.: 32")).slice(0, 1)).toEqual([23]);
+  expect(t(sheet("[row 37] B37=24 C37=SBP-1024 D37=Corr. Sheet E37=1000x700 F37=5 G37=28 H37=26770", "Size: 1000x700 mm, Ply: 5, B.F.: 28")).slice(0, 1)).toEqual([24]);
+  expect(t(sheet("[row 38] B38=25 C38=SBP-1025 D38=Corr. Sheet E38=1200x800 F38=3 G38=25 H38=23840", "Size: 1200x800 mm, Ply: 3, B.F.: 25")).slice(0, 1)).toEqual([25]);
+});

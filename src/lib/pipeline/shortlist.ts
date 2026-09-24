@@ -1,7 +1,7 @@
 // TRD §8.3 candidate shortlist: cheap, deterministic, no model. Pure so it is unit-testable.
 import type { RfxLine } from "@/types/db";
 
-export type ItemLike = { vendor_sku: string | null; vendor_description: string; location: { snippet?: string } | null };
+export type ItemLike = { vendor_sku: string | null; vendor_description: string; notes?: string | null; location: { snippet?: string } | null };
 export type Candidate = { line_no: number; score: number; why: string[] };
 
 const DIMS = /(\d{2,4})\s*(?:mm)?\s*[x×*]\s*(\d{2,4})(?:\s*(?:mm)?\s*[x×*]\s*(\d{2,4}))?/gi;
@@ -56,7 +56,9 @@ function jaccard(a: Set<string>, b: Set<string>) {
  */
 export function shortlist(it: ItemLike, lines: RfxLine[], k = 5): Candidate[] {
   const own = text(it);
-  const snippet = it.location?.snippet ?? "";
+  // The extractor's notes often carry the labelled columns ("Size: 1200x800 mm, Ply: 5, B.F.: 32") that a bare spreadsheet row
+  // ("E36=1200x800 F36=5 G36=32") gives without labels — read them with the snippet (P8: realistic Balaji sheets 23–25).
+  const snippet = [it.location?.snippet, it.notes].filter(Boolean).join(" ");
   const all = `${own} ${snippet}`;
   const found = dims(all);
   const plyM = own.match(PLY) ?? snippet.match(PLY);

@@ -43,6 +43,7 @@ export async function map(resp: ResponseRow): Promise<MapSummary> {
     it.vendor_description, it.vendor_sku && `sku ${it.vendor_sku}`,
     it.unit_price !== null && `price ${it.unit_price} ${it.price_unit_raw ?? ""}`.trim(),
     it.pack_size && `pack ${it.pack_size} ${it.pack_size_unit ?? ""}`.trim(),
+    it.notes && `notes: ${it.notes.slice(0, 160)}`,
     it.location.snippet && `source: "${String(it.location.snippet).slice(0, 180)}"`,
   ].filter(Boolean).join(" | ");
 
