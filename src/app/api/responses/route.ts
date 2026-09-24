@@ -38,18 +38,20 @@ export const POST = route(async (req: Request) => {
     files.push(...seed.files);
     emailText = [emailText, seed.emailText].filter(Boolean).join("\n\n") || undefined;
   }
-  let clarification;
+  let clarification, thread: { subject?: string; inReplyTo?: string | null } = {};
   if (fields.data.clarification_of) {
     if (!fields.data.vendor_id) throw new AppError("BAD_REQUEST", "A clarification reply needs its vendor.");
-    const { data: req } = await db().from("communications").select("id, reply_to").eq("id", fields.data.clarification_of).eq("rfx_id", fields.data.rfx_id)
+    const { data: req } = await db().from("communications").select("id, reply_to, subject, message_id").eq("id", fields.data.clarification_of).eq("rfx_id", fields.data.rfx_id)
       .eq("vendor_id", fields.data.vendor_id).eq("kind", "clarification").maybeSingle();
     if (!req) throw new AppError("NOT_FOUND", "That clarification email isn't this vendor's on this RFx.", undefined, 404);
     const n = Number(req.reply_to?.match(/-clar-(\d+)@/)?.[1] ?? 0) || null;
     clarification = { ...(await clarificationContext(fields.data.rfx_id, fields.data.vendor_id, n)), request_id: req.id };
+    // A pasted answer is still a reply to that email: same subject and threading as a mailed one.
+    thread = { subject: /^re:/i.test(req.subject ?? "") ? req.subject! : `Re: ${req.subject ?? "clarification"}`, inReplyTo: req.message_id };
   }
   const response_id = await createResponse({
     rfxId: fields.data.rfx_id, vendorId: fields.data.vendor_id ?? null, source: fields.data.source,
-    emailText, files, actor: user.id, ...(clarification ? { clarification } : {}),
+    emailText, files, actor: user.id, ...(clarification ? { clarification, ...thread } : {}),
   });
   return { response_id };
 });

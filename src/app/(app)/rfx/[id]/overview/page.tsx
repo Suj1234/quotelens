@@ -12,6 +12,8 @@ import { SyncPoller } from "@/components/comms/sync-inbox";
 
 const UNIT: Record<string, string> = { per_1000_pcs: "per 1000 pcs", per_piece: "per piece", per_kg: "per kg", per_box: "per box" };
 const word = (n: number) => countWord(n).toLowerCase();
+// "Q6: No – BRC audit planned for Q1 2027 · Q3: …" → ["Q6", "Q3"] (only the labels, not a "Q1" inside an answer).
+const failedQs = (note: string) => [...new Set(note.split(" · ").map((s) => s.match(/^Q\d+(?=:)/)?.[0]).filter((q): q is string => !!q))];
 
 // DESIGN §3.4 Overview (buyer's default tab). No buttons that duplicate the tabs (DESIGN §0.8).
 export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/overview">) {
@@ -83,7 +85,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
                   <td className="mono">{v.received ? shortDate(v.received) : "—"}</td>
                   <td className="num mono">{v.received ? `${v.priced}/${v.lines}` : "—"}</td>
                   <td className="mono">{v.validUntil ? shortDate(v.validUntil) : "—"}{v.validityShort && <> <span className="chip amber" style={{ height: 15 }}>{v.validityDays}d</span></>}</td>
-                  <td>{!v.received ? <span className="chip grey">{v.status === "invited" ? "awaiting reply" : v.status.replace("_", " ")}</span> : v.cleared === true ? <span className="chip green">cleared</span> : v.cleared === false ? <span className="chip red" title={v.clearedNote}>{(v.clearedNote.match(/Q\d+/g) ?? []).length ? `failed ${[...new Set(v.clearedNote.match(/Q\d+/g))].join(", ")}` : "not cleared"}</span> : <span className="chip amber" title={v.clearedNote}>{v.clearedNote.split(" · ")[0].slice(0, 28) || "pending"}</span>}</td>
+                  <td>{!v.received ? <span className="chip grey">{v.status === "invited" ? "awaiting reply" : v.status.replace("_", " ")}</span> : v.cleared === true ? <span className="chip green">cleared</span> : v.cleared === false ? <span className="chip red" title={v.clearedNote}>{failedQs(v.clearedNote).length ? `failed ${failedQs(v.clearedNote).join(", ")}` : "not cleared"}</span> : <span className="chip amber" title={v.clearedNote}>{v.clearedNote.split(" · ")[0].slice(0, 28) || "pending"}</span>}</td>
                   <td className="num mono">{v.needs || "—"}</td>
                   <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
                     {v.responseId && <Button asChild size="xs" variant="ghost"><Link href={`/rfx/${id}/responses/${v.responseId}`}>Open response</Link></Button>}

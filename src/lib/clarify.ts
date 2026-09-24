@@ -156,7 +156,7 @@ export async function sendClarification(o: { rfxId: string; vendorId: string; su
   }
   await db().from("rfx_vendors").update({ status: "clarification_sent" }).eq("rfx_id", o.rfxId).eq("vendor_id", o.vendorId);
   await audit({ rfx_id: o.rfxId, actor: user.id, event: "clarification.sent", entity_type: "communication", entity_id: sent.id,
-    payload: { vendor: v.name, n, items: items.length, titles: items.map((i) => i.title), message_id: sent.message_id } });
+    payload: { vendor: v.name, n, items: items.length, titles: items.map((i) => i.title).sort((a, b) => a.localeCompare(b, "en", { numeric: true })), message_id: sent.message_id } });
   return { communication_id: sent.id, message_id: sent.message_id, clar_n: n, asked: items.length };
 }
 

@@ -59,7 +59,7 @@ export async function createResponse(input: {
   }
 
   await db().from("communications").update({ response_id: responseId, attachments }).eq("id", comm.data.id);
-  await audit({ rfx_id: rfxId, actor: input.actor, event: "response.received", entity_type: "response", entity_id: responseId, payload: { source, files: files.length, email_text: !!emailText, clarification: !!input.clarification, message_id: input.messageId ?? null } });
+  await audit({ rfx_id: rfxId, actor: input.actor, event: "response.received", entity_type: "response", entity_id: responseId, payload: { source, vendor: vendor?.name ?? null, files: files.length, email_text: !!emailText, clarification: !!input.clarification, message_id: input.messageId ?? null } });
   console.log(`[stage:intake] response ${responseId} (${source}): ${files.length} files${emailText ? " + email text" : ""}`);
   return responseId;
 }

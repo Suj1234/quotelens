@@ -82,7 +82,8 @@ export async function getLedger(rfxId: string): Promise<LedgerRow[]> {
     const lines = g.rows.map((r) => r.line).filter((l): l is number => l !== null).sort((a, b) => a - b);
     return {
       kind: g.kind, vendor: g.vendor, lines: spans(lines), basis: g.basis.replaceAll("_", " "), by: g.by, at: g.rows[g.rows.length - 1].at,
-      description: g.rows.length > 1 ? `${FOLDED[g.kind] ?? g.rows[0].description.replace(/^Line \d+: /, "")} (${g.rows.length} lines)` : g.rows[0].description,
+      description: g.rows.length <= 1 ? g.rows[0].description : g.rows.every((r) => r.description.includes("clarification reply"))
+        ? clarified(g.rows) : `${FOLDED[g.kind] ?? g.rows[0].description.replace(/^Line \d+: /, "")} (${g.rows.length} lines)`,
     };
   });
 }
@@ -93,6 +94,13 @@ const FOLDED: Record<string, string> = {
   pack_size: "Pack size not stated by the vendor; best guess or our line spec used",
   unit_conversion: "Unit converted on a basis the vendor didn't state",
 };
+/** Folded answers from a vendor's clarification reply, in line order (prototype: "Bundle sizes 25 / 20 / 50 / 40 from vendor clarification"). */
+function clarified(rows: { description: string; line: number | null }[]): string {
+  const sorted = [...rows].sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+  const packs = sorted.map((r) => r.description.match(/(bundle|box) of (\d+)/));
+  if (packs.every(Boolean)) return `${packs[0]![1] === "box" ? "Box" : "Bundle"} sizes ${packs.map((p) => p![2]).join(" / ")} from the vendor's clarification reply (${rows.length} lines)`;
+  return `Values from the vendor's clarification reply: ${sorted.map((r) => r.description.replace(/ from the vendor's clarification reply.*$/, "")).join("; ")}`;
+}
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
 
 /** [1,2,3,5,7,8] → "1–3, 5, 7–8"; [] → "—" */
@@ -138,7 +146,7 @@ export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
       }
       continue;
     }
-    if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `${p.clarification ? "Clarification reply" : "Reply"} received from ${vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})` });
+    if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `${p.clarification ? "Clarification reply" : "Reply"} received from ${(p.vendor as string | undefined) ?? vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})` });
     else if (e.event === "clarification.sent") rows.push({ at: e.created_at, dir: "→", text: `${who(e.actor)} sent ${p.vendor} a clarification (${p.items} ${p.items === 1 ? "point" : "points"}: ${((p.titles as string[] | undefined) ?? []).map((t) => t.split(":")[0]).join(", ")})` });
     else if (e.event === "email.synced") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} synced the inbox — ${p.new} new${p.skipped ? `, ${p.skipped} already received` : ""}${p.ignored ? `, ${p.ignored} ignored` : ""}` });
     else if (e.event === "seed.responses_loaded") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} loaded the ${p.set} seeded responses (${p.responses})` });
