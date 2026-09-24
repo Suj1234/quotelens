@@ -10,13 +10,13 @@ import { issueBlockers, NO_RULES } from "@/lib/line-rules";
 import { assertDraft, getDraft } from "@/lib/rfx-draft";
 import { getSetting } from "@/lib/settings";
 import { replyToAddress, sendEmail, type OutAttachment } from "@/lib/email";
-import { lineSheetXlsx, questionnairePdf } from "@/lib/dispatch-docs";
+import { quoteFormXlsx } from "@/lib/dispatch-docs";
 
 export const REPLY_SENTENCE = "Please reply to this email with your quotation in any format convenient to you — we will process it as sent.";
 
-// TRD §9.3 P-DISPATCH, verbatim.
+// TRD §9.3 P-DISPATCH, verbatim except the attachment note (one Excel quote form; DECISIONS 2026-09-25).
 const P_DISPATCH = `Write a professional RFx cover email from {buyer_name}, {buyer_title}, Meridian Foods Pvt Ltd to {vendor_name}.
-Include: RFx code {code}, title, one-paragraph scope ({cover_note}), commercial terms (currency, quoting unit, incoterm, freight, payment terms, validity requested, contract duration, delivery locations), response deadline {deadline}, a note that the line-item sheet (Excel) and supplier questionnaire (PDF) are attached, and this exact sentence: "Please reply to this email with your quotation in any format convenient to you — we will process it as sent."
+Include: RFx code {code}, title, one-paragraph scope ({cover_note}), commercial terms (currency, quoting unit, incoterm, freight, payment terms, validity requested, contract duration, delivery locations), response deadline {deadline}, a note that one Excel quote form is attached, with the line items on its first tab and the supplier questionnaire on its "Questionnaire" tab, and this exact sentence: "Please reply to this email with your quotation in any format convenient to you — we will process it as sent."
 Sign off with buyer name and email. Plain text, no markdown. Under 220 words.
 Return ONLY JSON: {"subject": string, "body_text": string}`;
 
@@ -29,6 +29,9 @@ const Dispatch = z.object({
 const TITLE: Record<string, string> = { buyer: "Category Buyer", admin: "Category Buyer", approver: "VP Procurement" };
 const UNIT: Record<string, string> = { per_1000_pcs: "per 1000 pieces", per_piece: "per piece", per_kg: "per kg", per_box: "per box" };
 
+export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+export const quoteFormName = (code: string) => `${code}_Quote_Form.xlsx`;
+
 /** TRD §16 POST /api/rfx/{id}/issue (+ §15.1–15.2): freeze v1, build the attachments, one dispatch email per vendor. */
 export async function issueRfx(rfxId: string, user: { id: string; name: string; email: string; role: string }) {
   await assertDraft(rfxId);
@@ -39,13 +42,12 @@ export async function issueRfx(rfxId: string, user: { id: string; name: string; 
   const r = d.rfx;
 
   // Attachments first: if they can't be built, nothing is frozen.
-  const [xlsx, pdf] = await Promise.all([lineSheetXlsx(d), questionnairePdf(d, user)]);
+  const xlsx = await quoteFormXlsx(d);
+  const name = quoteFormName(r.code);
   const atts: OutAttachment[] = [
-    { name: `${r.code}_Line_Sheet.xlsx`, bucket: "outbound", path: `rfx/${rfxId}/outbound/${r.code}_Line_Sheet.xlsx`, mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: xlsx.length },
-    { name: `${r.code}_Supplier_Questionnaire.pdf`, bucket: "outbound", path: `rfx/${rfxId}/outbound/${r.code}_Supplier_Questionnaire.pdf`, mime: "application/pdf", size: pdf.length },
+    { name, bucket: "outbound", path: `rfx/${rfxId}/outbound/${name}`, mime: XLSX_MIME, size: xlsx.length },
   ];
   await put("outbound", atts[0].path, xlsx, atts[0].mime);
-  await put("outbound", atts[1].path, pdf, atts[1].mime);
 
   // Freeze v1 (TRD §6.3: version 1 = frozen); the status guard makes a double click a no-op instead of a second dispatch.
   const now = new Date().toISOString();

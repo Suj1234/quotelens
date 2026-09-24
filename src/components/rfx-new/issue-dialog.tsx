@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Draft } from "@/lib/rfx-draft";
 import { Button } from "@/components/ui/button";
+import { FileViewer } from "@/components/rfx-new/file-viewer";
 
 /** TRD §17.3: confirm what will be sent and to whom before v1 is frozen. */
 export function IssueDialog({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const r = draft.rfx;
+  const form = `${r.code}_Quote_Form.xlsx`;
   async function issue() {
     setBusy(true);
     try {
@@ -24,6 +27,8 @@ export function IssueDialog({ draft, onClose }: { draft: Draft; onClose: () => v
       setBusy(false);
     }
   }
+  // The viewer is a side sheet (z 30) under this dialog (z 40), so the dialog steps aside while it's open.
+  if (viewing) return <FileViewer file={{ name: form, url: `/api/rfx/${r.id}/issue/preview` }} onClose={() => setViewing(false)} />;
   return (
     <>
       <div className="scrim" onClick={busy ? undefined : onClose} />
@@ -33,7 +38,12 @@ export function IssueDialog({ draft, onClose }: { draft: Draft; onClose: () => v
           <p>Issuing freezes <b>v1</b> — {draft.lines.length} lines, the terms, {draft.questions.length} questions and this vendor list — and sends one email per vendor. Replies are read against v1.</p>
           <div>
             <div className="eyebrow" style={{ marginBottom: 4 }}>Each email carries</div>
-            <div className="mono" style={{ fontSize: 12 }}>{r.code}_Line_Sheet.xlsx · {r.code}_Supplier_Questionnaire.pdf</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="mono" style={{ fontSize: 12 }}>{form}</span>
+              <span className="hint">Line Items · Questionnaire tabs</span>
+              <Button size="xs" variant="ghost" disabled={busy} onClick={() => setViewing(true)} style={{ marginLeft: "auto" }}>View</Button>
+              <Button size="xs" variant="ghost" asChild><a href={`/api/rfx/${r.id}/issue/preview`} download={form}>Download</a></Button>
+            </div>
           </div>
           <table className="t">
             <thead><tr><th>To</th><th>Email</th><th>Reply-To tag</th></tr></thead>

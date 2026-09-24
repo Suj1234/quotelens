@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 export type ViewFile = { name: string; blob?: Blob; url?: string };
 type Content =
-  | { kind: "sheet"; sheets: { name: string; rows: string[][] }[] }
+  | { kind: "sheet"; sheets: { name: string; rows: string[][]; banners: number[] }[] }
   | { kind: "frame" | "image"; src: string }
   | { kind: "text"; text: string }
   | { kind: "other"; src: string };
@@ -32,7 +32,14 @@ export function FileViewer({ file, onClose }: { file: ViewFile; onClose: () => v
       if (["xlsx", "xls", "csv"].includes(e)) {
         const XLSX = await import("xlsx");
         const wb = e === "csv" ? XLSX.read(await blob.text(), { type: "string" }) : XLSX.read(await blob.arrayBuffer(), { type: "array" });
-        c = { kind: "sheet", sheets: wb.SheetNames.map((n) => ({ name: n, rows: XLSX.utils.sheet_to_json<string[]>(wb.Sheets[n], { header: 1, raw: false, defval: "" }) })) };
+        c = { kind: "sheet", sheets: wb.SheetNames.map((n) => {
+          const ws = wb.Sheets[n];
+          const r0 = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]).s.r : 0;
+          // Rows merged across from column A (a title or info block) render as one full-width cell, not as a column A
+          // as wide as its text.
+          const banners = (ws["!merges"] ?? []).filter((m) => m.s.c === 0 && m.e.c > 0 && m.s.r === m.e.r).map((m) => m.s.r - r0);
+          return { name: n, rows: XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, defval: "" }), banners };
+        }) };
       } else if (e === "txt") c = { kind: "text", text: await blob.text() };
       else {
         url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: e === "pdf" ? "application/pdf" : "" }));
@@ -46,6 +53,8 @@ export function FileViewer({ file, onClose }: { file: ViewFile; onClose: () => v
   useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
 
   const sheet = content?.kind === "sheet" ? content.sheets[tab] : null;
+  const width = sheet ? Math.max(1, ...sheet.rows.map((r) => r.length)) : 1;
+  const head = sheet ? sheet.rows.findIndex((r, i) => !sheet.banners.includes(i) && r.some(Boolean)) : -1; // the table's column labels
   return (
     <>
       <div className="scrim" onClick={onClose} />
@@ -61,7 +70,9 @@ export function FileViewer({ file, onClose }: { file: ViewFile; onClose: () => v
             <div style={{ overflow: "auto" }}>
               <table className="t" style={{ fontSize: 12 }}>
                 <tbody>{sheet.rows.map((row, i) => (
-                  <tr key={i}><td className="mono text-muted-foreground" style={{ width: 1 }}>{i + 1}</td>{row.map((cell, j) => <td key={j} style={{ whiteSpace: "nowrap", fontWeight: i === 0 ? 500 : undefined }}>{cell}</td>)}</tr>
+                  <tr key={i}><td className="mono text-muted-foreground" style={{ width: 1 }}>{i + 1}</td>{sheet.banners.includes(i)
+                    ? <td colSpan={width} style={{ background: "var(--tint)", fontWeight: i === 0 ? 600 : undefined }}>{row[0]}</td>
+                    : row.map((cell, j) => <td key={j} style={{ whiteSpace: "nowrap", fontWeight: i === head ? 500 : undefined }}>{cell}</td>)}</tr>
                 ))}</tbody>
               </table>
             </div>
