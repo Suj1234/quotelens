@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { SignInForm } from "@/components/auth/sign-in-form";
+import { SiteFooter } from "@/components/site-footer";
 import s from "./signin.module.css";
 
 const icon = { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6 };
@@ -26,24 +27,28 @@ export default async function SignInPage() {
               <div key={st.title} className={s.step}><div className={s.ico}>{st.svg}</div><b>{st.title}</b><span>{st.text}</span></div>
             ))}
           </div>
-          {/* Illustrative sample (not data) — same as design/prototype.html */}
-          <div className={s.mini} aria-hidden>
-            <div className={`${s.row} ${s.head}`}><span>Line</span><span>Vendor A</span><span>Vendor B</span><span>Vendor C</span></div>
-            <div className={s.row}><span>Shipper carton 5-ply</span><span className="mono">38,240</span><span className={`mono ${s.min}`}>36,892</span><span className="mono">38,680</span></div>
-            <div className={s.row}><span>Inner carton 3-ply</span><span className={`mono ${s.min}`}>7,140</span><span className="mono">7,415</span><span className={s.amb}>needs a look</span></div>
-            <div className={s.row}><span>Corrugated sheet</span><span className="mono">38,610</span><span className={s.nq}>not quoted</span><span className={`mono ${s.min}`}>37,300</span></div>
-            <div className={s.cap}>Lowest price marked on every line · missing and uncertain quotes stay visible</div>
+          {/* Illustrative sample (not data) — based on design/prototype.html; unit + legend added 2026-09-25 */}
+          <div className={s.sample} aria-hidden>
+            <div className={s.legend}>
+              <span>Sample comparison · ₹ per 1,000 pcs</span>
+              <span><i className={`${s.sw} ${s.min}`} />Lowest on the line</span>
+              <span><i className={`${s.sw} ${s.amb}`} />Needs a look</span>
+              <span><i className={`${s.sw} ${s.nq}`} />Not quoted</span>
+            </div>
+            <div className={s.mini}>
+              <div className={`${s.row} ${s.head}`}><span>Line</span><span>Vendor A</span><span>Vendor B</span><span>Vendor C</span></div>
+              <div className={s.row}><span>Shipper carton 5-ply</span><span className="mono">38,240</span><span className={`mono ${s.min}`}>36,892</span><span className="mono">38,680</span></div>
+              <div className={s.row}><span>Inner carton 3-ply</span><span className={`mono ${s.min}`}>7,140</span><span className="mono">7,415</span><span className={s.amb}>needs a look</span></div>
+              <div className={s.row}><span>Corrugated sheet</span><span className="mono">38,610</span><span className={s.nq}>not quoted</span><span className={`mono ${s.min}`}>37,300</span></div>
+            </div>
           </div>
-          <p className="hint" style={{ marginTop: "auto" }}>Meridian Foods Pvt Ltd · Sourcing</p>
         </div>
       </div>
       <div className={s.form}>
-        <div>
-          <div className={`brand ${s.mbrand}`} style={{ fontSize: 15 }}><span className="brand-mark" />QuoteLens</div>
-          <SignInForm />
-        </div>
-        <p className="hint">Private to Meridian Foods. Vendors never sign in here.</p>
+        <div className={`brand ${s.mbrand}`} style={{ fontSize: 15 }}><span className="brand-mark" />QuoteLens</div>
+        <SignInForm />
       </div>
+      <SiteFooter />
     </div>
   );
 }

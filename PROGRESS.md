@@ -217,6 +217,7 @@
   | Q6 unsure cells | none — every cell decided (0 rows) | 0 | 6.0 s |
   | Q7 OrientPack USD ±3 % | first two asks (P-SQL v4) ₹13,99,78,512 — ledger join counted each line 3×; fixed in P-SQL v5 (DECISIONS) → USD→INR 83.15 (manual, 23 Sep 2026); ₹4,66,59,504 → ₹4,80,59,286 / ₹4,52,59,719 | 29 | 5.0 / 5.0 / 6.0 s |
   | Q8 export Q1 as Excel | Q1's allocation again (₹4,53,39,035) with Export | 30 | 6.0 s |
+- [x] **Post-P8: sign-in page layout + Privacy / Terms / Help (Sabarish's request, 25 Sep 2026)** — sign-in: no empty band between columns (left content up to 820px, right column 400–520px), headline 34px in two lines, form 400px and vertically centred, sample grid gets "₹ per 1,000 pcs" and a legend, one full-width footer with Privacy · Terms · Help; new public pages `/privacy`, `/terms`, `/help` (`src/app/(public)/`, placeholder content for the fictional Meridian Foods). Checked at 1440, 1280 and 390px, no horizontal scroll; 87 tests, lint, build green. Deviation from DESIGN §3.1 logged in DECISIONS.
 - **Phase 8 requirement checklist** (sources: handoff P8 §0/§5, CLAUDE P8-T1…T4 and §10, TRD §6.19–6.20/§10/§11.3–11.4/§11.7/§16/§17.13–17.15/§18/§19/§22, PRD §4/§10, DESIGN §2.2/§2.16/§3.10/§4/§5/§6). ✓ only with evidence.
   | # | Requirement (source) | Status / evidence |
   |---|---|---|

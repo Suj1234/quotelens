@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,8 +36,8 @@ export function SignInForm() {
 
   return (
     <form className={s.fwrap} onSubmit={submit}>
-      <h2 style={{ fontSize: 20 }}>Sign in</h2>
-      <p className="text-muted-foreground" style={{ marginTop: 4, fontSize: 12 }}>Use your Meridian Foods work email.</p>
+      <h2 style={{ fontSize: 22 }}>Sign in</h2>
+      <p className="text-muted-foreground" style={{ marginTop: 4, fontSize: 13 }}>Use your Meridian Foods work email.</p>
       <div style={{ marginTop: 22 }}>
         <label htmlFor="em">Work email</label>
         <Input id="em" type="email" placeholder="you@meridianfoods.in" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -45,7 +46,7 @@ export function SignInForm() {
         <label htmlFor="pw">Password</label>
         <Input id="pw" ref={pw} type="password" placeholder="••••••••" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
-      <Button type="submit" variant="default" size="lg" className="w-full" style={{ marginTop: 16 }} disabled={busy}>Continue</Button>
+      <Button type="submit" variant="default" size="lg" className="w-full" style={{ marginTop: 18, height: 40 }} disabled={busy}>Continue</Button>
       {error && <p className={s.error} role="alert">{error}</p>}
       <div className={s.demo}>
         <div className="eyebrow">Demo accounts</div>
@@ -56,6 +57,7 @@ export function SignInForm() {
           </button>
         ))}
       </div>
+      <p className="hint" style={{ marginTop: 18 }}>Trouble signing in? See <Link href="/help#access">Help</Link>.</p>
     </form>
   );
 }
