@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { get } from "@/lib/storage";
 import { getSetting } from "@/lib/settings";
 import type { ResponseRow, RfxLine } from "@/types/db";
-import { itemRange, shortlist, type ItemLike } from "./shortlist";
+import { itemRange, labelSheetRow, shortlist, type ItemLike } from "./shortlist";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
 
 const BATCH = 10; // items per decide() call (CLAUDE.md P2-T3)
@@ -44,7 +44,7 @@ export async function map(resp: ResponseRow): Promise<MapSummary> {
     it.unit_price !== null && `price ${it.unit_price} ${it.price_unit_raw ?? ""}`.trim(),
     it.pack_size && `pack ${it.pack_size} ${it.pack_size_unit ?? ""}`.trim(),
     it.notes && `notes: ${it.notes.slice(0, 160)}`,
-    it.location.snippet && `source: "${String(it.location.snippet).slice(0, 180)}"`,
+    it.location.snippet && `source: "${String(it.location.snippet).slice(0, 260)}"`,
   ].filter(Boolean).join(" | ");
 
   type Job = { it: ExtractedItem; key: string; q: Question; opts?: { line_no: number; label: string }[]; range?: [number, number] };
@@ -169,7 +169,8 @@ async function withSheetRows(items: ExtractedItem[]): Promise<ExtractedItem[]> {
   for (const f of files ?? []) if (f.derived_text_path) text.set(f.id, (await get("derived", f.derived_text_path)).toString("utf8").split("\n"));
   return items.map((i) => {
     const ref = i.location?.type === "cell" ? String(i.location.ref ?? "") : "";
-    const row = ref && i.file_id ? text.get(i.file_id)?.find((l) => l.includes(` ${ref}=`)) : undefined;
-    return row ? { ...i, location: { ...i.location, snippet: row } } : i;
+    const lines = ref && i.file_id ? text.get(i.file_id) : undefined;
+    const at = lines ? lines.findIndex((l) => l.includes(` ${ref}=`)) : -1;
+    return at >= 0 ? { ...i, location: { ...i.location, snippet: labelSheetRow(lines![at], lines!.slice(Math.max(0, at - 40), at)) } } : i;
   });
 }

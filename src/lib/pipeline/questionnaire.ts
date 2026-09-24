@@ -137,7 +137,10 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   // Missing mandatory answers make the vendor "not cleared" (view 0004) — say so once, so the buyer can ask the vendor.
   if (scope) await resolveByReply(resp, { lineIds: [], questionIds: write.filter((r) => r.state === "answered").map((r) => r.question_id) });
   const missingMandatory = write.filter((r) => r.state === "missing").map((r) => questions.find((q) => q.id === r.question_id)!).filter((q) => q.mandatory);
-  if (missingMandatory.length) {
+  // Once per vendor: a second reply (a stray file, a clarification) doesn't repeat the card another reply already raised (P8).
+  const already = missingMandatory.length && resp.vendor_id ? (await db().from("review_items").select("id").eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id)
+    .eq("type", "questionnaire_missing").eq("status", "open").neq("response_id", resp.id).limit(1)).data?.length : 0;
+  if (missingMandatory.length && !already) {
     reviews.push({
       type: "questionnaire_missing", title: `Questionnaire not returned: ${missingMandatory.length} mandatory ${missingMandatory.length === 1 ? "answer" : "answers"} missing`,
       detail: missingMandatory.map((q) => `Q${q.q_no} ${q.text}`).join(" · "), proposed_value: missingMandatory.length, evidence: { sources },

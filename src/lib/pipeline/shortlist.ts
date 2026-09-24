@@ -57,8 +57,9 @@ function jaccard(a: Set<string>, b: Set<string>) {
 export function shortlist(it: ItemLike, lines: RfxLine[], k = 5): Candidate[] {
   const own = text(it);
   // The extractor's notes often carry the labelled columns ("Size: 1200x800 mm, Ply: 5, B.F.: 32") that a bare spreadsheet row
-  // ("E36=1200x800 F36=5 G36=32") gives without labels — read them with the snippet (P8: realistic Balaji sheets 23–25).
-  const snippet = [it.location?.snippet, it.notes].filter(Boolean).join(" ");
+  // ("E36=1200x800 F36=5 G36=32") gives without labels — read them too, but only when the item doesn't cite its line number:
+  // for "items 5" the notes ("5-ply carton") only fill the options with look-alikes and the model answers "none" (P8, both seen).
+  const snippet = [it.location?.snippet, refs(own).length ? null : it.notes].filter(Boolean).join(" ");
   const all = `${own} ${snippet}`;
   const found = dims(all);
   const plyM = own.match(PLY) ?? snippet.match(PLY);
@@ -94,3 +95,20 @@ export function shortlist(it: ItemLike, lines: RfxLine[], k = 5): Candidate[] {
     return { line_no: l.line_no, score: Math.round(score * 1000) / 1000, why };
   }).sort((a, b) => b.score - a.score || a.line_no - b.line_no).slice(0, k);
 }
+
+/**
+ * A spreadsheet row from the derived text ("[row 37] B37=24 C37=SBP-1024 … F37=5 G37=28 H37=26770") with each cell named by
+ * its column header — the nearest earlier row with 3+ cells and no number in it ("B11=Sl … F11=Ply G11=B.F.") — so the
+ * shortlist and the model read "Ply=5 · B.F.=28" instead of bare columns (P8: realistic Balaji sheets). No header → unchanged.
+ */
+export function labelSheetRow(row: string, earlier: string[]): string {
+  const cells = (l: string) => l.replace(/^\[row \d+\]\s*/, "").split(/ (?=[A-Z]{1,3}\d+=)/)
+    .map((c) => c.match(/^([A-Z]{1,3})\d+=(.*)$/)).filter((m): m is RegExpMatchArray => !!m).map((m) => ({ col: m[1], v: m[2].trim() }));
+  const isNum = (v: string) => /^[-\d,.]+%?$/.test(v.replace(/\/-$/, "")) && /\d/.test(v);
+  const header = [...earlier].reverse().map(cells).find((cs) => cs.length >= 3 && !cs.some((c) => isNum(c.v)));
+  if (!header) return row;
+  const name = new Map(header.map((c) => [c.col, c.v]));
+  const head = row.match(/^\[row \d+\]/)?.[0] ?? "";
+  return `${head} ${cells(row).map((c) => `${name.get(c.col) ?? c.col}=${c.v}`).join(" · ")}`.trim();
+}
+

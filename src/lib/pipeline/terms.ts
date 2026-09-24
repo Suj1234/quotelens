@@ -49,5 +49,9 @@ export async function decideTerms(resp: ResponseRow, rfx: Rfx, t: TermsRow, item
 
   const p = Object.fromEntries(["references_prior_pricing", "freight_excluded", "taxes_excluded", "total_discount_conditional", "rates_net_of_discount", "buyer_misses_condition"]
     .map((k) => [k, Math.round(bool(r, k) * 1000) / 1000])) as TermsDecision["p"];
+  // Prior pricing needs the supplier's own words about earlier prices (TRD §11.6 quotes them on every affected cell);
+  // without them the model's yes is a guess (P8: an ISO certificate with the note "No quotation terms found." came back p 0.9).
+  const priorWords = t.references_prior_pricing_text || itemNotes.length || /last year|previous|earlier|same as|prior|as per|existing (rate|price)/i.test(t.other_notes ?? "");
+  if (!priorWords) p.references_prior_pricing = 0;
   return { provider: r.provider, p };
 }
