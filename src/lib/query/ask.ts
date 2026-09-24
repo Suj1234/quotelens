@@ -9,7 +9,7 @@ import { money } from "@/lib/format";
 import { guardSql, rewriteBestGuess } from "./sql-guard";
 import { aggregates, chartSpec, primaryTotal, unverifiedNumbers, type Row } from "./result";
 
-// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price (v1, v2 in prompts/archive/).
+// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price; v4: allocations one row per line (v1–v3 in prompts/archive/).
 const P_SQL = `You convert a procurement buyer's question into ONE PostgreSQL SELECT over these read-only views. Return JSON only.
 
 Views:
@@ -30,6 +30,7 @@ Hard rules:
 - Cheapest per line = the minimum price per line_no among eligible vendors; return the winning vendor and price per line and the total of price × annual_qty / 1000.
 - Round money to 0 decimals in output columns named *_inr.
 - Prefer returning tidy columns the buyer can read: line_no, description, vendor, price, annual_value_inr, etc.
+- When the question allocates lines to vendors (who gets which line, a split, an award), return one row per line_no with the winning vendor, its price and annual_value_inr; put any total it is compared with in an extra column repeated on every row (e.g. q1_total_inr).
 Guard notes (a query that breaks these is rejected):
 - Write every column and table alias with AS.
 - Filter every view you read on rfx_id = '{rfx_id}', or join it on rfx_id to a view that is filtered.
@@ -77,7 +78,7 @@ export type AskAnswer = {
 };
 
 /** The query keeps only vendors who cleared the questionnaire (a filter, not just the column in the select list). */
-const qualifiedFilter = (sql: string) => /cleared_questionnaire\s*(=\s*true|is\s+true)|cleared_questionnaire\s*(and|\)|$)/i.test(sql);
+export const qualifiedFilter = (sql: string) => /cleared_questionnaire\s*(=\s*true|is\s+true)|cleared_questionnaire\s*(and|\)|$)/i.test(sql);
 
 /** Unsure cells the query could have used: its lines (when it returns line_no), its vendors (qualified filter, or named in a literal). */
 function unsureInScope(sql: string, rows: Row[], unsure: GridCell[], vendors: GridVendor[]) {

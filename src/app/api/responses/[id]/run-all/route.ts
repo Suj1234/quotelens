@@ -1,5 +1,6 @@
 import { requireApiUser } from "@/lib/auth";
 import { route } from "@/lib/http";
+import { assertOpen } from "@/lib/lock";
 import { runAll } from "@/lib/pipeline/run";
 import { STAGES, type Stage } from "@/types/db";
 
@@ -9,6 +10,7 @@ export const maxDuration = 300; // TRD §21
 export const POST = route(async (req: Request, ctx: RouteContext<"/api/responses/[id]/run-all">) => {
   const user = await requireApiUser(["buyer", "admin"]);
   const { id } = await ctx.params;
+  await assertOpen({ response: id });
   const from = new URL(req.url).searchParams.get("from") as Stage | null;
   const events = runAll(id, user.id, from && STAGES.includes(from) ? from : "classify");
   const enc = new TextEncoder();

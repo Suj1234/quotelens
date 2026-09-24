@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listRfx } from "@/lib/rfx";
-import { countWord, relativeDay } from "@/lib/format";
+import { countWord, inrShort, relativeDay } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { RowLink } from "@/components/rfx/row-link";
 
@@ -50,8 +50,8 @@ export default async function RfxListPage() {
                     <td><span className={`status ${r.status}`}>{LABEL[r.status]}</span></td>
                     <td className="mono">{r.responded} of {r.invited}</td>
                     <td className="num mono">{r.lines}</td>
-                    {/* Annual value comes from a saved scenario/award (P7); none exist yet */}
-                    <td className="num mono">—</td>
+                    {/* The approved award's scenario total (P7); "—" until an award is approved */}
+                    <td className="num mono">{r.annual_value !== null ? inrShort(r.annual_value) : "—"}</td>
                     <td className="text-muted-foreground">{relativeDay(r.updated)}</td>
                   </RowLink>
                 );

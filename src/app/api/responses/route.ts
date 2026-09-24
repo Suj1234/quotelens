@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireApiUser } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { route } from "@/lib/http";
+import { assertOpen } from "@/lib/lock";
 import { createResponse, seedReply, type IncomingFile } from "@/lib/responses";
 import { db } from "@/lib/db";
 import { clarificationContext } from "@/lib/clarify";
@@ -30,6 +31,7 @@ export const POST = route(async (req: Request) => {
     form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0)
       .map(async (f) => ({ name: f.name, mime: f.type, buf: Buffer.from(await f.arrayBuffer()) })),
   );
+  await assertOpen({ rfx: fields.data.rfx_id });
   let emailText = fields.data.email_text;
   if (fields.data.use_seed) {
     const { data: v } = fields.data.vendor_id ? await db().from("vendors").select("short_code").eq("id", fields.data.vendor_id).single() : { data: null };

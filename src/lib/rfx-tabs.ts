@@ -149,6 +149,14 @@ export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
     if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `${p.clarification ? "Clarification reply" : "Reply"} received from ${(p.vendor as string | undefined) ?? vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})` });
     else if (e.event === "clarification.sent") rows.push({ at: e.created_at, dir: "→", text: `${who(e.actor)} sent ${p.vendor} a clarification (${p.items} ${p.items === 1 ? "point" : "points"}: ${((p.titles as string[] | undefined) ?? []).map((t) => t.split(":")[0]).join(", ")})` });
     else if (e.event === "email.synced") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} synced the inbox — ${p.new} new${p.skipped ? `, ${p.skipped} already received` : ""}${p.ignored ? `, ${p.ignored} ignored` : ""}` });
+    // P7 (PRD #34): scenarios, overrides, the memo, send back and approval, in words.
+    else if (e.event === "scenario.saved") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} saved scenario “${p.name}”${p.total_short ? ` (${p.total_short})` : ""}${p.from_query ? " from an answer" : ""}` });
+    else if (e.event === "scenario.override") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} gave line ${p.line_no} of “${p.name}” to ${p.vendor} instead of ${p.from_vendor} — ${p.reason}` });
+    else if (e.event === "scenario.override_reverted") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} reverted the override on line ${p.line_no} of “${p.name}” (back to ${p.vendor})` });
+    else if (e.event === "scenario.deleted") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} deleted scenario “${p.name}”` });
+    else if (e.event === "award.memo") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} ${p.regenerated ? "generated the award memo again" : "generated the award memo"} from “${p.scenario}”` });
+    else if (e.event === "award.sent_back") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} sent the memo back: “${p.note}”` });
+    else if (e.event === "award.approved") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} approved the award — RFx locked` });
     else if (e.event === "seed.responses_loaded") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} loaded the ${p.set} seeded responses (${p.responses})` });
     else if (e.event.startsWith("review.")) {
       const a = e.event.slice(7);

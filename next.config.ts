@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The award memo PDF reads its fonts (IBM Plex, has ₹) from disk at render time; ship them with the award routes.
+  outputFileTracingIncludes: {
+    "/api/award/*": ["src/lib/award/fonts/*.woff"],
+    "/api/award/**/*": ["src/lib/award/fonts/*.woff"],
+  },
 };
 
 export default nextConfig;

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
 import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { AddResponse } from "@/components/rfx/add-response";
+import { isLocked } from "@/lib/lock";
 import { getUnmatchedResponses } from "@/lib/unmatched";
 import { db } from "@/lib/db";
 import { outstandingClarifications } from "@/lib/clarify";
@@ -14,8 +15,8 @@ import { STAGES } from "@/types/db";
 
 export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/responses">) {
   const user = await requireUser();
-  const buyer = user.role !== "approver";
   const { id } = await params;
+  const buyer = user.role !== "approver" && !(await isLocked(id)); // DESIGN §4 + PRD #33: no adding or re-running once awarded
   const [rows, strays, { data: allVendors }, { data: status }, clars, { data: clarReplies }] = await Promise.all([
     listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name"),
     db().from("v_vendor_status").select("vendor_id, lines_priced, lines_total, cleared_questionnaire").eq("rfx_id", id),

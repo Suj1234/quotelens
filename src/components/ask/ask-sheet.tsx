@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AskCard } from "./ask-card";
 
 // DESIGN §3.7: the buyer opens Ask from the RFx header, the approver from the Comparison toolbar — the same 400px sheet.
-const AskCtx = createContext<{ open: () => void } | null>(null);
+const AskCtx = createContext<{ open: () => void; locked: boolean } | null>(null);
 export const useAsk = () => useContext(AskCtx);
 
 const SUGGESTIONS = [
@@ -19,11 +19,11 @@ const SUGGESTIONS = [
   "Which cells are you not sure about, and how much money rides on them?",
 ];
 
-export function AskProvider({ rfxId, children }: { rfxId: string; children: React.ReactNode }) {
+export function AskProvider({ rfxId, locked = false, children }: { rfxId: string; locked?: boolean; children: React.ReactNode }) {
   const [isOpen, setOpen] = useState(false);
   const open = useCallback(() => setOpen(true), []);
   return (
-    <AskCtx.Provider value={{ open }}>
+    <AskCtx.Provider value={{ open, locked }}>
       {children}
       {isOpen && <AskSheet rfxId={rfxId} onClose={() => setOpen(false)} />}
     </AskCtx.Provider>
@@ -36,30 +36,22 @@ export function AskButton() {
   return <Button onClick={ask.open}><MessageSquare strokeWidth={1.7} /> Ask</Button>;
 }
 
-function AskSheet({ rfxId, onClose }: { rfxId: string; onClose: () => void }) {
+/** One Ask session: this session's answer cards, the RFx's earlier answers, the question in flight (sheet and Decide share it). */
+export function useAskRunner(rfxId: string) {
   const [cards, setCards] = useState<AskAnswer[]>([]);
   const [history, setHistory] = useState<AskAnswer[] | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const log = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     fetch(`/api/ask/history?rfx=${rfxId}`).then((r) => r.json()).then((b) => setHistory(b.items ?? [])).catch(() => setHistory([]));
   }, [rfxId]);
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
   useEffect(() => {
     if (!pending) return;
     const t0 = Date.now();
     const t = setInterval(() => setElapsed(Date.now() - t0), 250);
     return () => clearInterval(t);
   }, [pending]);
-  useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [cards.length, pending]);
 
   async function ask(q: string) {
     const question = q.trim();
@@ -79,32 +71,48 @@ function AskSheet({ rfxId, onClose }: { rfxId: string; onClose: () => void }) {
       setPending(null);
     }
   }
-
-  const asked = new Set(cards.map((c) => c.question));
   const earlier = (history ?? []).filter((h) => !cards.some((c) => c.query_id === h.query_id));
+  return { cards, setCards, earlier, text, setText, pending, elapsed, ask };
+}
+
+/** "Earlier questions · n": the RFx's last 20 answers (either user); opening one adds its stored card without re-running it. */
+export function EarlierQuestions({ earlier, onOpen }: { earlier: AskAnswer[]; onOpen: (a: AskAnswer) => void }) {
+  const [show, setShow] = useState(false);
+  if (!earlier.length) return null;
+  return (
+    <div>
+      <button className="eyebrow" onClick={() => setShow(!show)} style={{ cursor: "pointer" }}>{show ? "▾" : "▸"} Earlier questions · {earlier.length}</button>
+      {show && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column" }}>
+          {earlier.map((h) => (
+            <button key={h.query_id} onClick={() => onOpen(h)} style={{ textAlign: "left", padding: "6px 0", borderBottom: "1px solid var(--hair2)", fontSize: 12.5 }}>
+              {h.question}
+              <div className="hint">{h.asked_by ?? ""} · {shortDate(h.created_at)}{h.ok ? "" : " · no answer"}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AskSheet({ rfxId, onClose }: { rfxId: string; onClose: () => void }) {
+  const { cards, setCards, earlier, text, setText, pending, elapsed, ask } = useAskRunner(rfxId);
+  const log = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [cards.length, pending]);
+  const asked = new Set(cards.map((c) => c.question));
   return (
     <>
       <div className="scrim" onClick={onClose} />
       <aside className="sheet" role="dialog" aria-label="Ask">
         <div className="hd"><b>Ask</b><Button variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
         <div className="bd" ref={log}>
-          {earlier.length > 0 && (
-            <div>
-              <button className="eyebrow" onClick={() => setShowHistory(!showHistory)} style={{ cursor: "pointer" }}>
-                {showHistory ? "▾" : "▸"} Earlier questions · {earlier.length}
-              </button>
-              {showHistory && (
-                <div style={{ marginTop: 6, display: "flex", flexDirection: "column" }}>
-                  {earlier.map((h) => (
-                    <button key={h.query_id} onClick={() => setCards((c) => [...c, h])} style={{ textAlign: "left", padding: "6px 0", borderBottom: "1px solid var(--hair2)", fontSize: 12.5 }}>
-                      {h.question}
-                      <div className="hint">{h.asked_by ?? ""} · {shortDate(h.created_at)}{h.ok ? "" : " · no answer"}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <EarlierQuestions earlier={earlier} onOpen={(h) => setCards((c) => [...c, h])} />
           {!cards.length && !pending && <div className="text-muted-foreground" style={{ fontSize: 12 }}>Ask in plain language. Every number comes from a query over the grid, and the query is shown with the answer.</div>}
           {cards.map((a) => <AskCard key={a.query_id} a={a} rfxId={rfxId} />)}
           {pending && (

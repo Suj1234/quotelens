@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregates, chartSpec, primaryTotal, unverifiedNumbers } from "./result";
+import { aggregates, allocationColumn, chartSpec, primaryTotal, unverifiedNumbers } from "./result";
 
 describe("aggregates / primaryTotal (TRD §13.1 step 5)", () => {
   it("sums annual values, takes a repeated window total once, counts vendors", () => {
@@ -38,5 +38,23 @@ describe("unverifiedNumbers (P-NARRATE rule)", () => {
     expect(unverifiedNumbers("Saving of ₹12,00,000, 3.2% lower.", [rows])).toEqual(["12,00,000", "3.2%"]);
     expect(unverifiedNumbers("Total ₹44,81,2345.", [rows])).toEqual(["44,81,2345"]); // digits match, grouping doesn't
     expect(unverifiedNumbers("Rate set in September 2023.", [rows])).toEqual(["2023"]); // 2026 is supplied, 2023 is not
+  });
+});
+
+describe("allocationColumn", () => {
+  it("finds the winner column when there is one row per line", () => {
+    const rows = [{ line_no: 1, cheapest_vendor: "Kohinoor", runner_up_vendor: "Balaji" }, { line_no: 2, cheapest_vendor: "Balaji", runner_up_vendor: "Kohinoor" }];
+    expect(allocationColumn(["line_no", "cheapest_vendor", "runner_up_vendor"], rows)).toBe("cheapest_vendor");
+    expect(allocationColumn(["line_no", "vendor"], [{ line_no: 1, vendor: "A" }, { line_no: 1, vendor: "B" }])).toBeNull(); // two rows for line 1
+    expect(allocationColumn(["total_inr"], [{ total_inr: 5 }])).toBeNull();
+    expect(allocationColumn(["line_no", "vendor", "state"], [{ line_no: 14, vendor: "OrientPack", state: "low_confidence" }])).toBeNull();
+  });
+});
+
+describe("chartSpec on per-line allocations", () => {
+  it("charts totals repeated on every row (Q5: split vs Q1)", () => {
+    const rows = [1, 2, 3].map((n) => ({ line_no: n, vendor: "A", annual_value_inr: n * 10, q1_total_inr: 90, split_total_inr: 60 }));
+    const c = chartSpec({ needs_chart: false, intent: "Split vs Q1", chart: { type: null, x: null, y: null, title: null } }, rows, Object.keys(rows[0]))!;
+    expect(c.data).toEqual([{ label: "q1 total", value: 90 }, { label: "split total", value: 60 }]);
   });
 });

@@ -13,7 +13,7 @@ const STATE_LABEL: Record<string, [string, string]> = {
 };
 
 /** DESIGN §2.9 provenance drawer: source · as written · mapping · conversion chain · review. */
-export function ProvenanceDrawer({ rfxId, cellKey, basis, canReview, onClose }: { rfxId: string; cellKey: string; basis: "unit" | "landed"; canReview: boolean; onClose: () => void }) {
+export function ProvenanceDrawer({ rfxId, cellKey, basis, canReview, locked = false, onClose }: { rfxId: string; cellKey: string; basis: "unit" | "landed"; canReview: boolean; locked?: boolean; onClose: () => void }) {
   const [line, vendor] = cellKey.split(":");
   const [d, setD] = useState<CellDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function ProvenanceDrawer({ rfxId, cellKey, basis, canReview, onClose }: 
                 : open
                   ? canReview
                     ? <Link className={buttonVariants({ size: "sm" })} href={`/rfx/${rfxId}/review?item=${open.id}`}>Open in queue</Link>
-                    : <div className="text-muted-foreground" style={{ fontSize: 12.5 }}>Waiting for Sujit.</div>
+                    : <div className="text-muted-foreground" style={{ fontSize: 12.5 }}>{locked ? "Read-only — the RFx is awarded." : "Waiting for Sujit."}</div>
                   : <div className="text-muted-foreground" style={{ fontSize: 12.5 }}>Nothing pending.</div>}
               {d.reviews.filter((r) => r.status !== "open").map((r) => <div key={r.id} className="hint" style={{ marginTop: 4 }}>{r.title} — {r.status.replaceAll("_", " ")}{r.note ? ` · ${r.note}` : ""}</div>)}
             </section>

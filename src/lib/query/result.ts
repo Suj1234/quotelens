@@ -30,9 +30,14 @@ export function primaryTotal(totals: Record<string, number>): number | null {
 
 /** Step 7 / §13.6. One-row answers (e.g. "Q1 total vs best single vendor") chart their numeric columns as bars. */
 export function chartSpec(plan: { needs_chart: boolean; intent: string; chart: { type: "bar" | "line" | null; x: string | null; y: string | null; title: string | null } }, rows: Row[], columns: string[]): ChartSpec | null {
-  if (!rows.length || rows.length > 12) return null; // a 400px sheet fits ~12 bars; longer answers stay tables
+  if (!rows.length) return null;
   const numeric = columns.filter((c) => rows.every((r) => r[c] === null || isNum(r[c])) && rows.some((r) => isNum(r[c])));
   const totals = numeric.filter((c) => /total/i.test(c));
+  // Per-line allocations carry the totals they're compared with on every row (P-SQL v4): chart those, like a one-row answer.
+  const constant = rows.length > 1 ? totals.filter((c) => rows.every((r) => Number(r[c]) === Number(rows[0][c]))) : [];
+  if (constant.length >= 2) return { type: "bar", title: plan.chart.title ?? plan.intent, x: "label", series: [{ name: "value", y: "value" }],
+    data: constant.map((c) => ({ label: c.replace(/_inr$/, "").replaceAll("_", " "), value: Number(rows[0][c]) })) };
+  if (rows.length > 12) return null; // a 400px sheet fits ~12 bars; longer answers stay tables
   // A one-row answer comparing two or more totals is charted even when the planner didn't ask (PRD Q2 "number + bar chart").
   if (!plan.needs_chart && !(rows.length === 1 && totals.length >= 2)) return null;
   const title = plan.chart.title ?? plan.intent;
@@ -80,4 +85,17 @@ export function unverifiedNumbers(text: string, supplied: unknown[]): string[] {
     if (!ok) bad.push(m[0].trim());
   }
   return bad;
+}
+
+/**
+ * TRD §13.5: an answer can be saved as a scenario when its rows have line_no, a vendor column and one row per line.
+ * Returns that vendor column (the planner names it vendor / winning_vendor / cheapest_vendor run to run), else null.
+ */
+export function allocationColumn(columns: string[], rows: Row[]): string | null {
+  if (!rows.length || !columns.includes("line_no") || columns.includes("state")) return null; // a list of cell states (Q6) is not an allocation
+  const lines = rows.map((r) => Number(r.line_no));
+  if (lines.some((n) => !Number.isInteger(n)) || new Set(lines).size !== rows.length) return null;
+  const cands = columns.filter((c) => /vendor/i.test(c) && !/runner|second|next|alt|count|_id$/i.test(c))
+    .sort((a, b) => Number(b === "vendor") - Number(a === "vendor"));
+  return cands.find((c) => rows.every((r) => typeof r[c] === "string" && r[c] !== "")) ?? null;
 }

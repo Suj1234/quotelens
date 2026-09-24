@@ -19,10 +19,11 @@ const failedQs = (note: string) => [...new Set(note.split(" · ").map((s) => s.m
 export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/overview">) {
   const user = await requireUser();
   const { id } = await params;
-  if (user.role === "approver") redirect(`/rfx/${id}/comparison`);
+  if (user.role === "approver") redirect(`/rfx/${id}/decide`);
   const o = await getOverview(id);
   const r = o.rfx;
   const invited = o.vendors.length;
+  const locked = r.status === "awarded";
 
   if (r.status === "draft") {
     return (
@@ -36,7 +37,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
   const { data: allVendors } = o.strays.length ? await db().from("vendors").select("id, name").order("name") : { data: [] };
   return (
     <div className="page">
-      {o.mode === "mock" && <SyncPoller rfxId={id} />}
+      {o.mode === "mock" && !locked && <SyncPoller rfxId={id} />}
       <div className="grid2" style={{ gridTemplateColumns: "1.25fr 1fr", alignItems: "start" }}>
         <div>
           <div className="eyebrow">Where this stands</div>
@@ -73,7 +74,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
       </div>
 
       <div className="card" style={{ marginTop: 18 }}>
-        <div className="hd"><b>Vendors</b><span style={{ display: "flex", gap: 10, alignItems: "center" }}><span className="hint">click a row for the response</span>{o.mode === "mock" && <LoadSeed rfxId={id} />}</span></div>
+        <div className="hd"><b>Vendors</b><span style={{ display: "flex", gap: 10, alignItems: "center" }}><span className="hint">click a row for the response</span>{o.mode === "mock" && !locked && <LoadSeed rfxId={id} />}</span></div>
         <div style={{ overflowX: "auto" }}>
           <table className="t">
             <thead><tr><th>Vendor</th><th>Sent as</th><th>Received</th><th className="num">Priced</th><th>Valid to</th><th>Questionnaire</th><th className="num">Needs you</th><th /></tr></thead>
@@ -89,7 +90,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
                   <td className="num mono">{v.needs || "—"}</td>
                   <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
                     {v.responseId && <Button asChild size="xs" variant="ghost"><Link href={`/rfx/${id}/responses/${v.responseId}`}>Open response</Link></Button>}
-                    {o.mode === "mock" && <Button asChild size="xs" variant="ghost"><Link href={`/rfx/${id}/portal/${v.id}`}>Portal (mock)</Link></Button>}
+                    {o.mode === "mock" && !locked && <Button asChild size="xs" variant="ghost"><Link href={`/rfx/${id}/portal/${v.id}`}>Portal (mock)</Link></Button>}
                   </td>
                 </>;
                 return v.responseId ? <RowLink key={v.id} href={`/rfx/${id}/responses/${v.responseId}`}>{cells}</RowLink> : <tr key={v.id}>{cells}</tr>;
@@ -108,7 +109,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
                 <span className="ext">{s.files[0]?.split(".").pop()?.toUpperCase() ?? "TXT"}</span>
                 <span style={{ flex: 1 }}>{s.files.join(", ") || "email body"} · {s.from ?? "unknown sender"}</span>
                 <span className="chip amber">unknown vendor</span>
-                <AssignVendor responseId={s.id} vendors={allVendors ?? []} />
+                {!locked && <AssignVendor responseId={s.id} vendors={allVendors ?? []} />}
               </div>
             ))}
           </div>

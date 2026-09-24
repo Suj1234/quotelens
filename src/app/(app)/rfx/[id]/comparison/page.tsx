@@ -7,6 +7,7 @@ import { QuestionnaireTab } from "@/components/compare/questionnaire-tab";
 import { LedgerTab } from "@/components/compare/ledger-tab";
 import { UnmatchedPanel } from "@/components/compare/unmatched-panel";
 import { getUnmatched } from "@/lib/unmatched";
+import { isLocked } from "@/lib/lock";
 
 // DESIGN §3.7 / TRD §17.9
 export default async function ComparisonPage({ params, searchParams }: PageProps<"/rfx/[id]/comparison">) {
@@ -17,7 +18,7 @@ export default async function ComparisonPage({ params, searchParams }: PageProps
   return (
     <div className="cmpwrap">
       <CmpTabs rfxId={id} tab={tab} />
-      {tab === "prices" && <Prices id={id} canReview={user.role !== "approver"} />}
+      {tab === "prices" && <Prices id={id} approver={user.role === "approver"} />}
       {tab === "questionnaire" && <QuestionnaireTab qa={await getQuestionnaireGrid(id)} />}
       {tab === "documents" && <DocumentsTab docs={await getDocuments(id)} />}
       {tab === "ledger" && <LedgerTab rows={await getLedger(id)} />}
@@ -26,11 +27,12 @@ export default async function ComparisonPage({ params, searchParams }: PageProps
   );
 }
 
-async function Prices({ id, canReview }: { id: string; canReview: boolean }) {
-  const [grid, unmatched] = await Promise.all([getComparison(id), getUnmatched(id)]);
+async function Prices({ id, approver }: { id: string; approver: boolean }) {
+  const [grid, unmatched, locked] = await Promise.all([getComparison(id), getUnmatched(id), isLocked(id)]);
+  const canReview = !approver && !locked;
   return <>
     {grid.cells.length
-      ? <ComparisonView rfxId={id} grid={grid} canReview={canReview} />
+      ? <ComparisonView rfxId={id} grid={grid} canReview={canReview} approver={approver} locked={locked} />
       : <div className="empty" style={{ marginTop: 24 }}><b>No prices yet.</b> Load or add responses and run the stages; cells appear here as each vendor is normalised.</div>}
     <UnmatchedPanel items={unmatched} lines={grid.lines} canAct={canReview} />
   </>;

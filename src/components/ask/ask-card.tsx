@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { AskAnswer } from "@/lib/query/ask";
-import type { ChartSpec, Row } from "@/lib/query/result";
+import { allocationColumn, type ChartSpec, type Row } from "@/lib/query/result";
 import { inrShort, money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { useAsk } from "./ask-sheet";
 
 const PAGE = 25;
 const isMoney = (c: string) => /_inr$|price|value|total|spend|saving|impact|cost|amount/i.test(c) && !/pct|percent|rank|probability/i.test(c);
@@ -82,6 +84,24 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
   const [showBg, setShowBg] = useState(false);
   const [busy, setBusy] = useState(false);
   const cur = showBg && bg ? bg : a;
+  // TRD §13.5 / DESIGN §2.13: Save as scenario only on answers that allocate lines (line_no + vendor, one row per line); never on a locked RFx.
+  const router = useRouter();
+  const locked = useAsk()?.locked ?? false;
+  const saveable = cur.ok && !locked && allocationColumn(cur.columns, cur.rows) !== null;
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState(a.question.slice(0, 120));
+  const [saved, setSaved] = useState<string | null>(null);
+  async function saveScenario() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/scenarios", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rfx_id: rfxId, name: name.trim() || a.question, query_id: cur.query_id }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`${body.error ?? "Couldn't save the scenario"} (${body.code ?? res.status})`);
+      toast.success(`Saved — ${body.name}`); setSaved(body.name); setNaming(false); router.refresh();
+    } catch (e) {
+      toast.error((e as Error).message === "Failed to fetch" ? "Couldn't reach the server — check the connection and try again (NETWORK)" : (e as Error).message);
+    } finally { setBusy(false); }
+  }
 
   async function bestGuesses() {
     setBusy(true);
@@ -125,7 +145,18 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
           {a.unresolved_cells} cells unresolved in this RFx{a.at_stake > 0 ? ` · ${inrShort(a.at_stake)} at stake` : ""} — totals leave them out.
         </div>
       )}
+      {naming && (
+        <div style={{ display: "flex", gap: 6, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input className="ta" style={{ flex: 1, minWidth: 180, height: 28 }} value={name} onChange={(e) => setName(e.target.value)} aria-label="Scenario name" autoFocus
+            onKeyDown={(e) => { if (e.key === "Enter") saveScenario(); if (e.key === "Escape") setNaming(false); }} />
+          <Button size="sm" variant="default" disabled={busy || !name.trim()} onClick={saveScenario}>{busy ? "Saving…" : "Save"}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setNaming(false)}>Cancel</Button>
+        </div>
+      )}
       <div className="acts">
+        {saveable && !naming && (saved
+          ? <span className="hint" style={{ alignSelf: "center" }}>Saved as “{saved}” — compare it on the Award tab</span>
+          : <Button size="sm" onClick={() => setNaming(true)}>Save as scenario</Button>)}
         {a.ok && !bg && unsureInScope && a.unresolved_cells > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={bestGuesses}>{busy ? "Computing…" : "Include best guesses"}</Button>}
         {cur.ok && cur.rows.length > 0 && <>
           <Button asChild size="sm"><a href={`/api/export/query/${cur.query_id}?format=xlsx`} download>Export</a></Button>

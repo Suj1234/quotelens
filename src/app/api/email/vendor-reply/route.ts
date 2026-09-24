@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireApiUser } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { route } from "@/lib/http";
+import { assertOpen } from "@/lib/lock";
 import { replyAsVendor } from "@/lib/email/mailbox";
 
 export const maxDuration = 60;
@@ -15,6 +16,7 @@ export const POST = route(async (req: Request) => {
   const form = await req.formData().catch(() => { throw new AppError("BAD_REQUEST", "Expected multipart form data."); });
   const f = Fields.safeParse(Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string" && v !== "")));
   if (!f.success) throw new AppError("BAD_REQUEST", "Missing or invalid fields.", z.flattenError(f.error));
+  await assertOpen({ rfx: f.data.rfx_id });
   const files = await Promise.all(form.getAll("files").filter((x): x is File => x instanceof File && x.size > 0)
     .map(async (x) => ({ name: x.name, mime: x.type, buf: Buffer.from(await x.arrayBuffer()) })));
   return replyAsVendor({ rfxId: f.data.rfx_id, vendorId: f.data.vendor_id, mailboxId: f.data.mailbox_id, text: f.data.email_text ?? null, files });

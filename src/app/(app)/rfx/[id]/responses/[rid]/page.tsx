@@ -42,7 +42,7 @@ export default async function ResponseDetailPage({ params, searchParams }: PageP
       </p>
 
       <div style={{ marginTop: 18 }}>
-        <PipelineStrip responseId={rid} status={response.pipeline_status} errors={response.stage_errors} timings={timings} canRun={user.role !== "approver"} autoRun={autoRun && user.role !== "approver"} />
+        <PipelineStrip responseId={rid} status={response.pipeline_status} errors={response.stage_errors} timings={timings} canRun={user.role !== "approver" && rfx.status !== "awarded"} autoRun={autoRun && user.role !== "approver" && rfx.status !== "awarded"} />
       </div>
 
       {/* TRD §17.7: flags chips, summary counts, Go to Review Queue (n) */}

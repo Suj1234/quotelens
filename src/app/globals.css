@@ -245,7 +245,31 @@
   .tl .ev:last-child { border-bottom: 0; }
   .tl .ev .ts { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
   .tl .ev .dir { font-family: var(--font-mono); color: var(--faint); }
+  .lockbar { padding: 14px 28px 0; }
   .lock { padding: 9px 12px; background: var(--tint); border: 1px solid var(--hair); border-radius: 5px; font-size: 12.5px; color: var(--muted); }
+  /* DESIGN §2.16 memo (prototype values) */
+  .memo { background: var(--surface); border: 1px solid var(--hair); padding: 36px 40px; max-width: 800px; font-size: 13px; line-height: 1.55; }
+  .memo h1 { font-size: 19px; margin-bottom: 2px; }
+  .memo h2 { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; font-weight: 500; }
+  .memo p { margin: 0 0 6px; white-space: pre-line; }
+  .memo pre { margin: 6px 0 0; padding: 10px; background: var(--tint); border-radius: 5px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; color: var(--ink2); }
+  .memo .sig { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 30px; }
+  .memo .sig div { border-top: 1px solid var(--ink); padding-top: 6px; }
+  /* DESIGN §3.8 Decide, §2.14 Ask box (prototype values) */
+  .brief { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+  .delta { font-family: var(--font-mono); font-size: 30px; font-weight: 500; line-height: 1.1; }
+  .delta small { font-family: var(--font-sans); font-size: 12.5px; color: var(--muted); font-weight: 400; }
+  .askbox { border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .askbox textarea { width: 100%; min-height: 56px; resize: none; border: 0; padding: 4px 2px; font-size: 14px; background: transparent; }
+  .askbox textarea:focus { outline: none; }
+  .askbox .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .qgroups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .qgroup .eyebrow { margin-bottom: 6px; }
+  .qgroup button { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 1px solid var(--hair); border-radius: 5px; background: var(--surface); font-size: 12.5px; color: var(--ink2); margin-bottom: 6px; }
+  .qgroup button:hover { border-color: var(--ink); color: var(--ink); }
+  /* Share per vendor (TRD §14.2): one colour (DESIGN §2.15), segments split by a surface gap; names in the title and legend */
+  .stack { display: flex; height: 10px; width: 140px; background: var(--tint2); border-radius: 2px; overflow: hidden; gap: 2px; }
+  .stack i { display: block; height: 100%; background: var(--accent); }
   /* prototype: sheet (Ask, Add response) — DESIGN §1.4 400px */
   .sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--sheet), 100vw); background: var(--surface); border-left: 1px solid var(--hair); z-index: 30; display: flex; flex-direction: column; box-shadow: var(--shadow); }
   .sheet > .hd { padding: 14px 16px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: center; }
@@ -287,8 +311,8 @@
   .chat textarea { width: 100%; min-height: 64px; resize: vertical; }
   .note { padding: 10px 12px; border: 1px solid var(--hair); border-left: 3px solid var(--accent); border-radius: 5px; background: var(--surface); font-size: 12.5px; }
   .note.warn { border-left-color: var(--amber); }
-  textarea.ta { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 7px 9px; width: 100%; }
-  textarea.ta:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  textarea.ta, input.ta { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 7px 9px; width: 100%; min-width: 0; }
+  textarea.ta:focus, input.ta:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 @keyframes ql-slide { from { left: -40%; } to { left: 100%; } }
 
@@ -296,6 +320,9 @@
   .grid2, .vrow, .rqcard, .split { grid-template-columns: 1fr; }
   :root { --sheet: 100vw; }
   .cmpwrap { padding-left: 16px; padding-right: 16px; }
+  .brief, .qgroups { grid-template-columns: 1fr; }
+  .lockbar { padding-left: 16px; padding-right: 16px; }
+  .memo { padding: 20px 16px; }
   .pipe { grid-template-columns: repeat(2, 1fr); }
   .rfxhead { padding-left: 16px; padding-right: 16px; }
   .page { padding-left: 16px; padding-right: 16px; }

@@ -27,7 +27,7 @@ type Pending = { total: number; by_vendor: { vendor: string; count: number; clar
 const ASKABLE = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing"];
 const andList = (xs: (string | number)[]) => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : String(xs[0] ?? "");
 
-export function ReviewQueue({ rfxId, items, canAct, focus, vendor: initialVendor = "", pending: initialPending }: { rfxId: string; items: QueueItem[]; canAct: boolean; focus: string | null; vendor?: string; pending: Pending | null }) {
+export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendor: initialVendor = "", pending: initialPending }: { rfxId: string; items: QueueItem[]; canAct: boolean; locked?: boolean; focus: string | null; vendor?: string; pending: Pending | null }) {
   const router = useRouter();
   // The server's count, unless this page polled a newer one since (a refresh brings a new server count and wins again).
   const [polled, setPolled] = useState<{ base: Pending | null; v: Pending } | null>(null);
@@ -141,7 +141,7 @@ export function ReviewQueue({ rfxId, items, canAct, focus, vendor: initialVendor
         {groups.map((g) => (
           <section key={g} className="rq">
             <div className="eyebrow" style={{ marginTop: 6 }}>{group === "type" ? g.replaceAll("_", " ") : g} · {ordered.filter((i) => keyOf(i) === g).length}</div>
-            {ordered.filter((i) => keyOf(i) === g).map((it) => <Card key={it.id} it={it} rfxId={rfxId} askable={items.filter((x) => x.status === "open" && x.vendor?.id === it.vendor?.id && ASKABLE.includes(x.type)).map((x) => x.id)} canAct={canAct} busy={busy === it.id} current={cur === it.id} onPick={() => setCur(it.id)} run={run}
+            {ordered.filter((i) => keyOf(i) === g).map((it) => <Card key={it.id} it={it} rfxId={rfxId} askable={items.filter((x) => x.status === "open" && x.vendor?.id === it.vendor?.id && ASKABLE.includes(x.type)).map((x) => x.id)} canAct={canAct} locked={locked} busy={busy === it.id} current={cur === it.id} onPick={() => setCur(it.id)} run={run}
               selected={picked.has(it.id)} onSelect={() => toggle(it.id)} />)}
           </section>
         ))}
@@ -151,8 +151,8 @@ export function ReviewQueue({ rfxId, items, canAct, focus, vendor: initialVendor
   );
 }
 
-function Card({ it, rfxId, askable, canAct, busy, current, onPick, run, selected, onSelect }: {
-  it: QueueItem; rfxId: string; askable: string[]; canAct: boolean; busy: boolean; current: boolean; onPick: () => void; selected: boolean; onSelect: () => void;
+function Card({ it, rfxId, askable, canAct, locked, busy, current, onPick, run, selected, onSelect }: {
+  it: QueueItem; rfxId: string; askable: string[]; canAct: boolean; locked: boolean; busy: boolean; current: boolean; onPick: () => void; selected: boolean; onSelect: () => void;
   run: (it: QueueItem, a: Action, body?: Record<string, unknown>) => Promise<{ status: string; draft?: Draft } | null>;
 }) {
   const [mode, setMode] = useState<"override" | "exclude" | "map" | null>(null);
@@ -198,7 +198,7 @@ function Card({ it, rfxId, askable, canAct, busy, current, onPick, run, selected
             {it.actions.map((a) => <Button key={a} size="sm" variant={a === primary ? "default" : "outline"} disabled={busy} onClick={(e) => { e.stopPropagation(); click(a); }}>{label(a)}</Button>)}
           </div>
         )}
-        {!resolved && !canAct && <div className="hint" style={{ marginTop: 10 }}>Waiting for Sujit.</div>}
+        {!resolved && !canAct && <div className="hint" style={{ marginTop: 10 }}>{locked ? "Read-only — the RFx is awarded." : "Waiting for Sujit."}</div>}
 
         {mode && (
           <div className="acts" onClick={(e) => e.stopPropagation()}>
