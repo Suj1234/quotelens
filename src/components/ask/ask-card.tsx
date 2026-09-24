@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { useAsk } from "./ask-sheet";
 
 const PAGE = 25;
-const isMoney = (c: string) => /_inr$|price|value|total|spend|saving|impact|cost|amount/i.test(c) && !/pct|percent|rank|probability/i.test(c);
-const isPct = (c: string) => /pct|percent/i.test(c);
+// "gap_pct" is a percentage; "annual_value_deprec_3pct" is rupees under a 3 % scenario (the digit names the scenario).
+const isPct = (c: string) => /pct|percent/i.test(c) && !/\d_?pct/i.test(c);
+// original_* columns are in the vendor's own currency (its code sits in another column) — shown as plain numbers, never ₹.
+const isMoney = (c: string) => /_inr$|price|value|total|spend|saving|impact|cost|amount/i.test(c) && !isPct(c) && !/^original_|rank|probability/i.test(c);
 const label = (c: string) => c === "line_no" ? "Line" : c === "q_no" ? "Q" : (c.replace(/_inr$/, "").replaceAll("_", " ").replace(/^./, (x) => x.toUpperCase()));
 
 function fmt(c: string, v: unknown): { text: string; num: boolean } {

@@ -9,7 +9,7 @@ import { money } from "@/lib/format";
 import { guardSql, rewriteBestGuess } from "./sql-guard";
 import { aggregates, chartSpec, primaryTotal, unverifiedNumbers, type Row } from "./result";
 
-// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price; v4: allocations one row per line (v1–v3 in prompts/archive/).
+// TRD §9.8 P-SQL, verbatim, plus v_vendor_status.validity_days (migration 0007) and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price; v4: allocations one row per line; v5: no v_assumptions fan-out in totals (v1–v4 in prompts/archive/).
 const P_SQL = `You convert a procurement buyer's question into ONE PostgreSQL SELECT over these read-only views. Return JSON only.
 
 Views:
@@ -30,6 +30,7 @@ Hard rules:
 - Cheapest per line = the minimum price per line_no among eligible vendors; return the winning vendor and price per line and the total of price × annual_qty / 1000.
 - Round money to 0 decimals in output columns named *_inr.
 - Prefer returning tidy columns the buyer can read: line_no, description, vendor, price, annual_value_inr, etc.
+- v_assumptions has several rows per vendor (FX rate, freight, discount, exclusions). Never join it to v_comparison in a query that sums, totals or ranks prices — each line × vendor row must be counted once: read the assumption in a separate subquery or CTE filtered by kind (e.g. kind = 'fx_rate'), and compute totals from v_comparison alone.
 - When the question allocates lines to vendors (who gets which line, a split, an award), return one row per line_no with the winning vendor, its price and annual_value_inr; put any total it is compared with in an extra column repeated on every row (e.g. q1_total_inr).
 Guard notes (a query that breaks these is rejected):
 - Write every column and table alias with AS.
