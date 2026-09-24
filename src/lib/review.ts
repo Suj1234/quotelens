@@ -10,6 +10,7 @@ import { passes } from "@/lib/pipeline/questionnaire";
 import { runStage } from "@/lib/pipeline/run";
 import type { SessionUser } from "@/lib/auth";
 import type { ResponseFile } from "@/types/db";
+import { ASKABLE, draftClarification } from "@/lib/clarify";
 
 // TRD §12 + §17.8, DESIGN §2.11 / §3.6.
 export type Action = "confirm" | "override" | "exclude" | "map" | "ignore" | "ask-vendor" | "mark-not-quoted" | "dismiss" | "accept-yes" | "treat-no";
@@ -115,8 +116,8 @@ export async function listReview(rfxId: string, f: { vendor?: string; type?: str
     || (a.vendor?.name ?? "").localeCompare(b.vendor?.name ?? "") || (a.line_no ?? 0) - (b.line_no ?? 0));
 }
 
-export type ActBody = { value?: number; reason?: string; line_id?: string; mode?: "draft" | "mark_sent" };
-export type ActResult = { status: string; draft?: { to: string; reply_to: string; subject: string; body: string } };
+export type ActBody = { value?: number; reason?: string; line_id?: string };
+export type ActResult = { status: string; draft?: Awaited<ReturnType<typeof draftClarification>> };
 
 /** TRD §12.3 — one action on one review item; every call leaves an audit event. */
 export async function act(itemId: string, action: Action, body: ActBody, user: SessionUser): Promise<ActResult> {
@@ -226,11 +227,10 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
       break;
     }
     case "ask-vendor": {
-      draft = await clarificationDraft(r);
-      if (body.mode !== "mark_sent") return { status: r.status, draft }; // draft only; sending arrives with email (P6)
-      await db().from("rfx_vendors").update({ status: "clarification_sent" }).eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!);
-      status = "asked_vendor"; resolution = { ...resolution, note: "Asked the vendor" };
-      break;
+      // TRD §12.3: a P-CLARIFY draft covering all this vendor's open askable cards; sending is POST /api/clarify/send.
+      const { data: open } = await db().from("review_items").select("id").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!).eq("status", "open").in("type", ASKABLE);
+      draft = await draftClarification(r.rfx_id, r.vendor_id!, [...new Set([r.id, ...(open ?? []).map((o) => o.id)])], user);
+      return { status: r.status, draft };
     }
     case "dismiss": status = "dismissed"; break;
   }
@@ -247,23 +247,7 @@ async function freightFor(rfxId: string, vendorId: string): Promise<number> {
   return Number((data?.value as { inr_per_1000?: number } | null)?.inr_per_1000 ?? 0);
 }
 
-// ponytail: template draft; P6-T3 replaces it with P-CLARIFY and real sending.
-async function clarificationDraft(r: Row & { rfx_id: string }) {
-  const [{ data: rfx }, { data: v }, { data: rv }] = await Promise.all([
-    db().from("rfx").select("code, title").eq("id", r.rfx_id).single(),
-    db().from("vendors").select("name, contact_name, email").eq("id", r.vendor_id!).single(),
-    db().from("rfx_vendors").select("reply_tag").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!).single(),
-  ]);
-  const { data: open } = await db().from("review_items").select("title").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!).eq("status", "open").in("type", ["ambiguous_unit", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing", "missing_line"]);
-  const points = [...new Set([r.title, ...(open ?? []).map((o) => o.title)])];
-  return {
-    to: v?.email ?? "", reply_to: `${rv?.reply_tag ?? "rfx"}-clar-1`,
-    subject: `Clarification — RFx ${rfx?.code}: ${points.length === 1 ? r.title : `${points.length} points on your quotation`}`,
-    body: `Dear ${v?.contact_name ?? v?.name ?? "Sir/Madam"},\n\nThank you for your quotation for ${rfx?.title}. Before we can compare it, please clarify:\n\n${points.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n\nA short reply to this email is enough.\n\nRegards,\nSujit Menon\nCategory Buyer — Packaging, Meridian Foods`,
-  };
-}
-
 /** Only the fields an action uses go into the audit trail. */
-const pick = (a: Action, b: ActBody) => a === "override" ? { value: b.value, reason: b.reason } : a === "exclude" ? { reason: b.reason } : a === "map" ? { line_id: b.line_id } : a === "ask-vendor" ? { mode: b.mode } : {};
+const pick = (a: Action, b: ActBody) => a === "override" ? { value: b.value, reason: b.reason } : a === "exclude" ? { reason: b.reason } : a === "map" ? { line_id: b.line_id } : {};
 
 export const isInformational = (type: string) => INFORMATIONAL.includes(type);

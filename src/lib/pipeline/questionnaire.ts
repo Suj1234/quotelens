@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { cleanEmail } from "@/lib/preprocess/email";
 import { get } from "@/lib/storage";
 import type { ResponseFile, ResponseRow, RfxQuestion } from "@/types/db";
+import { clarificationScope, resolveByReply } from "@/lib/clarify";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
 
 // TRD §9.7 P-QA-EXTRACT + two rules (v2, 2026-09-24; v1 in prompts/archive/): exact-question answers only, and a fixed reading of ranges.
@@ -42,6 +43,8 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   ]);
   if (fe || qe || pe) throw fe ?? qe ?? pe;
   const questions = qs as RfxQuestion[];
+  // A clarification reply may answer questions that were unclear, missing or asked about (latest answer wins); it never touches the rest.
+  const scope = resp.is_clarification ? (await clarificationScope(resp)).questionIds : null;
   await clearStageReviews(resp.id, "questionnaire");
 
   // Questionnaire files first so the cap never cuts them.
@@ -88,7 +91,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
 
   const reviewed = new Set((prior ?? []).filter((p) => p.state === "reviewed").map((p) => p.question_id));
   // An answer another reply from this vendor gave is never replaced by this one; a different answer raises a card instead.
-  const elsewhere = new Map((prior ?? []).filter((p) => p.state !== "missing" && p.response_id !== resp.id).map((p) => [p.question_id, p]));
+  const elsewhere = new Map((prior ?? []).filter((p) => p.state !== "missing" && p.response_id !== resp.id && !scope?.has(p.question_id)).map((p) => [p.question_id, p]));
   const rows = questions.filter((q) => !reviewed.has(q.id)).map((q) => {
     const a = byNo.get(q.q_no);
     const base = { rfx_id: resp.rfx_id, question_id: q.id, vendor_id: resp.vendor_id, response_id: resp.id, answer_raw: a?.answer_raw ?? null, location: a?.location ?? null, provider: d?.provider ?? null, reviewed_by: null, reviewed_at: null };
@@ -110,7 +113,8 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
     if (stated < 0.5 || (q.answer_type === "number" && num === null)) return { ...missing, answer_raw: a.answer_raw, provider: d.provider, probability: round(stated) };
     return { ...base, state: "answered", answer_bool: null, answer_number: num, answer_text: a.answer_text ?? a.answer_raw, probability: round(stated), passes: passes(q.disqualify_if, { num }) };
   });
-  const write = rows.filter((r) => !elsewhere.has(r.question_id));
+  // A clarification reply writes only real answers to in-scope questions ("not answered here" is not news).
+  const write = rows.filter((r) => !elsewhere.has(r.question_id) && (!scope || (scope.has(r.question_id) && r.state !== "missing")));
   const disagree = rows.filter((r) => {
     const o = elsewhere.get(r.question_id);
     return o && r.state === "answered" && (r.answer_bool !== o.answer_bool || (r.answer_number !== null && Number(r.answer_number) !== Number(o.answer_number)));
@@ -130,6 +134,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
     };
   });
   // Missing mandatory answers make the vendor "not cleared" (view 0004) — say so once, so the buyer can ask the vendor.
+  if (scope) await resolveByReply(resp, { lineIds: [], questionIds: write.filter((r) => r.state === "answered").map((r) => r.question_id) });
   const missingMandatory = write.filter((r) => r.state === "missing").map((r) => questions.find((q) => q.id === r.question_id)!).filter((q) => q.mandatory);
   if (missingMandatory.length) {
     reviews.push({

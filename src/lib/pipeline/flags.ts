@@ -24,6 +24,14 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
   const cells = cellsQ.data ?? [];
 
   // Reuse the decision normalise made on the same terms; decide afresh only if normalise didn't run.
+  // A clarification reply (TRD §8.7) answers specific lines: the vendor's terms and flags stay those of its main reply.
+  if (resp.is_clarification) {
+    const rv = await db().from("rfx_vendors").update({ status: "clarified" }).eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id).in("status", ["clarification_sent", "responded", "invited"]);
+    if (rv.error) throw rv.error;
+    const { count } = await db().from("review_items").select("id", { count: "exact", head: true }).eq("rfx_id", resp.rfx_id).eq("vendor_id", resp.vendor_id).in("status", ["open", "asked_vendor"]);
+    return { flags: [], lines_priced: cells.filter((c) => c.unit_price_inr_per_1000 !== null).length, lines_total: cells.length, not_quoted: cells.filter((c) => c.state === "not_quoted").length,
+      open_reviews: count ?? 0, rfx_status: rfx.status, provider: "none" };
+  }
   const td = (resp.summary.normalise as NormaliseSummary | undefined)?.terms
     ?? (terms ? await decideTerms(resp, rfx, terms, [...new Set((itemsQ.data ?? []).map((i) => i.notes).filter(Boolean) as string[])]) : null);
 

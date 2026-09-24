@@ -96,13 +96,19 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
   }
   if (useEmail) sources.push({ name: "email body", file: null, chunks: [{ parts: [{ text: cleanEmail(resp.email_text!) }], format: FORMAT.email }] });
 
+  // A clarification reply answers our questions (a pack size, a price) and often repeats no price at all (TRD §8.7):
+  // tell the reader what was asked so it lists every answered item instead of "no prices → items: []".
+  const reqId = (resp.summary.clarification as { request_id?: string | null } | undefined)?.request_id;
+  const asked = resp.is_clarification && reqId ? (await db().from("communications").select("body_text").eq("id", reqId).maybeSingle()).data?.body_text : null;
+  const clarNote = resp.is_clarification ? `\nThis is the supplier's reply to our clarification request${asked ? " (quoted below)" : ""}. The rule "no prices → items: []" does not apply: create one item for every item the reply answers, even without a price — vendor_description naming the item as the supplier does (keep its item number and size), pack_size and pack_size_unit when it states a pack or bundle size, unit_price and price_unit_raw only if it states a price (else null), raw_confidence for how clearly the answer is written.${asked ? `\nOur request:\n${asked.slice(0, 2000)}` : ""}` : "";
+
   // Sources run in parallel; chunks of one source run in order (TRD §7: large PDFs sequentially).
   const results = await Promise.all(sources.map(async (src) => {
     const out: Extraction[] = [];
     for (const c of src.chunks) {
       const ask = (extra = "") => generateJSON({
         tier: "strong", purpose: "extract", rfx_id: resp.rfx_id, response_id: resp.id, schema: ExtractionResult, temperature: 0.1,
-        parts: [...c.parts, { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) + extra }],
+        parts: [...c.parts, { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) + clarNote + extra }],
       });
       let r = await ask();
       // Self-check: the model occasionally collapses a table (esp. photos) into one item. If it returned clearly fewer items

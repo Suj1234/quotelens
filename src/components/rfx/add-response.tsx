@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { shortDate } from "@/lib/format";
 
 export const LIMIT = 4.4 * 1024 * 1024; // leave room for the form fields under Vercel's 4.5 MB body limit
 export const tooLarge = (files: File[]) => `${files.length === 1 ? files[0].name : "These files"} ${files.length === 1 ? "is" : "are"} over 4.5 MB — the upload limit here. Send a smaller photo or scan, split the files, or paste the email text.`;
 
 /** Upload files and/or pasted text as one vendor reply, then open Response Detail with the six stages running. */
-export async function submitReply(o: { rfxId: string; vendorId: string; files: File[]; text: string; source: "mock_upload" | "mock_paste" | "portal"; useSeed?: boolean }): Promise<string> {
+export async function submitReply(o: { rfxId: string; vendorId: string; files: File[]; text: string; source: "mock_upload" | "mock_paste" | "portal"; useSeed?: boolean; clarificationOf?: string | null }): Promise<string> {
   const size = o.files.reduce((a, f) => a + f.size, 0);
   if (size > LIMIT) throw new Error(tooLarge(o.files));
   const form = new FormData();
@@ -18,6 +19,7 @@ export async function submitReply(o: { rfxId: string; vendorId: string; files: F
   form.set("source", o.source);
   if (o.text.trim()) form.set("email_text", o.text);
   if (o.useSeed) form.set("use_seed", "1");
+  if (o.clarificationOf) form.set("clarification_of", o.clarificationOf);
   o.files.forEach((f) => form.append("files", f));
   const res = await fetch("/api/responses", { method: "POST", body: form }).catch(() => { throw new Error("Couldn't reach the server — check the connection and try again (NETWORK)"); });
   const body = await res.json().catch(() => ({}));
@@ -55,13 +57,14 @@ export function ReplyForm({ files, setFiles, text, setText, placeholder }: { fil
 }
 
 /** DESIGN §3.5 "Add response" (400 px sheet): same six stages as a Gmail reply. */
-export function AddResponse({ rfxId, vendorId, vendorName }: { rfxId: string; vendorId: string; vendorName: string }) {
+export function AddResponse({ rfxId, vendorId, vendorName, clarification = null }: { rfxId: string; vendorId: string; vendorName: string; clarification?: { request_id: string; sent_at: string } | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [text, setText] = useState("");
   const [seed, setSeed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [answers, setAnswers] = useState(!!clarification);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && !busy && setOpen(false);
@@ -72,7 +75,7 @@ export function AddResponse({ rfxId, vendorId, vendorName }: { rfxId: string; ve
   async function submit() {
     setBusy(true);
     try {
-      const rid = await submitReply({ rfxId, vendorId, files, text, source: files.length || seed ? "mock_upload" : "mock_paste", useSeed: seed });
+      const rid = await submitReply({ rfxId, vendorId, files, text, source: files.length || seed ? "mock_upload" : "mock_paste", useSeed: seed, clarificationOf: answers ? clarification?.request_id : null });
       router.push(`/rfx/${rfxId}/responses/${rid}?run=1`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -89,6 +92,7 @@ export function AddResponse({ rfxId, vendorId, vendorName }: { rfxId: string; ve
           <div className="hd"><b>Add response — {vendorName}</b><Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpen(false)}>Close</Button></div>
           <div className="bd">
             <ReplyForm files={files} setFiles={setFiles} text={text} setText={setText} placeholder="Dear Sujit sir, our rates as below…" />
+            {clarification && <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12.5 }}><input type="checkbox" checked={answers} onChange={(e) => setAnswers(e.target.checked)} />This answers the clarification sent {shortDate(clarification.sent_at)}</label>}
             {seed && <div className="note" style={{ fontSize: 12 }}>Using the dataset&apos;s sample reply from {vendorName} (added to anything above).</div>}
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <Button size="sm" disabled={busy} onClick={() => setSeed(!seed)}>{seed ? "Don't use seed file" : "Use seed file"}</Button>

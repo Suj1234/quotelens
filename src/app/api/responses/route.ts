@@ -4,6 +4,7 @@ import { AppError } from "@/lib/errors";
 import { route } from "@/lib/http";
 import { createResponse, seedReply, type IncomingFile } from "@/lib/responses";
 import { db } from "@/lib/db";
+import { clarificationContext } from "@/lib/clarify";
 
 export const maxDuration = 120;
 
@@ -13,6 +14,7 @@ const Fields = z.object({
   email_text: z.string().max(100_000).optional(),
   source: z.enum(["mock_upload", "mock_paste", "portal"]).default("mock_upload"),
   use_seed: z.literal("1").optional(), // "Use seed file": this vendor's reply from the dataset (DESIGN §3.5)
+  clarification_of: z.uuid().optional(), // mock paste of a clarification reply (CLAUDE P6-T3): the clarification email it answers
 });
 const LIMIT = 4.5 * 1024 * 1024; // Vercel request body limit (DECISIONS P0-T5)
 
@@ -36,9 +38,18 @@ export const POST = route(async (req: Request) => {
     files.push(...seed.files);
     emailText = [emailText, seed.emailText].filter(Boolean).join("\n\n") || undefined;
   }
+  let clarification;
+  if (fields.data.clarification_of) {
+    if (!fields.data.vendor_id) throw new AppError("BAD_REQUEST", "A clarification reply needs its vendor.");
+    const { data: req } = await db().from("communications").select("id, reply_to").eq("id", fields.data.clarification_of).eq("rfx_id", fields.data.rfx_id)
+      .eq("vendor_id", fields.data.vendor_id).eq("kind", "clarification").maybeSingle();
+    if (!req) throw new AppError("NOT_FOUND", "That clarification email isn't this vendor's on this RFx.", undefined, 404);
+    const n = Number(req.reply_to?.match(/-clar-(\d+)@/)?.[1] ?? 0) || null;
+    clarification = { ...(await clarificationContext(fields.data.rfx_id, fields.data.vendor_id, n)), request_id: req.id };
+  }
   const response_id = await createResponse({
     rfxId: fields.data.rfx_id, vendorId: fields.data.vendor_id ?? null, source: fields.data.source,
-    emailText, files, actor: user.id,
+    emailText, files, actor: user.id, ...(clarification ? { clarification } : {}),
   });
   return { response_id };
 });

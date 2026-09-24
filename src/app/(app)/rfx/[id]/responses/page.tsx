@@ -9,15 +9,17 @@ import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { AddResponse } from "@/components/rfx/add-response";
 import { getUnmatchedResponses } from "@/lib/unmatched";
 import { db } from "@/lib/db";
+import { outstandingClarifications } from "@/lib/clarify";
 import { STAGES } from "@/types/db";
 
 export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/responses">) {
   const user = await requireUser();
   const buyer = user.role !== "approver";
   const { id } = await params;
-  const [rows, strays, { data: allVendors }, { data: status }] = await Promise.all([
+  const [rows, strays, { data: allVendors }, { data: status }, clars] = await Promise.all([
     listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name"),
     db().from("v_vendor_status").select("vendor_id, lines_priced, lines_total, cleared_questionnaire").eq("rfx_id", id),
+    outstandingClarifications(id),
   ]);
   const st = (vid: string) => status?.find((x) => x.vendor_id === vid);
   const replied = rows.filter((r) => r.response).length;
@@ -68,7 +70,7 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               <div className="sub">{r.response && (() => { const c = st(r.vendor_id)?.cleared_questionnaire; return c === true ? <span className="chip green">cleared</span> : c === false ? <span className="chip red">not cleared</span> : <span className="chip amber">questionnaire pending</span>; })()}</div>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                 {r.response && <Button asChild size="sm"><Link href={`/rfx/${id}/responses/${r.response.id}`}>Open</Link></Button>}
-                {buyer && <AddResponse rfxId={id} vendorId={r.vendor_id} vendorName={r.name} />}
+                {buyer && <AddResponse rfxId={id} vendorId={r.vendor_id} vendorName={r.name} clarification={clars.get(r.vendor_id) ?? null} />}
               </div>
             </div>
           ))}

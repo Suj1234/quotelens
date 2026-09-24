@@ -13,7 +13,7 @@ export type CellDetail = {
   original: { value: number | null; unit: string | null; currency: string | null } | null;
   evidence: Evidence | null;
   mapping: { p: number; provider_label: string; options: { line_no: number; description: string; p: number }[] } | null;
-  chain: { text: string; basis: string; assumption: string | null }[];
+  chain: { text: string; basis: string; assumption: string | null; href?: string }[];
   reviews: { id: string; type: string; title: string; status: string; note: string | null }[];
   reviewed: { by: string; at: string; note: string | null } | null;
 };
@@ -49,7 +49,8 @@ export async function getCellDetail(rfxId: string, lineNo: number, vendorCode: s
   } : null;
 
   const assumptions = new Map((assumpQ.data ?? []).map((a) => [a.id, a.description as string]));
-  const chain = ((cell.conversion_chain ?? []) as Step[]).map((s) => ({ text: stepText(s), basis: basisLabel(s), assumption: s.assumption_id ? assumptions.get(s.assumption_id) ?? null : null }));
+  const chain = ((cell.conversion_chain ?? []) as Step[]).map((s) => ({ text: stepText(s), basis: basisLabel(s), assumption: s.assumption_id ? assumptions.get(s.assumption_id) ?? null : null,
+    ...(s.step === "clarification" && s.response_id ? { href: `/rfx/${rfxId}/responses/${s.response_id}` } : {}) }));
   const reviewer = cell.users as { name: string } | null;
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
@@ -59,6 +60,7 @@ export async function getCellDetail(rfxId: string, lineNo: number, vendorCode: s
     original: cell.original_value !== null || cell.original_unit ? { value: n(cell.original_value), unit: cell.original_unit, currency: cell.original_currency } : null,
     evidence, mapping, chain,
     reviews: (reviewQ.data ?? []).map((r) => ({ id: r.id, type: r.type, title: r.title, status: r.status, note: (r.resolution as { note?: string } | null)?.note ?? null })),
-    reviewed: cell.reviewed_at ? { by: reviewer?.name ?? "buyer", at: cell.reviewed_at, note: cell.review_note } : null,
+    reviewed: cell.reviewed_at ? { by: reviewer?.name ?? "buyer", at: cell.reviewed_at, note: cell.review_note }
+      : cell.state === "reviewed" && cell.review_note ? { by: `${vendor.name} (clarification reply)`, at: cell.updated_at, note: cell.review_note } : null,
   };
 }

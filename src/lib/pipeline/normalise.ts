@@ -6,6 +6,7 @@ import { applyLineDiscount, grossUp, landed, round2 } from "@/lib/normalise/pric
 import { parseUnit, toPer1000Factor, type UnitKey } from "@/lib/normalise/units";
 import { longDate, money } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
+import { clarificationScope, resolveByReply } from "@/lib/clarify";
 import type { ResponseRow, Rfx, RfxLine } from "@/types/db";
 import type { ExtractedItem, MapSummary } from "./map";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
@@ -15,7 +16,10 @@ type State = "confirmed" | "inferred" | "low_confidence" | "ambiguous" | "not_qu
 type Step = Record<string, unknown> & { step: string };
 type Assumption = { id: string; kind: string; description: string; value: unknown; basis: string; rfx_line_id?: string; line_quote_id?: string };
 
-export type NormaliseSummary = { cells: number; states: Partial<Record<State, number>>; assumptions: number; reviews: number; terms: TermsDecision; freight_included: boolean; kept_buyer_cells: number };
+export type NormaliseSummary = {
+  cells: number; states: Partial<Record<State, number>>; assumptions: number; reviews: number; terms: TermsDecision; freight_included: boolean; kept_buyer_cells: number;
+  clarification?: { lines: number[]; unanswered: number[]; out_of_scope: number; resolved_cards: number };
+};
 
 const SRC_WORD: Record<string, string> = { image: "photo", pdf: "PDF", cell: "sheet", text: "text" };
 const LOW_READ = 0.6; // raw_confidence below this → low_confidence (TRD §8.4, §11.5)
@@ -26,14 +30,18 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   if (!mapping) throw new Error("Run the map stage first (no mapping on this response).");
   if (!resp.vendor_id) throw new Error("Response has no vendor yet; assign one before normalising.");
   const vendorId = resp.vendor_id;
+  // TRD §8.7: a clarification reply only answers specific lines; the vendor's terms stay those of the reply it corrects.
+  const clar = resp.is_clarification ? await clarificationScope(resp) : null;
+  const main = clar && resp.supersedes_response_id ? (await db().from("responses").select("*").eq("id", resp.supersedes_response_id).maybeSingle<ResponseRow>()).data : null;
+  const termsOf = main ?? resp;
 
   const [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ, fx, th, discountDefault, freightDefault] = await Promise.all([
     db().from("rfx").select("*").eq("id", resp.rfx_id).single<Rfx>(),
     db().from("rfx_lines").select("*").eq("rfx_id", resp.rfx_id).order("line_no"),
     db().from("extracted_items").select("*").eq("response_id", resp.id),
-    db().from("response_terms").select("*").eq("response_id", resp.id).maybeSingle(),
+    db().from("response_terms").select("*").eq("response_id", termsOf.id).maybeSingle(),
     db().from("rfx_vendors").select("freight_assumption_inr_per_1000").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).maybeSingle(),
-    db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by, response_id, unit_price_inr_per_1000, best_guess_value").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
+    db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by, response_id, extracted_item_id, unit_price_inr_per_1000, best_guess_value").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
     getSetting("fx_rates"), getSetting("thresholds"), getSetting("discount_default"), getSetting("freight_default_inr_per_1000"),
   ]);
   for (const q of [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ]) if (q.error) throw q.error;
@@ -44,7 +52,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const lineById = new Map(lines.map((l) => [l.id, l]));
 
   const notes = [...new Set([...items.values()].map((i) => i.notes).filter((n): n is string => !!n))];
-  const td = await decideTerms(resp, rfx, terms, notes);
+  const td = (main?.summary.normalise as NormaliseSummary | undefined)?.terms ?? await decideTerms(termsOf, rfx, terms, notes);
   const refPrior = td.p.references_prior_pricing >= 0.5;
   const freightIncluded = td.p.freight_excluded < 0.5;
   const freightPer1000 = rvQ.data?.freight_assumption_inr_per_1000 ?? freightDefault;
@@ -54,20 +62,34 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   // of this vendor except the ones a buyer already decided (reviewed / excluded) — those are never overwritten.
   await clearStageReviews(resp.id, "normalise");
   // System ledger rows carry the reply they came from (value.response_id): a re-run replaces only its own (untagged = pre-P3 rows).
-  const del = await db().from("assumptions").delete().eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system")
+  // Rows a later clarification superseded are history and stay (TRD §6.14 superseded_by).
+  const mineQ = await db().from("assumptions").select("id").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system").eq("value->>response_id", resp.id);
+  if (mineQ.data?.length) await db().from("assumptions").update({ superseded_by: null }).in("superseded_by", mineQ.data.map((a) => a.id));
+  const del = await db().from("assumptions").delete().eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("made_by", "system").is("superseded_by", null)
     .or(`value->>response_id.eq.${resp.id},value->>response_id.is.null`);
   if (del.error) throw del.error;
-  type Existing = { id: string; state: string; reviewed_by: string | null; response_id: string | null; unit_price_inr_per_1000: number | null; best_guess_value: number | null };
+  type Existing = { id: string; state: string; reviewed_by: string | null; response_id: string | null; extracted_item_id: string | null; unit_price_inr_per_1000: number | null; best_guess_value: number | null };
   const existing = new Map((existingQ.data ?? []).map((c) => [c.rfx_line_id as string, c as Existing]));
   // Cells another reply from this vendor wrote: this reply never overwrites them (clarification replies: TRD §8.7, P6).
-  const others = new Map([...existing].filter(([, c]) => c.response_id && c.response_id !== resp.id && c.state !== "not_quoted"));
-  // Any buyer decision (reviewed, excluded, or "treat as not quoted") survives a re-run.
-  const buyerOwned = new Set([...existing].filter(([, c]) => c.reviewed_by || c.state === "reviewed" || c.state === "excluded").map(([l]) => l));
+  // A clarification reply (TRD §8.7) deliberately replaces the cells in its scope — the P3-T5 guard stays for every other reply.
+  const inScope = (lineId: string) => !!clar?.lineIds.has(lineId);
+  const others = new Map([...existing].filter(([l, c]) => c.response_id && c.response_id !== resp.id && c.state !== "not_quoted" && !inScope(l)));
+  // Any buyer decision (reviewed, excluded, or "treat as not quoted") survives a re-run; a clarification may answer a line it was asked about.
+  const buyerOwned = new Set([...existing].filter(([l, c]) => (c.reviewed_by || c.state === "reviewed" || c.state === "excluded")
+    && !(inScope(l) && (clar!.askedLines.has(l) || c.response_id === resp.id || !c.reviewed_by))).map(([l]) => l));
+  // The items the clarified cells were first read from: the reply answers a question, it doesn't repeat the price.
+  const origIds = clar ? [...existing].filter(([l, c]) => inScope(l) && c.extracted_item_id && c.response_id !== resp.id).map(([, c]) => c.extracted_item_id!) : [];
+  const origItems = new Map(origIds.length ? ((await db().from("extracted_items").select("*").in("id", origIds)).data as ExtractedItem[]).map((i) => [i.id, i]) : []);
+  const clarOut = { lines: [] as number[], unanswered: [] as number[], out_of_scope: 0, written: [] as string[] };
+  const existingVendorRows = clar ? (await db().from("assumptions").select("id, kind, description").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).is("superseded_by", null)).data ?? [] : [];
 
   const assumptions: Assumption[] = [];
   const reviews: ReviewInput[] = [];
   const once = new Map<string, string>(); // vendor-level assumption key → id
   const vendorAssumption = (key: string, a: Omit<Assumption, "id">) => {
+    // A clarification reuses the vendor-level rows its main reply wrote (FX rate, discount) instead of adding duplicates.
+    const reuse = clar && !once.has(key) ? existingVendorRows.find((r) => r.kind === a.kind && r.description.slice(0, 8) === a.description.slice(0, 8)) : undefined;
+    if (reuse) once.set(key, reuse.id);
     if (!once.has(key)) { const id = randomUUID(); once.set(key, id); assumptions.push({ id, ...a }); }
     return once.get(key)!;
   };
@@ -90,9 +112,13 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const conflictLines = new Set(mapping.filter((m) => m.conflict_with).map((m) => m.line_id));
 
   for (const m of winners) {
-    const it = items.get(m.item_id);
+    const own = items.get(m.item_id);
     const line = lineById.get(m.line_id);
-    if (!it || !line || buyerOwned.has(line.id)) continue;
+    if (!own || !line) continue;
+    if (clar && !inScope(line.id)) { clarOut.out_of_scope++; continue; } // TRD §8.7: other lines untouched
+    if (buyerOwned.has(line.id)) continue;
+    const orig = clar ? origItems.get(existing.get(line.id)?.extracted_item_id ?? "") : undefined;
+    const it = orig ? mergeClarified(orig, own) : own;
     const id = cellId(line.id);
     const ev = { file_id: it.file_id, location: it.location, snippet: it.location.snippet ?? null };
     const base = {
@@ -102,6 +128,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     };
 
     if (it.unit_price === null) {
+      if (clar) { clarOut.unanswered.push(line.line_no); continue; } // still no price: the original cell and its card stay
       if ((it.raw_confidence ?? 1) < LOW_READ) {
         cells.push({ ...base, state: "low_confidence", best_guess_note: it.notes ?? "Price could not be read." });
         reviews.push({ type: "low_confidence_read", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: `Line ${line.line_no}: price unreadable in the ${SRC_WORD[String(it.location.type)] ?? "source"}`, detail: it.notes, probability: it.raw_confidence, proposed_state: "reviewed", evidence: ev });
@@ -115,6 +142,9 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
 
     // Conversion chain (TRD §6.12): every step recorded; any non-vendor-stated basis makes the cell "inferred".
     const chain: Step[] = [];
+    const clarPack = clar && own.unit_price === null ? (own.pack_size ?? parseUnit(own.price_unit_raw).pack) : null;
+    if (clar) chain.push({ step: "clarification", response_id: resp.id, communication_id: resp.communication_id, at: resp.received_at, pack: clarPack,
+      price_from_first_reply: orig && own.unit_price === null ? { value: orig.unit_price, unit: orig.price_unit_raw } : null, basis_kind: "vendor_stated" });
     let v = it.unit_price;
     let inferred = m.p < th.act;
     let ambiguous: string | null = null;
@@ -136,7 +166,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       const spec = Number(line.spec_attributes?.pack_size) || null;
       if (stated) {
         factor = 1000 / stated;
-        chain.push({ step: "unit", from: unit, to: "per_1000_pcs", factor, basis: `pack size ${stated} stated by the vendor`, basis_kind: "vendor_stated" });
+        chain.push({ step: "unit", from: unit, to: "per_1000_pcs", factor, basis: clarPack === stated ? `pack size ${stated} from the vendor's clarification reply` : `pack size ${stated} stated by the vendor`, basis_kind: "vendor_stated" });
       } else if (spec) {
         factor = 1000 / spec;
         const aid = randomUUID();
@@ -191,6 +221,19 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
 
     const value = round2(v);
     const landedV = round2(landed(value, { freight_included: freightIncluded, freight_per_1000: freightPer1000 }));
+    if (clar) {
+      // Answered by the vendor: the cell counts, as reviewed (gold `after_clarification`); still unclear → the original stays.
+      if (ambiguous || (it.raw_confidence ?? 1) < LOW_READ) { clarOut.unanswered.push(line.line_no); continue; }
+      const aid = randomUUID();
+      const was = existing.get(line.id);
+      assumptions.push({ id: aid, kind: clarPack ? "pack_size" : "other", basis: "vendor_stated", rfx_line_id: line.id, line_quote_id: id,
+        value: { from: "clarification", pack: clarPack, value, communication_id: resp.communication_id },
+        description: `Line ${line.line_no}: ${clarPack ? `${unit === "per_box" ? "box" : "bundle"} of ${clarPack}` : `${money(value)} per 1000`} from the vendor's clarification reply (${longDate(resp.received_at)})${was ? ` — was ${was.state.replaceAll("_", " ")}${was.best_guess_value ? `, best guess ${money(Number(was.best_guess_value))}` : ""}` : ""}.` });
+      chain.push({ step: "clarified", assumption_id: aid, basis_kind: "vendor_stated" });
+      cells.push({ ...base, state: "reviewed" as State, conversion_chain: chain, unit_price_inr_per_1000: value, landed_price_inr_per_1000: landedV, review_note: "Answered by the vendor's clarification reply" });
+      clarOut.lines.push(line.line_no); clarOut.written.push(line.id);
+      continue;
+    }
     if (ambiguous) {
       cells.push({ ...base, state: "ambiguous", conversion_chain: chain, best_guess_value: factor !== null ? value : null, best_guess_note: [ambiguous, bestGuessNote].filter(Boolean).join(" ") });
       reviews.push({ type: "ambiguous_unit", rfx_line_id: line.id, line_quote_id: id, extracted_item_id: it.id, title: (unit === "per_box" || unit === "per_bundle") && !it.pack_size ? `Item ${line.line_no}: price ${unit.replace("per_", "per ")}, ${unit === "per_box" ? "box" : "bundle"} size not stated` : `Line ${line.line_no}: ${ambiguous}`,
@@ -218,8 +261,9 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   }
 
   // Lines with no item: references_prior when the vendor pointed at earlier pricing (TRD §11.6), else not_quoted.
+  // Not for a clarification reply: it answers some lines and says nothing about the rest.
   const covered = new Set(cells.map((c) => c.rfx_line_id));
-  for (const line of lines) {
+  for (const line of clar ? [] : lines) {
     if (covered.has(line.id) || buyerOwned.has(line.id) || others.has(line.id)) continue;
     cells.push({
       id: cellId(line.id), rfx_id: resp.rfx_id, rfx_line_id: line.id, vendor_id: vendorId, response_id: resp.id, extracted_item_id: null,
@@ -229,7 +273,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
 
   // Vendor-level ledger entries and informational review items (TRD §8.4, §11.4, §11.7) — only when this reply priced something
   // (a stray file for a known vendor must not raise freight/discount cards or ledger rows).
-  const wrote = cells.some((c) => c.extracted_item_id);
+  const wrote = !clar && cells.some((c) => c.extracted_item_id); // vendor-level terms belong to the main reply
   if (wrote && terms.total_discount_pct && !grossUpPct) {
     vendorAssumption("discount", { kind: "discount_treatment", basis: "settings_default", value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: discountDefault },
       description: `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
@@ -239,7 +283,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
       proposed_value: terms.total_discount_pct, evidence: { terms: true } });
   }
-  const refPriorLines = cells.filter((c) => c.state === "references_prior");
+  const refPriorLines = clar ? [] : cells.filter((c) => c.state === "references_prior");
   if (refPriorLines.length) {
     vendorAssumption("prior", { kind: "prior_pricing", basis: "vendor_stated", value: { lines: refPriorLines.length, text: terms.references_prior_pricing_text },
       description: `${refPriorLines.length} lines reference earlier pricing not on file ("${terms.references_prior_pricing_text ?? "same as before"}"); no value used.` });
@@ -278,10 +322,38 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     if (error) throw error;
   }
   const nReviews = await insertReviews(resp, "normalise", reviews);
+  let resolved = 0;
+  if (clar) {
+    // The clarified lines' earlier ledger rows are superseded by the vendor's answer, not deleted; their cards → resolved_by_reply.
+    for (const a of assumptions.filter((x) => x.rfx_line_id && clarOut.written.includes(x.rfx_line_id) && (x.value as { from?: string }).from === "clarification")) {
+      const { error } = await db().from("assumptions").update({ superseded_by: a.id }).eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).eq("rfx_line_id", a.rfx_line_id!)
+        .is("superseded_by", null).neq("id", a.id).or(`value->>response_id.neq.${resp.id},value->>response_id.is.null`);
+      if (error) throw error;
+    }
+    resolved = await resolveByReply(resp, { lineIds: clarOut.written, questionIds: [] });
+  }
 
   const states: Partial<Record<State, number>> = {};
   for (const c of cells) states[c.state] = (states[c.state] ?? 0) + 1;
-  return { cells: cells.length, states, assumptions: assumptions.length, reviews: nReviews, terms: td, freight_included: freightIncluded, kept_buyer_cells: buyerOwned.size };
+  return {
+    cells: cells.length, states, assumptions: assumptions.length, reviews: nReviews, terms: td, freight_included: freightIncluded, kept_buyer_cells: buyerOwned.size,
+    ...(clar ? { clarification: { lines: clarOut.lines, unanswered: clarOut.unanswered, out_of_scope: clarOut.out_of_scope, resolved_cards: resolved } } : {}),
+  };
+}
+
+/** A clarification answer on top of the item first read: the reply's fields win where it gives them (a pack size, a new price). */
+function mergeClarified(orig: ExtractedItem, reply: ExtractedItem): ExtractedItem {
+  const pack = reply.pack_size ?? parseUnit(reply.price_unit_raw).pack;
+  const newPrice = reply.unit_price !== null;
+  return {
+    ...reply,
+    unit_price: reply.unit_price ?? orig.unit_price,
+    price_unit_raw: newPrice ? reply.price_unit_raw ?? orig.price_unit_raw : orig.price_unit_raw,
+    currency_raw: reply.currency_raw ?? orig.currency_raw,
+    discount_pct: newPrice ? reply.discount_pct : orig.discount_pct,
+    pack_size: pack ?? orig.pack_size,
+    raw_confidence: newPrice ? reply.raw_confidence : orig.raw_confidence, // no new price → the price read is still the original one
+  };
 }
 
 function mode(xs: number[]): number | null {

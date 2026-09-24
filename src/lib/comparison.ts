@@ -1,11 +1,12 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { money } from "@/lib/format";
+import { longDate, money } from "@/lib/format";
 import type { RfxLine } from "@/types/db";
 
 // TRD §16 GET /api/rfx/{id}/comparison — the grid model (DESIGN §2.6–2.8).
 export type CellState = "confirmed" | "inferred" | "reviewed" | "low_confidence" | "ambiguous" | "not_quoted" | "references_prior" | "excluded" | "conflict";
-export type Step = { step: string; from?: string | null; to?: string; factor?: number; rate?: number; rate_date?: string; pct?: number; basis?: string; basis_kind?: string; assumption_id?: string; before?: number; after?: number };
+export type Step = { step: string; from?: string | null; to?: string; factor?: number; rate?: number; rate_date?: string; pct?: number; basis?: string; basis_kind?: string; assumption_id?: string; before?: number; after?: number;
+  response_id?: string; at?: string; pack?: number | null; price_from_first_reply?: { value: number | null; unit: string | null } | null };
 export type Loc = { type?: string; sheet?: string; ref?: string; page?: number; line?: number; snippet?: string; source?: string; file_id?: string; bbox?: number[] };
 
 export type GridCell = {
@@ -33,6 +34,8 @@ export function stepText(s: Step): string {
     case "discount_gross_up": return `÷ ${fmt(1 - (s.pct ?? 0) / 100)}: printed net of a ${s.pct}% discount we won't earn`;
     case "unit": return `${UNIT_LABEL[s.from ?? ""] ?? s.from} → per 1000 pcs: × ${fmt(s.factor ?? 1)} (${s.basis ?? "ratio"})`;
     case "currency": return s.from ? `${s.from} → ${s.to} at ${s.rate}${s.rate_date ? ` (${s.rate_date})` : ""}` : `Currency not stated; assumed ${s.to}`;
+    case "clarification": return `Vendor's clarification reply${s.at ? ` (${longDate(s.at)})` : ""}: ${s.pack ? `pack size ${s.pack}` : "price stated"}${s.price_from_first_reply?.value != null ? `; price as first quoted, ${money(s.price_from_first_reply.value)} ${s.price_from_first_reply.unit ?? ""}`.trimEnd() : ""}`;
+    case "clarified": return "Answered by the vendor — the cell counts as reviewed";
     case "buyer_override": return `Buyer set ${s.after !== undefined ? money(s.after) : "a value"}${s.before !== undefined && s.before !== null ? ` (was ${money(s.before)})` : ""}`;
     default: return s.step.replaceAll("_", " ");
   }
@@ -41,6 +44,7 @@ export function stepText(s: Step): string {
 /** "vendor stated" / "RFx spec" / "assumption · fx_rate" / "buyer entered" (DESIGN §2.9). */
 export function basisLabel(s: Step): string {
   if (s.step === "buyer_override") return "buyer entered";
+  if (s.step === "clarification" || s.step === "clarified") return "vendor stated · clarification";
   if (s.step === "currency") return s.from ? "assumption · fx_rate" : "assumption";
   if (s.step === "discount_gross_up") return "assumption · discount";
   if (s.basis_kind === "rfx_spec") return "RFx spec";

@@ -146,10 +146,13 @@ export async function loadSeedResponses(rfxId: string, set: "clean" | "realistic
 
 /** Delete responses of one source for an RFx, with everything later stages wrote for them. */
 async function clearResponses(rfxId: string, source: string) {
-  const { data } = await db().from("responses").select("id, vendor_id, communication_id").eq("rfx_id", rfxId).eq("source", source);
-  if (!data?.length) return;
+  const { data: base } = await db().from("responses").select("id, vendor_id, communication_id").eq("rfx_id", rfxId).eq("source", source);
+  if (!base?.length) return;
+  const vendorIds = base.map((r) => r.vendor_id).filter(Boolean);
+  // Clarification replies to these vendors go too (they answer the replies being replaced), with the clarification emails and their mock mail.
+  const { data: clars } = vendorIds.length ? await db().from("responses").select("id, vendor_id, communication_id").eq("rfx_id", rfxId).eq("is_clarification", true).in("vendor_id", vendorIds) : { data: [] };
+  const data = [...base, ...(clars ?? []).filter((c) => !base.some((b) => b.id === c.id))];
   const ids = data.map((r) => r.id);
-  const vendorIds = data.map((r) => r.vendor_id).filter(Boolean);
   // Children before line_quotes: review items and ledger rows point at cells.
   for (const t of ["review_items", "questionnaire_answers"]) {
     const { error } = await db().from(t).delete().in("response_id", ids);
@@ -165,7 +168,15 @@ async function clearResponses(rfxId: string, source: string) {
   if (lq.error) throw lq.error;
   const del = await db().from("responses").delete().in("id", ids);
   if (del.error) throw del.error;
-  await db().from("communications").delete().in("id", data.map((r) => r.communication_id).filter(Boolean));
+  const inbound = data.map((r) => r.communication_id).filter(Boolean);
+  const { data: outClar } = vendorIds.length ? await db().from("communications").select("id, message_id, eml_path").eq("rfx_id", rfxId).eq("kind", "clarification").in("vendor_id", vendorIds) : { data: [] };
+  const { data: inComms } = inbound.length ? await db().from("communications").select("message_id, eml_path").in("id", inbound) : { data: [] };
+  const msgIds = [...(outClar ?? []), ...(inComms ?? [])].map((c) => c.message_id).filter(Boolean) as string[];
+  const { data: box } = msgIds.length ? await db().from("mock_mailbox").select("id, direction, eml_path").eq("rfx_id", rfxId).or(`message_id.in.(${msgIds.map((m) => `"${m}"`).join(",")}),in_reply_to.in.(${msgIds.map((m) => `"${m}"`).join(",")})`) : { data: [] };
+  await db().from("communications").delete().in("id", [...inbound, ...(outClar ?? []).map((c) => c.id)]);
+  if (box?.length) await db().from("mock_mailbox").delete().in("id", box.map((b) => b.id));
+  const files = { outbound: (outClar ?? []).map((c) => c.eml_path), raw: [...(inComms ?? []).map((c) => c.eml_path), ...(box ?? []).filter((b) => b.direction === "to_buyer").map((b) => b.eml_path)] };
+  for (const [bucket, paths] of Object.entries(files)) { const p = paths.filter(Boolean) as string[]; if (p.length) await db().storage.from(bucket).remove(p); }
 }
 
 export async function getResponse(id: string): Promise<ResponseRow> {
