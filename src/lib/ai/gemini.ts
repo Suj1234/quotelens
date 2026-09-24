@@ -27,7 +27,7 @@ async function call(tier: Tier, contents: Content[], config: Record<string, unkn
       const text = res.text ?? "";
       await logModelCall({
         ...ctx, provider: "gemini", model, latency_ms: Date.now() - t0, ok: true,
-        input_tokens: res.usageMetadata?.promptTokenCount, output_tokens: res.usageMetadata?.candidatesTokenCount,
+        usage: res.usageMetadata, // → every token count + cost (log.ts, migration 0012)
         input_preview: preview(contents), output_preview: text,
       });
       return text;
