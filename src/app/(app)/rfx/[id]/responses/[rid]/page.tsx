@@ -10,7 +10,8 @@ import type { MapSummary } from "@/lib/pipeline/map";
 import type { Stage } from "@/types/db";
 
 // TRD §17.7 / DESIGN §3.5 expanded row
-export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id]/responses/[rid]">) {
+export default async function ResponseDetailPage({ params, searchParams }: PageProps<"/rfx/[id]/responses/[rid]">) {
+  const autoRun = (await searchParams).run === "1"; // arriving from "Submit and run" / the portal: start the six stages
   const user = await requireUser();
   const { id, rid } = await params;
   const [rfx, { response, vendor, files, items, terms, cells, openReviews }] = await Promise.all([getRfx(id), getResponseDetail(rid)]);
@@ -41,7 +42,7 @@ export default async function ResponseDetailPage({ params }: PageProps<"/rfx/[id
       </p>
 
       <div style={{ marginTop: 18 }}>
-        <PipelineStrip responseId={rid} status={response.pipeline_status} errors={response.stage_errors} timings={timings} canRun={user.role !== "approver"} />
+        <PipelineStrip responseId={rid} status={response.pipeline_status} errors={response.stage_errors} timings={timings} canRun={user.role !== "approver"} autoRun={autoRun && user.role !== "approver"} />
       </div>
 
       {/* TRD §17.7: flags chips, summary counts, Go to Review Queue (n) */}

@@ -102,6 +102,19 @@ const SEED_SETS: Record<"clean" | "realistic", SeedEntry[]> = {
   ],
 };
 
+/** One vendor's reply from the dataset (files + email body), e.g. for "Use seed file" in Add response (DESIGN §3.5). */
+export async function seedReply(vendorCode: string, set: "clean" | "realistic" = "clean"): Promise<{ files: IncomingFile[]; emailText: string | null } | null> {
+  const e = SEED_SETS[set].find((x) => x.vendor === vendorCode);
+  if (!e) return null;
+  const available = new Set<string>();
+  for (const dir of new Set([...e.files, e.email ?? ""].filter(Boolean).map((f) => path.dirname(f.split("|")[0])))) {
+    (await list("seed", `seed/${dir}`)).forEach((p) => available.add(p.replace(/^seed\//, "")));
+  }
+  const names = e.files.map((f) => f.split("|").find((alt) => available.has(alt))).filter((f): f is string => !!f);
+  const files = await Promise.all(names.map(async (n) => ({ name: path.basename(n), buf: await get("seed", `seed/${n}`) })));
+  return { files, emailText: e.email ? (await get("seed", `seed/${e.email}`)).toString("utf8") : null };
+}
+
 /**
  * Replace this RFx's previously seeded responses (and their pipeline outputs) with a fresh copy of the dataset.
  * Responses from other sources are left untouched.
@@ -114,17 +127,11 @@ export async function loadSeedResponses(rfxId: string, set: "clean" | "realistic
 
   await clearResponses(rfxId, "seed");
 
-  const available = new Set<string>();
-  for (const dir of new Set(SEED_SETS[set].flatMap((e) => [...e.files, e.email ?? ""]).filter(Boolean).map((f) => path.dirname(f.split("|")[0])))) {
-    (await list("seed", `seed/${dir}`)).forEach((p) => available.add(p.replace(/^seed\//, "")));
-  }
   const ids: string[] = [];
   for (const e of SEED_SETS[set]) {
-    const names = e.files.map((f) => f.split("|").find((alt) => available.has(alt))).filter((f): f is string => !!f);
-    const files = await Promise.all(names.map(async (n) => ({ name: path.basename(n), buf: await get("seed", `seed/${n}`) })));
-    const emailText = e.email ? (await get("seed", `seed/${e.email}`)).toString("utf8") : null;
+    const reply = await seedReply(e.vendor, set);
     ids.push(await createResponse({
-      rfxId, vendorId: vendorId(e.vendor), source: "seed", files, emailText, actor, subject: `Re: RFx ${rfx.code} - ${rfx.title}`,
+      rfxId, vendorId: vendorId(e.vendor), source: "seed", files: reply!.files, emailText: reply!.emailText, actor, subject: `Re: RFx ${rfx.code} - ${rfx.title}`,
     }));
   }
   await audit({ rfx_id: rfxId, actor, event: "seed.responses_loaded", payload: { set, responses: ids.length } });
@@ -146,6 +153,8 @@ async function clearResponses(rfxId: string, source: string) {
     const { error } = await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", vendorIds);
     if (error) throw error;
   }
+  // The reloaded vendors start again as invited (flags sets responded); a clarification asked during testing doesn't linger.
+  if (vendorIds.length) await db().from("rfx_vendors").update({ status: "invited" }).eq("rfx_id", rfxId).in("vendor_id", vendorIds).in("status", ["responded", "clarification_sent", "clarified"]);
   const lq = await db().from("line_quotes").delete().in("response_id", ids);
   if (lq.error) throw lq.error;
   const del = await db().from("responses").delete().in("id", ids);

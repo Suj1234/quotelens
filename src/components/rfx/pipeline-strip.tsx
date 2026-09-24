@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { STAGES, type Stage, type StageState } from "@/types/db";
 
 type Props = {
-  responseId: string; canRun: boolean;
+  responseId: string; canRun: boolean; autoRun?: boolean;
   status: Partial<Record<Stage, StageState>>; errors: Partial<Record<Stage, string>>; timings: Partial<Record<Stage, number>>;
 };
 type Ev = { stage: Stage; status: "done" | "error" | "skipped"; ms: number; error?: string };
@@ -15,7 +15,7 @@ type Ev = { stage: Stage; status: "done" | "error" | "skipped"; ms: number; erro
 const secs = (ms?: number) => (ms === undefined ? "" : `${(ms / 1000).toFixed(1)}s`);
 
 /** DESIGN §2.12. Run all streams NDJSON stage events from the server chain (TRD §16 run-all). */
-export function PipelineStrip({ responseId, canRun, ...initial }: Props) {
+export function PipelineStrip({ responseId, canRun, autoRun, ...initial }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState(initial.status);
   const [errors, setErrors] = useState(initial.errors);
@@ -78,6 +78,14 @@ export function PipelineStrip({ responseId, canRun, ...initial }: Props) {
       setBusy(false);
     }
   }
+
+  const auto = useRef(false);
+  useEffect(() => { // once, and only for a fresh reply (nothing run yet); the URL loses ?run so a reload doesn't re-run
+    if (!autoRun || auto.current || STAGES.some((s) => initial.status[s] && initial.status[s] !== "pending")) return;
+    auto.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    void run();
+  });
 
   const failed = STAGES.find((s) => status[s] === "error");
   return (

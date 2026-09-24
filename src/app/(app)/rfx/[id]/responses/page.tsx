@@ -6,6 +6,7 @@ import { ext, formatLabel } from "@/lib/file-labels";
 import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
 import { AssignVendor } from "@/components/rfx/assign-vendor";
+import { AddResponse } from "@/components/rfx/add-response";
 import { getUnmatchedResponses } from "@/lib/unmatched";
 import { db } from "@/lib/db";
 import { STAGES } from "@/types/db";
@@ -14,30 +15,35 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
   const user = await requireUser();
   const buyer = user.role !== "approver";
   const { id } = await params;
-  const [rows, strays, { data: allVendors }] = await Promise.all([listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name")]);
+  const [rows, strays, { data: allVendors }, { data: status }] = await Promise.all([
+    listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name"),
+    db().from("v_vendor_status").select("vendor_id, lines_priced, lines_total, cleared_questionnaire").eq("rfx_id", id),
+  ]);
+  const st = (vid: string) => status?.find((x) => x.vendor_id === vid);
   const replied = rows.filter((r) => r.response).length;
   const running = rows.filter((r) => r.response && STAGES.some((s) => r.response!.pipeline_status[s] === "running")).length;
+  const unprocessed = rows.filter((r) => r.response && STAGES.some((s) => r.response!.pipeline_status[s] !== "done")).length;
 
   return (
     <div className="page">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        {/* DESIGN §3.5: "Five responses in, all processed. Open one to see what was read and where, or add a response by hand — …" (counts computed) */}
         <p className="lead">
-          {replied === rows.length
-            ? <><b>All {countWord(rows.length).toLowerCase()}</b> vendors have replied</>
-            : <><b>{replied} of {rows.length}</b> vendors have replied</>}
-          {running ? `, ${countWord(running).toLowerCase()} still processing` : ""}.
-          {replied > 0 && " Open one to see what was read and where."}
+          {replied === 0 ? <><b>No responses yet</b> from the {countWord(rows.length).toLowerCase()} invited vendors.</>
+            : <><b>{countWord(replied)} {replied === 1 ? "response" : "responses"} in</b>{replied < rows.length ? ` of ${rows.length}` : ""}, {unprocessed === 0 ? "all processed" : running ? `${countWord(running).toLowerCase()} still processing` : `${countWord(unprocessed).toLowerCase()} not fully processed`}.</>}
+          {" "}Open one to see what was read and where, or add a response by hand — it runs through the same six stages as a Gmail reply.
         </p>
         {buyer && replied > 0 && <LoadSeed rfxId={id} />}
       </div>
 
-      {replied === 0 ? (
+      {replied === 0 && buyer && (
         <div className="empty" style={{ marginTop: 16 }}>
           <p><b>No responses yet.</b></p>
-          <p style={{ margin: "4px 0 14px" }}>Load the five sample replies from the dataset to run them through the pipeline.</p>
-          {buyer && <div style={{ display: "inline-flex" }}><LoadSeed rfxId={id} primary /></div>}
+          <p style={{ margin: "4px 0 14px" }}>Add a reply by hand on a vendor&apos;s row, or load the five sample replies from the dataset.</p>
+          <div style={{ display: "inline-flex" }}><LoadSeed rfxId={id} primary /></div>
         </div>
-      ) : (
+      )}
+      {rows.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           {rows.map((r) => (
             <div className="vrow" key={r.vendor_id}>
@@ -47,7 +53,8 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               </div>
               <div className="sub">
                 {r.response
-                  ? <>received {shortDate(r.response.received_at)} · <span className="mono">{r.response.priced}</span> prices read{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}</>
+                  ? STAGES.some((s) => r.response!.pipeline_status[s] === "running") ? <span className="chip teal">processing…</span>
+                    : <>received {shortDate(r.response.received_at)} · <span className="mono">{st(r.vendor_id)?.lines_priced ?? 0}/{st(r.vendor_id)?.lines_total ?? 0}</span> priced{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}</>
                   : "no reply yet"}
               </div>
               <div className="sub">
@@ -58,9 +65,10 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
                   <span className={`chip ${(r.response.summary.classify as { email?: { kind: string } } | undefined)?.email?.kind === "quotation" ? "teal" : "grey"}`} style={{ margin: "2px 2px 2px 0" }}>EMAIL</span>
                 )}
               </div>
-              <div className="sub" />
-              <div>
+              <div className="sub">{r.response && (() => { const c = st(r.vendor_id)?.cleared_questionnaire; return c === true ? <span className="chip green">cleared</span> : c === false ? <span className="chip red">not cleared</span> : <span className="chip amber">questionnaire pending</span>; })()}</div>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                 {r.response && <Button asChild size="sm"><Link href={`/rfx/${id}/responses/${r.response.id}`}>Open</Link></Button>}
+                {buyer && <AddResponse rfxId={id} vendorId={r.vendor_id} vendorName={r.name} />}
               </div>
             </div>
           ))}
