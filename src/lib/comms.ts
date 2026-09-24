@@ -6,7 +6,7 @@ export type Attachment = { name: string; url: string | null; size?: number };
 export type Comm = {
   id: string; direction: "outbound" | "inbound"; kind: string; mode: string; status: string; vendor: string | null; vendor_id: string | null;
   from: string | null; to: string | null; reply_to: string | null; subject: string | null; body: string | null;
-  at: string; message_id: string | null; attachments: Attachment[]; response_id: string | null; error: string | null;
+  at: string; message_id: string | null; in_reply_to: string | null; eml_url: string | null; attachments: Attachment[]; response_id: string | null; error: string | null;
 };
 
 /** Every communication of an RFx with signed links for its attachments (outbound files live in `outbound`, inbound in `raw`). */
@@ -26,7 +26,8 @@ export async function listComms(rfxId: string, o: { direction?: "outbound" | "in
   return Promise.all((data ?? []).map(async (c) => ({
     id: c.id, direction: c.direction, kind: c.kind, mode: c.mode, status: c.status, vendor: (c.vendors as { name: string } | null)?.name ?? null, vendor_id: c.vendor_id,
     from: c.from_addr, to: c.to_addr, reply_to: c.reply_to, subject: c.subject, body: c.body_text,
-    at: c.sent_at ?? c.received_at ?? c.created_at, message_id: c.message_id, response_id: c.response_id, error: c.error,
+    at: c.sent_at ?? c.received_at ?? c.created_at, message_id: c.message_id, in_reply_to: c.in_reply_to,
+    eml_url: c.eml_path ? await signedUrl(c.direction === "outbound" ? "outbound" : "raw", c.eml_path, `${c.id}.eml`).catch(() => null) : null, response_id: c.response_id, error: c.error,
     attachments: await Promise.all((c.attachments as { name: string; path?: string; bucket?: Bucket; file_id?: string; size?: number }[]).map(async (a) => {
       const path = a.path ?? (a.file_id ? rawPaths.get(a.file_id) : undefined);
       const bucket: Bucket = a.bucket ?? "raw";

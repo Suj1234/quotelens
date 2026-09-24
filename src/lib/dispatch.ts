@@ -69,11 +69,11 @@ export async function issueRfx(rfxId: string, user: { id: string; name: string; 
         parts: [{ text: prompt }, { text: `Details — title: ${r.title}; terms: ${terms}; buyer email: ${user.email}.` }] });
       const sent = await sendEmail({
         rfx_id: rfxId, vendor_id: v.vendor_id, kind: "rfx_dispatch",
-        from: `${user.name} (Meridian Foods) <${process.env.GMAIL_USER || user.email}>`, to: v.email, reply_to: replyToAddress(tag),
+        from: `"${user.name} (Meridian Foods)" <${user.email}>`, to: v.email, reply_to: replyToAddress(tag),
         subject: mail.subject, text: mail.body_text, attachments: atts,
       });
       await db().from("rfx_vendors").update({ invited_at: new Date().toISOString(), status: "invited" }).eq("rfx_id", rfxId).eq("vendor_id", v.vendor_id);
-      await audit({ rfx_id: rfxId, actor: user.id, event: "dispatch.sent", entity_type: "communication", entity_id: sent.id, payload: { vendor: v.name, to: v.email, reply_tag: tag, mode: "mock" } });
+      await audit({ rfx_id: rfxId, actor: user.id, event: "dispatch.sent", entity_type: "communication", entity_id: sent.id, payload: { vendor: v.name, to: v.email, reply_tag: tag, mode: "mock", message_id: sent.message_id } });
       return { vendor: v.name, ok: true };
     } catch (e) {
       console.error(`[dispatch] ${v.name}: ${(e as Error).message}`);
