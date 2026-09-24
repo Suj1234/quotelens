@@ -16,7 +16,7 @@ export async function lineSheetXlsx(d: Draft): Promise<Buffer> {
   wb.creator = "Meridian Foods Pvt Ltd";
   const ws = wb.addWorksheet("Line Items", { views: [{ state: "frozen", ySplit: 5 }] });
   ws.addRow([`Meridian Foods Pvt Ltd — ${r.title}`]).font = { bold: true, size: 13 };
-  ws.addRow([`RFx ${r.code} · quote in ${r.currency} ${UNIT[r.quote_unit] ?? r.quote_unit} · ${r.incoterm === "delivered" ? "delivered to plant" : r.incoterm.replace("_", "-")}${r.freight_included_requested ? ", freight included" : ""} · ${r.payment_terms_days}-day payment · ${r.validity_days_requested}-day validity`]);
+  ws.addRow([`RFx ${r.code} · quote in ${r.currency} ${UNIT[r.quote_unit] ?? r.quote_unit} · ${r.incoterm === "delivered" ? "delivered to plant" : r.incoterm.replace("_", "-")}${r.freight_included_requested ? ", freight included" : ""} · ${r.tax_basis === "incl_gst" ? "prices incl. GST" : "prices excl. GST, state the rate"} · ${r.payment_terms_days}-day payment · ${r.validity_days_requested}-day validity`]);
   ws.addRow([`Please reply by ${r.response_deadline ? longDate(r.response_deadline) : "the deadline in the email"}. Fill in your price per line, or reply in any format convenient to you.`]).font = { italic: true };
   ws.addRow([]);
   const head = ws.addRow(["Line", "SKU", "Description", "Ply", "L (mm)", "W (mm)", "H (mm)", "GSM spec", "BF", "Type", "Wt/pc (g)", "Monthly qty", "Annual qty", "Deliver to", `Your price (${r.currency} ${UNIT[r.quote_unit] ?? r.quote_unit})`, "Remarks"]);

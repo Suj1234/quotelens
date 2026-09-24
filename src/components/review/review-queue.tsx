@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { EvidenceBlock } from "@/components/compare/evidence";
 import { SyncRepliedButton } from "@/components/comms/sync-inbox";
 
-const TYPE_ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
+const TYPE_ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "tax_basis", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
 const PRICE_TYPES = ["ambiguous_unit", "low_confidence_read", "conflict"];
 // DESIGN §3.6: assumptions driven by a global setting offer "Change in settings" (FX rate, freight default, discount default).
 const SETTINGS_TYPES = ["fx_assumption", "discount_treatment", "freight_treatment"];
-const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "validity_short", "missing_line"];
+const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_basis", "validity_short", "missing_line"];
 const LABEL: Record<Action, string> = {
   confirm: "Confirm", override: "Override…", exclude: "Exclude", map: "Map to line…", ignore: "Ignore", "ask-vendor": "Ask vendor",
   "mark-not-quoted": "Treat as not quoted", dismiss: "Dismiss", "accept-yes": "Accept as Yes", "treat-no": "Treat as No",

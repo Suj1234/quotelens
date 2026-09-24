@@ -6,7 +6,9 @@ import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { longDate } from "@/lib/format";
 import { put } from "@/lib/storage";
+import { issueBlockers, NO_RULES } from "@/lib/line-rules";
 import { assertDraft, getDraft } from "@/lib/rfx-draft";
+import { getSetting } from "@/lib/settings";
 import { replyToAddress, sendEmail, type OutAttachment } from "@/lib/email";
 import { lineSheetXlsx, questionnairePdf } from "@/lib/dispatch-docs";
 
@@ -27,18 +29,12 @@ const Dispatch = z.object({
 const TITLE: Record<string, string> = { buyer: "Category Buyer", admin: "Category Buyer", approver: "VP Procurement" };
 const UNIT: Record<string, string> = { per_1000_pcs: "per 1000 pieces", per_piece: "per piece", per_kg: "per kg", per_box: "per box" };
 
-export function issueBlockers(d: Awaited<ReturnType<typeof getDraft>>) {
-  return [
-    !d.lines.length && "line items", !d.rfx.terms_set && "commercial terms", !d.rfx.response_deadline && "a response deadline",
-    !d.questions.length && "a questionnaire", !d.vendors.length && "vendors",
-  ].filter((x): x is string => !!x);
-}
-
 /** TRD §16 POST /api/rfx/{id}/issue (+ §15.1–15.2): freeze v1, build the attachments, one dispatch email per vendor. */
 export async function issueRfx(rfxId: string, user: { id: string; name: string; email: string; role: string }) {
   await assertDraft(rfxId);
   const d = await getDraft(rfxId);
-  const blockers = issueBlockers(d);
+  const template = (await getSetting("category_templates"))[d.rfx.category]; // P9: the category template's required line fields block Issue too
+  const blockers = issueBlockers(d, template?.line_rules ?? NO_RULES);
   if (blockers.length) throw new AppError("NOT_READY", `Add ${blockers.join(", ")} before issuing.`, { blockers }, 409);
   const r = d.rfx;
 
@@ -59,7 +55,7 @@ export async function issueRfx(rfxId: string, user: { id: string; name: string; 
   await audit({ rfx_id: rfxId, actor: user.id, event: "rfx.frozen", entity_type: "rfx", entity_id: rfxId, payload: { version: 1, lines: d.lines.length, questions: d.questions.length, vendors: d.vendors.length } });
 
   const { data: inv } = await db().from("rfx_vendors").select("vendor_id, reply_tag").eq("rfx_id", rfxId);
-  const terms = `currency ${r.currency}; quoting unit ${UNIT[r.quote_unit] ?? r.quote_unit}; incoterm ${r.incoterm}; freight ${r.freight_included_requested ? "included" : "excluded"}; payment ${r.payment_terms_days} days; validity requested ${r.validity_days_requested} days; contract ${r.contract_months} months; delivery to ${r.delivery_locations.join(" and ")}`;
+  const terms = `currency ${r.currency}; quoting unit ${UNIT[r.quote_unit] ?? r.quote_unit}; incoterm ${r.incoterm}; freight ${r.freight_included_requested ? "included" : "excluded"}; GST ${r.tax_basis === "incl_gst" ? "included in the prices" : "excluded from the prices — state the GST rate separately"}; payment ${r.payment_terms_days} days; validity requested ${r.validity_days_requested} days; contract ${r.contract_months} months; delivery to ${r.delivery_locations.join(" and ")}`;
   const results = await Promise.all(d.vendors.map(async (v) => {
     const tag = inv?.find((i) => i.vendor_id === v.vendor_id)?.reply_tag ?? `rfx-${r.code.toLowerCase()}-${v.short_code}`;
     try {

@@ -10,7 +10,7 @@ import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { RowLink } from "@/components/rfx/row-link";
 import { SyncPoller } from "@/components/comms/sync-inbox";
 
-const UNIT: Record<string, string> = { per_1000_pcs: "per 1000 pcs", per_piece: "per piece", per_kg: "per kg", per_box: "per box" };
+const UNIT: Record<string, string> = { per_1000_pcs: "Per 1000 pcs", per_piece: "Per piece", per_kg: "Per kg", per_box: "Per box" };
 const word = (n: number) => countWord(n).toLowerCase();
 // "Q6: No – BRC audit planned for Q1 2027 · Q3: …" → ["Q6", "Q3"] (only the labels, not a "Q1" inside an answer).
 const failedQs = (note: string) => [...new Set(note.split(" · ").map((s) => s.match(/^Q\d+(?=:)/)?.[0]).filter((q): q is string => !!q))];
@@ -64,7 +64,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
               <dt>Issued</dt><dd>{r.frozen_at ? `${longDate(r.frozen_at)} · v${r.version} frozen` : "—"}</dd>
               <dt>Deadline</dt><dd>{r.response_deadline ? longDate(r.response_deadline) : "—"}</dd>
               <dt>Scope</dt><dd>{r.lines} lines · {invited} vendors invited{o.range ? ` · ${inrShort(o.range[0])}–${inrShort(o.range[1])} a year` : ""}</dd>
-              <dt>Terms</dt><dd>{r.currency} {UNIT[r.quote_unit] ?? r.quote_unit} · {r.incoterm === "delivered" ? "delivered" : r.incoterm.replace("_", "-")}{r.freight_included_requested ? ", freight included" : ""} · {r.payment_terms_days} days · {r.validity_days_requested}-day validity</dd>
+              <dt>Terms</dt><dd>{r.currency} · {UNIT[r.quote_unit] ?? r.quote_unit} · {r.incoterm === "delivered" ? "Delivered to plant" : r.incoterm === "ex_works" ? "Ex-works" : "FOB"}{r.freight_included_requested ? ", freight included" : ""} · {r.tax_basis === "incl_gst" ? "Incl. GST" : "Excl. GST"} · {r.payment_terms_days}-day payment · {r.validity_days_requested}-day validity</dd>
               <dt>Plants</dt><dd>{r.delivery_locations.join(", ")}</dd>
               <dt>Questionnaire</dt><dd>{o.questions} questions{o.disqualifying.length ? ` · ${o.disqualifying.join(", ")} disqualifying` : ""}</dd>
               <dt>Transport</dt><dd>{o.mode === "mock" ? "Mock email" : o.mode === "gmail" ? "Gmail" : o.mode} · <Link href="/settings">change</Link></dd>
@@ -86,7 +86,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
                   <td className="mono">{v.received ? shortDate(v.received) : "—"}</td>
                   <td className="num mono">{v.received ? `${v.priced}/${v.lines}` : "—"}</td>
                   <td className="mono">{v.validUntil ? shortDate(v.validUntil) : "—"}{v.validityShort && <> <span className="chip amber" style={{ height: 15 }}>{v.validityDays}d</span></>}</td>
-                  <td>{!v.received ? <span className="chip grey">{v.status === "invited" ? "awaiting reply" : v.status.replace("_", " ")}</span> : v.cleared === true ? <span className="chip green">cleared</span> : v.cleared === false ? <span className="chip red" title={v.clearedNote}>{failedQs(v.clearedNote).length ? `failed ${failedQs(v.clearedNote).join(", ")}` : "not cleared"}</span> : <span className="chip amber" title={v.clearedNote}>{v.clearedNote.split(" · ")[0].slice(0, 28) || "pending"}</span>}</td>
+                  <td>{!v.received ? <span className="chip grey">{v.status === "invited" ? "Awaiting reply" : v.status[0].toUpperCase() + v.status.slice(1).replace("_", " ")}</span> : v.cleared === true ? <span className="chip green">Cleared</span> : v.cleared === false ? <span className="chip red" title={v.clearedNote}>{failedQs(v.clearedNote).length ? `Failed ${failedQs(v.clearedNote).join(", ")}` : "Not cleared"}</span> : <span className="chip amber" title={v.clearedNote}>{(v.clearedNote.split(" · ")[0].slice(0, 28) || "pending").replace(/^./, (c) => c.toUpperCase())}</span>}</td>
                   <td className="num mono">{v.needs || "—"}</td>
                   <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
                     {v.responseId && <Button asChild size="xs" variant="ghost"><Link href={`/rfx/${id}/responses/${v.responseId}`}>Open response</Link></Button>}
@@ -108,7 +108,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
               <div className="filerow" key={s.id}>
                 <span className="ext">{s.files[0]?.split(".").pop()?.toUpperCase() ?? "TXT"}</span>
                 <span style={{ flex: 1 }}>{s.files.join(", ") || "email body"} · {s.from ?? "unknown sender"}</span>
-                <span className="chip amber">unknown vendor</span>
+                <span className="chip amber">Unknown vendor</span>
                 {!locked && <AssignVendor responseId={s.id} vendors={allVendors ?? []} />}
               </div>
             ))}

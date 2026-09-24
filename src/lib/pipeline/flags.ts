@@ -6,7 +6,7 @@ import type { NormaliseSummary } from "./normalise";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
 import { decideTerms, type TermsRow } from "./terms";
 
-export type Flag = "references_prior_pricing" | "freight_excluded" | "validity_short" | "currency_not_inr" | "total_discount_present" | "partial_quote";
+export type Flag = "references_prior_pricing" | "freight_excluded" | "validity_short" | "currency_not_inr" | "total_discount_present" | "partial_quote" | "tax_basis_differs";
 export type FlagsSummary = { flags: Flag[]; lines_priced: number; lines_total: number; not_quoted: number; open_reviews: number; rfx_status: string; provider: string };
 
 /** TRD §8.6 — vendor-level flags from the decided terms, interpreted terms written back, vendor + RFx status moved on. */
@@ -44,6 +44,8 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
     currency_not_inr: [...currencies].some((c) => c !== rfx.currency),
     total_discount_present: !!terms?.total_discount_pct || (td?.p.total_discount_conditional ?? 0) >= 0.5,
     partial_quote: notQuoted > 0,
+    // Only when the vendor wrote something about tax: silence is not a contradiction (migration 0013).
+    tax_basis_differs: !!terms?.tax_terms_raw && !!td && ((rfx.tax_basis ?? "excl_gst") === "excl_gst" ? td.p.taxes_excluded < 0.5 : td.p.taxes_excluded >= 0.5),
   };
   const list = (Object.keys(on) as Flag[]).filter((f) => on[f]);
 
@@ -63,6 +65,7 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
   if (on.partial_quote) reviews.push({ type: "missing_line", title: `${notQuoted} of ${cells.length} lines not quoted`, detail: terms?.other_notes, proposed_value: notQuoted, evidence: { terms: true } });
   if (on.freight_excluded) reviews.push({ type: "freight_treatment", title: "Freight not included", detail: terms?.freight_terms_raw, probability: td?.p.freight_excluded, evidence: { terms: true } });
   if (on.references_prior_pricing) reviews.push({ type: "prior_pricing", title: "Refers to earlier pricing", detail: terms?.references_prior_pricing_text, probability: td?.p.references_prior_pricing, evidence: { terms: true } });
+  if (on.tax_basis_differs) reviews.push({ type: "tax_basis", title: rfx.tax_basis === "incl_gst" ? "Prices exclude GST (RFx asked for GST included)" : "Prices include GST (RFx asked for prices excluding GST)", detail: terms?.tax_terms_raw, probability: td ? (rfx.tax_basis === "incl_gst" ? td.p.taxes_excluded : 1 - td.p.taxes_excluded) : null, evidence: { terms: true } });
   if (on.total_discount_present) reviews.push({ type: "discount_treatment", title: "Discount offered", detail: terms?.total_discount_condition, evidence: { terms: true } });
   // A reply that priced nothing (stray file) raises no vendor-level cards.
   if (((resp.summary.map as { mapped?: number } | undefined)?.mapped ?? 0) > 0) await insertReviews(resp, "flags", reviews);

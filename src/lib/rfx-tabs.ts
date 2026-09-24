@@ -116,7 +116,7 @@ export function spans(ns: number[]): string {
   return out.join(", ");
 }
 
-const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "validity_short", "missing_line"];
+const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_basis", "validity_short", "missing_line"];
 
 export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string };
 

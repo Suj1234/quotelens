@@ -15,9 +15,9 @@ import { ASKABLE, draftClarification } from "@/lib/clarify";
 // TRD §12 + §17.8, DESIGN §2.11 / §3.6.
 export type Action = "confirm" | "override" | "exclude" | "map" | "ignore" | "ask-vendor" | "mark-not-quoted" | "dismiss" | "accept-yes" | "treat-no";
 export const ACTIONS: Action[] = ["confirm", "override", "exclude", "map", "ignore", "ask-vendor", "mark-not-quoted", "dismiss", "accept-yes", "treat-no"];
-const INFORMATIONAL = ["fx_assumption", "discount_treatment", "freight_treatment", "validity_short", "missing_line"];
+const INFORMATIONAL = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_basis", "validity_short", "missing_line"];
 // DESIGN §3.6 order: ambiguous units, low-confidence read, prior pricing, discounts, FX, freight, questionnaire, validity; then the rest.
-const ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
+const ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "tax_basis", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
 
 export type QueueItem = {
   id: string; type: string; title: string; detail: string | null; status: string;
@@ -46,6 +46,7 @@ export function actionsFor(r: Pick<Row, "type" | "proposed_value" | "line_quote_
     case "unmapped_item": return ["map", "ignore"];
     case "conflict": return [...(r.proposed_value !== null ? ["confirm" as const] : []), "override", "dismiss"];
     case "unknown_vendor": case "not_a_quote": return ["dismiss"];
+    case "tax_basis": return ["confirm", "ask-vendor", "dismiss"]; // acknowledge, or ask the vendor to re-state prices
     default: return ["confirm", "dismiss"]; // informational: acknowledge, or dismiss (TRD §12.3)
   }
 }
@@ -97,6 +98,7 @@ export async function listReview(rfxId: string, f: { vendor?: string; type?: str
       const t = (termsQ.data ?? []).find((x) => x.response_id === r.response_id);
       const text = r.type === "fx_assumption" ? r.detail
         : r.type === "freight_treatment" ? t?.freight_terms_raw
+        : r.type === "tax_basis" ? t?.tax_terms_raw
         : r.type === "validity_short" ? (t?.validity_days ? `Validity: ${t.validity_days} days` : t?.validity_until)
         : r.type === "discount_treatment" ? [t?.total_discount_pct && `${t.total_discount_pct}%`, t?.total_discount_condition].filter(Boolean).join(" ")
         : r.type === "missing_line" ? t?.other_notes : r.detail;

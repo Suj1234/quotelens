@@ -7,12 +7,13 @@ import type { Settings } from "@/lib/settings-schema";
 import { dateTime, longDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { send } from "./api";
+import { CategoryTemplateCard } from "./category-template-card";
 
 type Change = { id: string; created_at: string; actor_name: string; text: string };
 const NEXT_RUN = "Applies from the next stage run; cells already written keep their state and chain.";
 
 /** DESIGN §3.10 settings cards; TRD §17.13 (each save → PUT /api/settings → audit event settings.changed). */
-export function SettingsCards({ settings, jevKey, changes }: { settings: Settings; jevKey: boolean; changes: Change[] }) {
+export function SettingsCards({ settings, jevKey, changes, category, vendors }: { settings: Settings; jevKey: boolean; changes: Change[]; category: string; vendors: { id: string; name: string; city: string | null }[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   async function save(key: keyof Settings, value: unknown, done: string) {
@@ -40,6 +41,8 @@ export function SettingsCards({ settings, jevKey, changes }: { settings: Setting
         <FxCard rates={settings.fx_rates} busy={busy === "fx_rates"} save={save} />
         <LandedCard settings={settings} busy={busy} save={save} />
       </div>
+
+      <CategoryTemplateCard category={category} templates={settings.category_templates} vendors={vendors} busy={busy === "category_templates"} save={save} />
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="hd"><b>Recent changes</b><span className="hint">settings apply to every RFx, so their changes are listed here</span></div>

@@ -11,6 +11,7 @@ const DEFAULTS: Settings = {
   email_mode: "mock", decision_provider: "auto", thresholds: { act: 0.85, review: 0.6 },
   fx_rates: {}, landed_cost: { include_tax: false, cost_of_money_annual_pct: 0 }, discount_default: "gross", vendor_addresses: {},
   freight_default_inr_per_1000: 180, // TRD §11.7 example; editable per vendor (rfx_vendors.freight_assumption_inr_per_1000)
+  category_templates: {}, // none until seeded (scripts/seed-template.ts) or set in Settings; the co-pilot then asks for everything
 };
 
 export async function getSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {

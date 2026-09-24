@@ -16,6 +16,7 @@ export interface Rfx {
   id: string; code: string; title: string; category: string; status: RfxStatus; version: number;
   frozen_at: string | null; buyer_id: string | null; currency: string; quote_unit: string; incoterm: string;
   freight_included_requested: boolean; payment_terms_days: number; validity_days_requested: number;
+  tax_basis: "excl_gst" | "incl_gst"; // migration 0013
   contract_months: number; response_deadline: string | null; delivery_locations: string[];
   cover_note: string | null; copilot_transcript: unknown[]; created_at: string; updated_at: string | null;
   terms_set: boolean; // migration 0008

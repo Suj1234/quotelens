@@ -124,6 +124,9 @@ must(
   "settings",
 );
 
+// P9 category template (Settings → Category templates), insert-if-missing — built from the same dataset files.
+await import("./seed-template");
+
 // Dataset pack → bucket `seed` (TRD §5: seed/…)
 const MIME: Record<string, string> = {
   ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".txt": "text/plain",

@@ -5,12 +5,21 @@ import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { createVendor } from "@/lib/vendors";
 import { UNTITLED } from "@/lib/rfx-list";
+import { todayIST } from "@/lib/format";
 import type { Rfx, RfxLine, RfxQuestion } from "@/types/db";
 
 // New RFx (TRD §16 POST/GET/PATCH /api/rfx, §17.3; DESIGN §3.3). A draft is editable until it is issued (version 1).
 
+/** The one category this workspace sources (P9 B8/B12; the brief: "you'll pick the category"). */
+export const CATEGORY = "Corrugated packaging";
+/** The co-pilot's first message (shown on an empty conversation; given to the model as its own opening turn). */
+export const openingLine = (buyer: string) =>
+  `Hi ${buyer}. Let's set up a new RFx for ${CATEGORY.toLowerCase()}. What should we call it, and what is it for — roughly how many items, which plants, and how long a contract? If you have last year's line sheet, attach it and I'll take the line items from it.`;
+
 export type DraftVendor = { vendor_id: string; name: string; email: string; short_code: string; city: string | null };
-export type Turn = { role: "buyer" | "copilot"; text: string; questions?: string[]; patch?: string; attachments?: string[]; at: string };
+// `questions` only on transcripts from before P9; `patch` = "Label · detail" lines built from the actions that succeeded;
+// role "event" = the buyer changed the draft by hand (P9: the co-pilot must know, e.g. before re-importing a sheet).
+export type Turn = { role: "buyer" | "copilot" | "event"; text: string; questions?: string[]; patch?: string; attachments?: string[]; at: string };
 export type Draft = {
   rfx: Rfx & { terms_set: boolean };
   lines: RfxLine[]; questions: RfxQuestion[]; vendors: DraftVendor[];
@@ -46,7 +55,7 @@ export async function createDraft(o: { title?: string; category?: string }, user
   for (let attempt = 0; attempt < 2; attempt++) {
     const code = await nextCode();
     const { data, error } = await db().from("rfx").insert({
-      code, title: o.title?.trim() || UNTITLED, category: o.category?.trim() || "Uncategorised", buyer_id: user.id, status: "draft", version: 0,
+      code, title: o.title?.trim() || UNTITLED, category: o.category?.trim() || CATEGORY, buyer_id: user.id, status: "draft", version: 0,
     }).select("id").single();
     if (!error) {
       await audit({ rfx_id: data.id, actor: user.id, event: "rfx.created", entity_type: "rfx", entity_id: data.id, payload: { code } });
@@ -72,7 +81,7 @@ export const QuestionInput = z.object({
 export const HeaderInput = z.object({
   title: z.string().trim().min(1).max(200), category: z.string().trim().min(1).max(100), cover_note: z.string().max(4000).nullable(),
   currency: z.string().length(3), quote_unit: z.enum(["per_1000_pcs", "per_piece", "per_kg", "per_box"]), incoterm: z.enum(["delivered", "ex_works", "fob"]),
-  freight_included_requested: z.boolean(), payment_terms_days: z.number().int().min(0).max(365), validity_days_requested: z.number().int().min(1).max(365),
+  freight_included_requested: z.boolean(), tax_basis: z.enum(["excl_gst", "incl_gst"]), payment_terms_days: z.number().int().min(0).max(365), validity_days_requested: z.number().int().min(1).max(365),
   contract_months: z.number().int().min(1).max(60), response_deadline: z.iso.date().nullable(), delivery_locations: z.array(z.string().trim().min(1)).max(20),
 }).partial();
 export const PatchBody = z.object({
@@ -123,6 +132,9 @@ export async function patchDraft(id: string, body: PatchBody, user: { id: string
   // Only fields that actually change are written and audited ("Save draft" sends the whole header).
   const { data: cur } = await db().from("rfx").select("*").eq("id", id).single();
   const header = Object.fromEntries(Object.entries(asked).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify((cur as Record<string, unknown>)[k] ?? null)));
+  // A new deadline must be after today (India) — from the co-pilot or a hand edit alike.
+  if (typeof header.response_deadline === "string" && header.response_deadline <= todayIST())
+    throw new AppError("BAD_INPUT", `The response deadline must be after today (${todayIST()}); ${header.response_deadline} isn't.`, undefined, 400);
   if (Object.keys(header).length) {
     const { error } = await db().from("rfx").update({ ...header, updated_at: new Date().toISOString() }).eq("id", id);
     if (error) throw error;
@@ -169,4 +181,62 @@ export async function setVendors(rfxId: string, code: string, vendorIds: string[
   if ((vs ?? []).length !== unique.length) throw new AppError("BAD_INPUT", "One of those vendors doesn't exist.", undefined, 400);
   const up = await db().from("rfx_vendors").upsert((vs ?? []).map((v) => ({ rfx_id: rfxId, vendor_id: v.id, status: "invited", reply_tag: `rfx-${code.toLowerCase()}-${v.short_code}` })), { onConflict: "rfx_id,vendor_id", ignoreDuplicates: true });
   if (up.error) throw up.error;
+}
+
+const HEADER_LABEL: Record<string, string> = {
+  title: "title", cover_note: "scope", currency: "currency", quote_unit: "quote unit", incoterm: "delivery basis", freight_included_requested: "freight",
+  tax_basis: "GST basis", payment_terms_days: "payment days", validity_days_requested: "validity days", contract_months: "contract months",
+  response_deadline: "deadline", delivery_locations: "plants",
+};
+const LINE_LABEL: Record<string, string> = {
+  sku: "SKU", description: "description", ply: "ply", length_mm: "L", width_mm: "W", height_mm: "H", gsm_spec: "GSM", burst_factor: "BF",
+  item_type: "type", weight_per_piece_g: "weight", monthly_qty: "monthly qty", annual_qty: "annual qty", delivery_location: "deliver to",
+};
+const field = (o: object, k: string) => (o as unknown as Record<string, unknown>)[k];
+const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : Array.isArray(v) ? v.join(", ") : String(v));
+
+/** A hand edit in plain words ("Lines: removed line 14 (…); line 3 monthly qty 6000 → 5000"), or null when nothing changed. */
+export function describeEdit(before: Draft, after: Draft): string | null {
+  const parts: string[] = [];
+  if (!before.rfx.terms_set && after.rfx.terms_set) {
+    const r = after.rfx;
+    parts.push(`Terms confirmed: ${r.currency} · ${({ per_1000_pcs: "Per 1000 pcs", per_piece: "Per piece", per_kg: "Per kg", per_box: "Per box" } as Record<string, string>)[r.quote_unit] ?? r.quote_unit} · ${({ delivered: "Delivered to plant", ex_works: "Ex-works", fob: "FOB" } as Record<string, string>)[r.incoterm] ?? r.incoterm}${r.freight_included_requested ? ", freight included" : ", freight extra"} · ${r.tax_basis === "incl_gst" ? "Incl. GST" : "Excl. GST"} · ${r.payment_terms_days}-day payment · ${r.validity_days_requested}-day validity · ${r.contract_months} months`);
+  }
+  const hdr = Object.keys(HEADER_LABEL).filter((k) => JSON.stringify(field(before.rfx, k) ?? null) !== JSON.stringify(field(after.rfx, k) ?? null));
+  if (hdr.length) parts.push(`Terms: ${hdr.map((k) => k === "cover_note" ? "scope rewritten" : `${HEADER_LABEL[k]} ${show(field(before.rfx, k))} → ${show(field(after.rfx, k))}`).join("; ")}`);
+
+  const key = (l: RfxLine) => l.sku || l.description;
+  const was = new Map(before.lines.map((l) => [key(l), l])), now = new Map(after.lines.map((l) => [key(l), l]));
+  const removed = before.lines.filter((l) => !now.has(key(l))).map((l) => `removed line ${l.line_no} (${l.description})`);
+  const added = after.lines.filter((l) => !was.has(key(l))).map((l) => `added line ${l.line_no} (${l.description})`);
+  const changed = after.lines.flatMap((l) => {
+    const b = was.get(key(l));
+    if (!b) return [];
+    const f = Object.keys(LINE_LABEL).filter((k) => JSON.stringify(field(b, k) ?? null) !== JSON.stringify(field(l, k) ?? null));
+    return f.length ? [`line ${l.line_no} ${f.map((k) => `${LINE_LABEL[k]} ${show(field(b, k))} → ${show(field(l, k))}`).join(", ")}`] : [];
+  });
+  const lineBits = [...removed, ...added, ...changed];
+  if (lineBits.length) parts.push(`Lines: ${lineBits.slice(0, 8).join("; ")}${lineBits.length > 8 ? `; and ${lineBits.length - 8} more` : ""} (now ${after.lines.length})`);
+
+  const qText = (q: RfxQuestion) => `${q.text}|${q.answer_type}|${q.mandatory}|${q.disqualify_if ?? ""}`;
+  const qb = new Set(before.questions.map(qText)), qa = new Set(after.questions.map(qText));
+  const qRemoved = before.questions.filter((q) => !qa.has(qText(q))).length, qAdded = after.questions.filter((q) => !qb.has(qText(q))).length;
+  if (qRemoved || qAdded) parts.push(`Questionnaire: ${[qRemoved && `${qRemoved} removed or changed`, qAdded && `${qAdded} added or changed`].filter(Boolean).join(", ")} (now ${after.questions.length})`);
+
+  const vb = before.vendors.map((v) => v.name), va = after.vendors.map((v) => v.name);
+  const vBits = [...vb.filter((n) => !va.includes(n)).map((n) => `removed ${n}`), ...va.filter((n) => !vb.includes(n)).map((n) => `added ${n}`)];
+  if (vBits.length) parts.push(`Vendors: ${vBits.join("; ")}`);
+  return parts.length ? parts.join("\n") : null;
+}
+
+/** PATCH from the New RFx screen: apply, then record the hand edit in the co-pilot transcript so the agent knows about it. */
+export async function patchDraftByHand(id: string, body: PatchBody, user: { id: string; name: string }) {
+  const before = await getDraft(id);
+  const after = await patchDraft(id, body, user);
+  const text = describeEdit(before, after);
+  if (!text) return after;
+  const turn: Turn = { role: "event", text: `${user.name.split(" ")[0]} edited the draft by hand — ${text}`, at: new Date().toISOString() };
+  const { error } = await db().from("rfx").update({ copilot_transcript: [...((after.rfx.copilot_transcript ?? []) as Turn[]), turn] }).eq("id", id);
+  if (error) throw error;
+  return getDraft(id);
 }

@@ -16,7 +16,7 @@ export type OverviewVendor = {
   needs: number; responseId: string | null; status: string;
 };
 
-const ACK: Record<string, string> = { freight_treatment: "freight", fx_assumption: "FX", discount_treatment: "discount" }; // DESIGN §3.6: Acknowledge
+const ACK: Record<string, string> = { freight_treatment: "freight", fx_assumption: "FX", discount_treatment: "discount", tax_basis: "GST basis" }; // DESIGN §3.6: Acknowledge
 
 /** "Item 5: price per bundle, bundle size not stated" ×4 → "4 × price per bundle, bundle size not stated (items 5, 9, 15, 19)". */
 export function groupNeeds(all: { vendor: string; type: string; title: string; line_no: number | null }[]): NeedsRow[] {

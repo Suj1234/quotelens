@@ -35,3 +35,8 @@ export function inrShort(v: number): string {
   if (Math.abs(v) >= 1e5) return `₹${(v / 1e5).toFixed(1)} L`;
   return money(Math.round(v));
 }
+
+/** Today as YYYY-MM-DD in India (the buyer's calendar), for "the deadline must be after today". */
+export const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+/** YYYY-MM-DD plus n days. */
+export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);

@@ -13,9 +13,12 @@
     "pipeline:seed": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/run-seed-pipeline.ts",
     "eval": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/run-eval.ts --rfx MER-0419",
     "db:check": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/db-check.ts",
-    "check:models": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/check-models.ts"
+    "check:models": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/check-models.ts",
+    "test:conversations": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/test-conversations.ts",
+    "seed:template": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed-template.ts"
   },
   "dependencies": {
+    "@google/adk": "^2.1.0",
     "@google/genai": "^2.24.0",
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.117.1",
