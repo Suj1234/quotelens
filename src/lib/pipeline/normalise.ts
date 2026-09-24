@@ -101,7 +101,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     const packs = winners.flatMap((m) => {
       const it = items.get(m.item_id), l = lineById.get(m.line_id);
       if (!it || !l || l.id === line.id || parseUnit(it.price_unit_raw).unit !== unit) return [];
-      const pack = it.pack_size ?? parseUnit(it.price_unit_raw).pack;
+      const pack = statedPack(it);
       return pack ? [{ pack, same: l.ply === line.ply && l.item_type === line.item_type, type: l.item_type === line.item_type }] : [];
     });
     return mode(packs.filter((p) => p.same).map((p) => p.pack)) ?? mode(packs.filter((p) => p.type).map((p) => p.pack));
@@ -162,7 +162,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     const { unit, pack: packInUnit } = parseUnit(it.price_unit_raw);
     let factor: number | null = null;
     if (unit === "per_box" || unit === "per_bundle") {
-      const stated = it.pack_size ?? packInUnit;
+      const stated = clar ? it.pack_size ?? packInUnit : statedPack(it); // a clarification's pack is the vendor's answer to our question (P6)
       const spec = Number(line.spec_attributes?.pack_size) || null;
       if (stated) {
         factor = 1000 / stated;
@@ -339,6 +339,20 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
     cells: cells.length, states, assumptions: assumptions.length, reviews: nReviews, terms: td, freight_included: freightIncluded, kept_buyer_cells: buyerOwned.size,
     ...(clar ? { clarification: { lines: clarOut.lines, unanswered: clarOut.unanswered, out_of_scope: clarOut.out_of_scope, resolved_cards: resolved } } : {}),
   };
+}
+
+/**
+ * A pack size counts as stated only when its number appears in what the vendor wrote (price unit, the quoted text, the item).
+ * The extractor sometimes fills pack_size from the vendor's other items ("inferred from 5-ply cartons group") — that is a
+ * best guess (cell ambiguous), not a vendor statement (P7: Westline items 5/9/15/19 came out confirmed on one reload).
+ */
+export function statedPack(it: Pick<ExtractedItem, "pack_size" | "price_unit_raw" | "vendor_description" | "location">): number | null {
+  const inUnit = parseUnit(it.price_unit_raw).pack;
+  if (inUnit) return inUnit;
+  const n = it.pack_size;
+  if (!n) return null;
+  const wrote = (t: string | null | undefined) => !!t && new RegExp(`(^|\\D)${n}(\\D|$)`).test(t.replace(/,/g, ""));
+  return [it.price_unit_raw, (it.location as { snippet?: string } | null)?.snippet, it.vendor_description].some(wrote) ? n : null;
 }
 
 /** A clarification answer on top of the item first read: the reply's fields win where it gives them (a pack size, a new price). */
