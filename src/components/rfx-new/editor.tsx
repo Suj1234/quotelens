@@ -106,7 +106,6 @@ export function Editor({ edit, set, draft, sourceFile, onAttach }: {
         <div className="bd">
           <dl className="kv" style={{ gridTemplateColumns: "170px 1fr", alignItems: "center" }}>
             <dt>Title</dt><dd><Txt v={h.title} on={(title) => setH({ title })} /></dd>
-            <dt>Category</dt><dd><Txt v={h.category} on={(category) => setH({ category })} /></dd>
             <dt>Currency</dt><dd><Txt v={h.currency} on={(currency) => setH({ currency: currency.toUpperCase().slice(0, 3) })} w={70} mono /></dd>
             <dt>Quote unit</dt><dd><select className="sel" value={h.quote_unit} onChange={(e) => setH({ quote_unit: e.target.value, terms_set: true })}>{[["per_1000_pcs", "per 1000 pieces"], ["per_piece", "per piece"], ["per_kg", "per kg"], ["per_box", "per box"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></dd>
             <dt>Incoterm</dt><dd><select className="sel" value={h.incoterm} onChange={(e) => setH({ incoterm: e.target.value, terms_set: true })}>{[["delivered", "Delivered to plant"], ["ex_works", "Ex-works"], ["fob", "FOB"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></dd>

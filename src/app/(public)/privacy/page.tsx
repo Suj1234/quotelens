@@ -138,6 +138,7 @@ const SECTIONS: Section[] = [
         <tbody>
           <tr><td className="mono">ql_session</td><td>Cookie, strictly necessary</td><td>Keeps you signed in; encrypted and HTTP-only</td><td>7 days</td></tr>
           <tr><td className="mono">ql-theme</td><td>Browser local storage</td><td>Remembers light or dark theme</td><td>Until you clear it</td></tr>
+          <tr><td className="mono">ql-sidebar</td><td>Cookie, preference</td><td>Remembers whether the sidebar is collapsed</td><td>1 year</td></tr>
         </tbody>
       </table>
       <p>QuoteLens uses no analytics, advertising or third-party tracking cookies.</p>

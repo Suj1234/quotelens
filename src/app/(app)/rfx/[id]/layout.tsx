@@ -34,7 +34,7 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
       <div className="rfxhead">
         <div className="top">
           <div>
-            <div className="code"><Link href="/rfx">{rfx.code} ▾</Link><span>{rfx.category}</span></div>
+            <nav className="code" aria-label="Breadcrumb"><Link href="/rfx">Sourcing events</Link><span>/</span><span className="cur">{rfx.code}</span></nav>
             <h1>{rfx.title}</h1>
             <div className="meta">
               <span className={`status ${rfx.status}`}>{statusText}</span>

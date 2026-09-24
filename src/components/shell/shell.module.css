@@ -1,26 +1,59 @@
-/* design/prototype.html frame: .topbar, .rail (DESIGN.md §2.1–2.2) */
-.app { display: flex; flex-direction: column; height: 100%; }
-.topbar { height: 48px; display: flex; align-items: center; gap: 16px; padding: 0 16px 0 14px; border-bottom: 1px solid var(--hair); background: var(--surface); flex: none; }
+/* App frame: top bar + labelled sidebar (DECISIONS 2026-09-25: replaces the DESIGN §2.1–2.2 56px rail) */
+.app { display: flex; flex-direction: column; height: 100%; --side: 200px; }
+.app.collapsed { --side: 56px; }
+.topbar { height: 48px; display: flex; align-items: center; gap: 16px; padding: 0 16px 0 18px; border-bottom: 1px solid var(--hair); background: var(--surface); flex: none; }
 .org { font-size: 12px; color: var(--muted); }
-.spacer { flex: 1; }
 .iconbtn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 5px; color: var(--muted); }
 .iconbtn:hover { background: var(--tint); color: var(--ink); }
 .iconbtn svg { width: 16px; height: 16px; }
-.user { display: flex; align-items: center; gap: 8px; }
-.body { display: flex; flex: 1; min-height: 0; }
-.rail { width: var(--rail); flex: none; border-right: 1px solid var(--hair); background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 4px; }
-.rail a { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); text-decoration: none; position: relative; }
-.rail a:hover { background: var(--tint); color: var(--ink); }
-.rail a.active { background: var(--accent-tint); color: var(--accent-ink); }
-.rail a svg { width: 18px; height: 18px; }
-.tip { position: absolute; left: 48px; top: 50%; transform: translateY(-50%); background: var(--ink); color: var(--paper); font-size: 11px; padding: 3px 7px; border-radius: 4px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; }
-.rail a:hover .tip { opacity: 1; }
-.grow { flex: 1; }
+.menubtn { display: none; margin-left: -6px; }
+.body { display: flex; flex: 1; min-height: 0; position: relative; }
 .main { flex: 1; min-width: 0; overflow: auto; display: flex; flex-direction: column; }
-@media (max-width: 900px) { .rail { display: none; } .org, .kbdhint { display: none; } }
-/* DESIGN §6: the page never scrolls sideways — on phones the "Name · Role" label ellipsises instead (P8). */
-@media (max-width: 600px) { .user { min-width: 0; } .user button { flex-shrink: 1; min-width: 0; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; display: block; } }
-/* Theme icon: sun in dark mode, moon in light */
+
+.side { width: var(--side); flex: none; border-right: 1px solid var(--hair); background: var(--surface); display: flex; flex-direction: column; padding: 12px 8px 8px; gap: 14px; overflow-y: auto; overflow-x: hidden; transition: width .15s ease; }
+.group { display: flex; flex-direction: column; gap: 2px; }
+.gh { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); font-weight: 500; padding: 0 10px 4px; white-space: nowrap; }
+.side a { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 6px; color: var(--ink2); text-decoration: none; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.side a:hover, .me:hover { background: var(--tint); color: var(--ink); }
+.side a.active { background: var(--accent-tint); color: var(--accent-ink); }
+.side svg { width: 17px; height: 17px; flex: none; }
+.label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.cnt { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.side a.active .cnt { color: var(--accent-ink); }
+.grow { flex: 1; }
+.me { display: flex; align-items: center; gap: 10px; padding: 6px 7px; border-radius: 6px; width: 100%; text-align: left; }
+.me .label { display: flex; flex-direction: column; line-height: 1.25; }
+.me .label b { font-size: 12.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.me .label span { font-size: 11.5px; color: var(--muted); }
+/* Floating collapse toggle: a small round button straddling the sidebar's right edge */
+.edge { position: absolute; top: 18px; left: calc(var(--side) - 11px); z-index: 20; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--hair); background: var(--surface); color: var(--muted); box-shadow: 0 1px 3px rgba(20, 22, 26, .08); transition: left .15s ease; }
+.edge:hover { color: var(--ink); border-color: var(--faint); }
+.edge svg { width: 13px; height: 13px; }
+
+/* Collapsed: icons only, labels and group titles hidden */
+.collapsed .side .label, .collapsed .side .cnt { display: none; }
+.collapsed .gh { height: 1px; padding: 0; margin: 0 8px 4px; background: var(--hair2); font-size: 0; }
+.collapsed .side a { justify-content: center; padding: 0; }
+.collapsed .me { justify-content: center; padding: 6px 0; }
+
+.scrim { display: none; }
+
+/* DESIGN §6: ≤ 900px the sidebar becomes a drawer behind a menu button (it was simply hidden before, leaving no navigation) */
+@media (max-width: 900px) {
+  .menubtn { display: grid; }
+  .edge { display: none; }
+  .org { display: none; }
+  .side { position: absolute; inset: 0 auto 0 0; z-index: 40; width: 260px; transform: translateX(-100%); transition: transform .18s ease; box-shadow: var(--shadow); }
+  .open .side { transform: none; }
+  .open .scrim { display: block; position: absolute; inset: 0; z-index: 39; background: rgba(20, 22, 26, .22); }
+  .collapsed .side .label, .collapsed .side .cnt { display: initial; }
+  .collapsed .side .me .label { display: flex; }
+  .collapsed .gh { height: auto; padding: 0 10px 4px; margin: 0; background: none; font-size: 10.5px; }
+  .collapsed .side a { justify-content: flex-start; padding: 0 10px; }
+  .collapsed .me { justify-content: flex-start; padding: 6px 7px; }
+}
+
+/* Theme icon: sun in dark mode (switch to light), moon in light */
 .sun { display: none; }
 :global(:root[data-theme="dark"]) .sun { display: block; }
 :global(:root[data-theme="dark"]) .moon { display: none; }

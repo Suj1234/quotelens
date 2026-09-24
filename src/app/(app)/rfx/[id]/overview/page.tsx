@@ -27,7 +27,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
 
   if (r.status === "draft") {
     return (
-      <div className="page">
+      <div className="page read">
         <div className="empty"><b>This RFx is still a draft.</b><div style={{ margin: "6px 0 12px", fontSize: 12.5 }}>Finish the lines, terms, questionnaire and vendors, then issue it.</div><Button asChild variant="default" size="sm"><Link href={`/rfx/new?id=${id}`}>Open in New RFx</Link></Button></div>
       </div>
     );
@@ -36,7 +36,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
   const days = o.lastReply && r.frozen_at ? Math.max(1, Math.ceil((new Date(o.lastReply).getTime() - new Date(r.frozen_at).getTime()) / 86_400_000)) : null;
   const { data: allVendors } = o.strays.length ? await db().from("vendors").select("id, name").order("name") : { data: [] };
   return (
-    <div className="page">
+    <div className="page read">
       {o.mode === "mock" && !locked && <SyncPoller rfxId={id} />}
       <div className="grid2" style={{ gridTemplateColumns: "1.25fr 1fr", alignItems: "start" }}>
         <div>

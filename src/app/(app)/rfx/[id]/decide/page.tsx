@@ -39,7 +39,7 @@ export default async function DecidePage({ params }: PageProps<"/rfx/[id]/decide
     ["Vendors", [...(perKgName && maxPly ? [`Why is the ${maxPly}-ply from ${perKgName} so cheap?`] : []), "Who didn't quote line 22?", "Export the first answer as Excel"]],
   ];
   return (
-    <div className="page">
+    <div className="page read">
       <div className="brief">
         <div>
           <p className="lead">

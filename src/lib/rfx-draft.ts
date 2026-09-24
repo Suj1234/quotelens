@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { createVendor } from "@/lib/vendors";
+import { UNTITLED } from "@/lib/rfx-list";
 import type { Rfx, RfxLine, RfxQuestion } from "@/types/db";
 
 // New RFx (TRD §16 POST/GET/PATCH /api/rfx, §17.3; DESIGN §3.3). A draft is editable until it is issued (version 1).
@@ -45,7 +46,7 @@ export async function createDraft(o: { title?: string; category?: string }, user
   for (let attempt = 0; attempt < 2; attempt++) {
     const code = await nextCode();
     const { data, error } = await db().from("rfx").insert({
-      code, title: o.title?.trim() || "Untitled RFx", category: o.category?.trim() || "Uncategorised", buyer_id: user.id, status: "draft", version: 0,
+      code, title: o.title?.trim() || UNTITLED, category: o.category?.trim() || "Uncategorised", buyer_id: user.id, status: "draft", version: 0,
     }).select("id").single();
     if (!error) {
       await audit({ rfx_id: data.id, actor: user.id, event: "rfx.created", entity_type: "rfx", entity_id: data.id, payload: { code } });

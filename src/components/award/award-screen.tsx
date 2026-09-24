@@ -70,7 +70,7 @@ export function AwardScreen(p: Props) {
   const pdf = award && <Button asChild><a href={award.pdf_url} target="_blank" rel="noreferrer">Download PDF</a></Button>;
 
   return (
-    <div className="page">
+    <div className="page read">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <p className="lead">{lead}</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
