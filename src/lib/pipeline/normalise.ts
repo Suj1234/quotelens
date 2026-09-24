@@ -342,7 +342,7 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
 }
 
 /** A clarification answer on top of the item first read: the reply's fields win where it gives them (a pack size, a new price). */
-function mergeClarified(orig: ExtractedItem, reply: ExtractedItem): ExtractedItem {
+export function mergeClarified(orig: ExtractedItem, reply: ExtractedItem): ExtractedItem {
   const pack = reply.pack_size ?? parseUnit(reply.price_unit_raw).pack;
   const newPrice = reply.unit_price !== null;
   return {
