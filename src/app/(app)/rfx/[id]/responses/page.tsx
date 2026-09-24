@@ -16,11 +16,13 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
   const user = await requireUser();
   const buyer = user.role !== "approver";
   const { id } = await params;
-  const [rows, strays, { data: allVendors }, { data: status }, clars] = await Promise.all([
+  const [rows, strays, { data: allVendors }, { data: status }, clars, { data: clarReplies }] = await Promise.all([
     listVendorResponses(id), getUnmatchedResponses(id), db().from("vendors").select("id, name").order("name"),
     db().from("v_vendor_status").select("vendor_id, lines_priced, lines_total, cleared_questionnaire").eq("rfx_id", id),
     outstandingClarifications(id),
+    db().from("responses").select("id, vendor_id, received_at").eq("rfx_id", id).eq("is_clarification", true).order("received_at"),
   ]);
+  const clarOf = (vid: string) => (clarReplies ?? []).filter((c) => c.vendor_id === vid);
   const st = (vid: string) => status?.find((x) => x.vendor_id === vid);
   const replied = rows.filter((r) => r.response).length;
   const running = rows.filter((r) => r.response && STAGES.some((s) => r.response!.pipeline_status[s] === "running")).length;
@@ -56,7 +58,8 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               <div className="sub">
                 {r.response
                   ? STAGES.some((s) => r.response!.pipeline_status[s] === "running") ? <span className="chip teal">processing…</span>
-                    : <>received {shortDate(r.response.received_at)} · <span className="mono">{st(r.vendor_id)?.lines_priced ?? 0}/{st(r.vendor_id)?.lines_total ?? 0}</span> priced{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}</>
+                    : <>received {shortDate(r.response.received_at)} · <span className="mono">{st(r.vendor_id)?.lines_priced ?? 0}/{st(r.vendor_id)?.lines_total ?? 0}</span> priced{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}
+                      {clarOf(r.vendor_id).map((c) => <span key={c.id}> · <Link href={`/rfx/${id}/responses/${c.id}`}>clarification reply {shortDate(c.received_at)}</Link></span>)}</>
                   : "no reply yet"}
               </div>
               <div className="sub">

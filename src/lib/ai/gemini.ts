@@ -9,13 +9,14 @@ export type Tier = "fast" | "strong";
 type Ctx = { purpose: string; rfx_id?: string | null; response_id?: string | null };
 
 let client: GoogleGenAI | undefined;
-const ai = () => (client ??= new GoogleGenAI({ apiKey: requireEnv("GEMINI_API_KEY") }));
+// A request that hangs (dropped connection) fails after 120 s instead of holding the stage forever.
+const ai = () => (client ??= new GoogleGenAI({ apiKey: requireEnv("GEMINI_API_KEY"), httpOptions: { timeout: 120_000 } }));
 export const modelId = (tier: Tier) => requireEnv(tier === "fast" ? "GEMINI_MODEL_FAST" : "GEMINI_MODEL_STRONG");
 
 const preview = (contents: Content[]) =>
   contents.flatMap((c) => c.parts ?? []).map((p) => p.text ?? (p.inlineData ? `[${p.inlineData.mimeType}]` : "")).join(" ");
 
-/** One API call with logging; retries once on 429/5xx after 2 s (TRD §19). */
+/** One API call with logging; retries once on 429/5xx or a network failure/timeout after 2 s (TRD §19). */
 async function call(tier: Tier, contents: Content[], config: Record<string, unknown>, { purpose, rfx_id, response_id }: Ctx) {
   const model = modelId(tier);
   const ctx = { purpose, rfx_id, response_id };
@@ -33,7 +34,8 @@ async function call(tier: Tier, contents: Content[], config: Record<string, unkn
     } catch (e) {
       const status = e instanceof ApiError ? e.status : undefined;
       await logModelCall({ ...ctx, provider: "gemini", model, latency_ms: Date.now() - t0, ok: false, error: (e as Error).message, input_preview: preview(contents) });
-      if (attempt === 0 && status && (status === 429 || status >= 500)) { await new Promise((r) => setTimeout(r, 2000)); continue; }
+      const network = !status && /fetch failed|timed? ?out|abort|ECONNRESET|socket/i.test(`${(e as Error).message} ${(e as Error).name}`);
+      if (attempt === 0 && (network || (status && (status === 429 || status >= 500)))) { await new Promise((r) => setTimeout(r, 2000)); continue; }
       throw new AppError("MODEL_ERROR", `Gemini call failed (${ctx.purpose}): ${(e as Error).message}`, { status }, 502);
     }
   }

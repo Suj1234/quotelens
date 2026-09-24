@@ -116,12 +116,13 @@ export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string 
 export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
   const [eQ, rQ, iQ, uQ] = await Promise.all([
     db().from("audit_events").select("event, actor, entity_id, payload, created_at").eq("rfx_id", rfxId).order("created_at", { ascending: false }).limit(400),
-    db().from("responses").select("id, vendors(name)").eq("rfx_id", rfxId),
+    db().from("responses").select("id, is_clarification, summary, vendors(name)").eq("rfx_id", rfxId),
     db().from("review_items").select("id, title").eq("rfx_id", rfxId),
     db().from("users").select("id, name"),
   ]);
   if (eQ.error) throw eQ.error;
   const vendorOf = (id: string | null) => ((rQ.data ?? []).find((r) => r.id === id)?.vendors as unknown as { name: string } | null)?.name ?? "a vendor";
+  const clar = (id: string | null) => (rQ.data ?? []).find((r) => r.id === id);
   const who = (id: string) => (id === "system" ? "QuoteLens" : (uQ.data ?? []).find((u) => u.id === id)?.name ?? "Someone");
   const title = (id: string | null) => (iQ.data ?? []).find((i) => i.id === id)?.title ?? "an item";
   const VERB: Record<string, string> = { confirm: "confirmed", override: "overrode", exclude: "excluded", map: "mapped", ignore: "ignored", "ask-vendor": "asked the vendor about", "mark-not-quoted": "treated as not quoted", dismiss: "dismissed", "accept-yes": "accepted as Yes", "treat-no": "treated as No" };
@@ -130,10 +131,16 @@ export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
     const p = e.payload as Record<string, unknown>;
     if (e.event === "pipeline.stage") {
       if (!p.ok) rows.push({ at: e.created_at, dir: "·", text: `Stage ${p.stage} failed for ${vendorOf(e.entity_id)}: ${String(p.error ?? "").slice(0, 120)}` });
-      else if (p.stage === "flags") rows.push({ at: e.created_at, dir: "·", text: `Processed ${vendorOf(e.entity_id)}'s reply — all six stages done` });
+      else if (p.stage === "flags") {
+        const r = clar(e.entity_id);
+        const n = ((r?.summary as { normalise?: { clarification?: { lines: number[] } } } | undefined)?.normalise?.clarification?.lines ?? []).length;
+        rows.push({ at: e.created_at, dir: "·", text: r?.is_clarification ? `Processed ${vendorOf(e.entity_id)}'s clarification reply — ${n} ${n === 1 ? "cell" : "cells"} resolved` : `Processed ${vendorOf(e.entity_id)}'s reply — all six stages done` });
+      }
       continue;
     }
-    if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `Reply received from ${vendorOf(e.entity_id)} (${String(p.source ?? "").replaceAll("_", " ")})` });
+    if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `${p.clarification ? "Clarification reply" : "Reply"} received from ${vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})` });
+    else if (e.event === "clarification.sent") rows.push({ at: e.created_at, dir: "→", text: `${who(e.actor)} sent ${p.vendor} a clarification (${p.items} ${p.items === 1 ? "point" : "points"}: ${((p.titles as string[] | undefined) ?? []).map((t) => t.split(":")[0]).join(", ")})` });
+    else if (e.event === "email.synced") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} synced the inbox — ${p.new} new${p.skipped ? `, ${p.skipped} already received` : ""}${p.ignored ? `, ${p.ignored} ignored` : ""}` });
     else if (e.event === "seed.responses_loaded") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} loaded the ${p.set} seeded responses (${p.responses})` });
     else if (e.event.startsWith("review.")) {
       const a = e.event.slice(7);

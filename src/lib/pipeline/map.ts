@@ -66,12 +66,18 @@ export async function map(resp: ResponseRow): Promise<MapSummary> {
     };
   });
 
+  // A clarification reply answers the items we asked about, often by item number alone: the request is context (TRD §8.7).
+  const reqId = (resp.summary.clarification as { request_id?: string | null } | undefined)?.request_id;
+  const asked = resp.is_clarification && reqId ? (await db().from("communications").select("body_text").eq("id", reqId).maybeSingle()).data?.body_text : null;
+  const context = asked ? [`This is the supplier's reply to our clarification request, which asked:\n${asked.slice(0, 1500)}\n`] : [];
+
   // Batches of 10 in parallel; the state lists the batch plus one neighbour on each side for context (TRD §8.3).
   const batches: Job[][] = [];
   for (let i = 0; i < jobs.length; i += BATCH) batches.push(jobs.slice(i, i + BATCH));
   const results = await Promise.all(batches.map((b, bi) => {
     const before = jobs[bi * BATCH - 1], after = jobs[bi * BATCH + b.length];
     const state = [
+      ...context,
       "Supplier quotation items (as written by the supplier):",
       ...(before ? [`(previous item) ${describe(before.it)}`] : []),
       ...b.map((j) => `ITEM ${j.key}: ${describe(j.it)}`),

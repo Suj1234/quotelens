@@ -45,6 +45,7 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const questions = qs as RfxQuestion[];
   // A clarification reply may answer questions that were unclear, missing or asked about (latest answer wins); it never touches the rest.
   const scope = resp.is_clarification ? (await clarificationScope(resp)).questionIds : null;
+  if (scope && !scope.size) return { answered: 0, ambiguous: 0, missing: 0, failing: [], provider: null, sources: [] }; // nothing it may answer: no model calls
   await clearStageReviews(resp.id, "questionnaire");
 
   // Questionnaire files first so the cap never cuts them.

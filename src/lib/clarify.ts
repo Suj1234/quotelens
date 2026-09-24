@@ -91,7 +91,7 @@ async function bullets(rfxId: string, vendorId: string, items: Item[]) {
       case "ambiguous_unit":
         return { id: i.id, ref: s?.no ?? null, text: pack ? `${s?.label}: priced per ${pack} but the ${pack} size is not stated — please state the number of pieces per ${pack}.` : `${s?.label}: ${i.detail ?? "the unit is unclear"} — please state the price in INR per 1000 pieces.` };
       case "low_confidence_read":
-        return { id: i.id, ref: s?.no ?? null, text: `${s?.label}: we could not read the price clearly — please confirm the price in INR per 1000 pieces.` };
+        return { id: i.id, ref: s?.no ?? null, text: `${s?.label}: we could not read the price clearly — please confirm the price, in the currency and unit of your quotation.` };
       case "prior_pricing": {
         const nos = ((i.evidence.lines as number[] | undefined) ?? []);
         const phrase = i.title.match(/“([^”]+)”/)?.[1] ?? "same as last year";
@@ -198,7 +198,8 @@ export async function resolveByReply(resp: ResponseRow, o: { lineIds: string[]; 
   const at = new Date().toISOString();
   for (const i of hit) {
     const { error } = await db().from("review_items").update({ status: "resolved_by_reply", updated_at: at,
-      resolution: { ...(i.resolution as object ?? {}), at, note: "Answered by the vendor's clarification reply", response_id: resp.id, communication_id: resp.communication_id } }).eq("id", i.id);
+      // communication_id stays the request the card was asked in (the scope of a later reply reads it); the answer is reply_*.
+      resolution: { ...(i.resolution as object ?? {}), at, note: "Answered by the vendor's clarification reply", reply_response_id: resp.id, reply_communication_id: resp.communication_id } }).eq("id", i.id);
     if (error) throw error;
   }
   return hit.length;
