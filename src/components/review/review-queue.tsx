@@ -57,9 +57,9 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
       const r = await fetch(`/api/review/${it.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!r.ok) { toast.error(`${j.error ?? "That didn't work."} (${j.code ?? r.status})`); return null; }
-      if (action !== "ask-vendor") { toast.success(DONE[action]); router.refresh(); }
+      if (action !== "ask-vendor") { toast.success(action === "confirm" && INFO.includes(it.type) ? "Acknowledged — noted in the ledger" : DONE[action]); router.refresh(); }
       return j as { status: string; draft?: Draft };
-    } catch { toast.error("Couldn't reach the server — check the connection and try again."); return null; }
+    } catch { toast.error("Couldn't reach the server — check the connection and try again (NETWORK)"); return null; }
     finally { setBusy(null); }
   }, [router]);
 
@@ -69,7 +69,7 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
     const r = await fetch("/api/review/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids, action }) }).catch(() => null);
     setBusy(null);
     const j = await r?.json().catch(() => null) as { results?: { error?: string }[] } | null;
-    if (!r?.ok || !j?.results) return toast.error("Couldn't apply that — try again.");
+    if (!r?.ok || !j?.results) return toast.error(r ? `Couldn't apply that — try again (${r.status})` : "Couldn't reach the server — check the connection and try again (NETWORK)");
     const failed = j.results.filter((x) => x.error).length;
     if (failed) toast.error(`${ids.length - failed} done, ${failed} skipped (that action doesn't apply to them)`); else toast.success(`${done} ${ids.length}`);
     setPicked(new Set());

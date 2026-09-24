@@ -54,10 +54,10 @@ export function AwardScreen(p: Props) {
 
   const lead = st === "approved" || locked ? <><b>Approved.</b> The grid is locked and the memo is on file.</>
     : st === "draft" ? <>Memo drafted from <b>{memoFrom}</b>. {buyer ? "Waiting for Priya's approval." : "Read it and approve, or send it back."}</>
-    : st === "sent_back" ? (buyer ? <>Priya sent the memo back. Read her note, adjust the scenario and <b>generate it again</b>.</> : <>You sent the memo back to Sujit. It returns here when he generates it again.</>)
+    : st === "sent_back" ? (buyer ? <>Priya sent the memo back. Read the note, adjust the scenario and <b>generate it again</b>.</> : <>You sent the memo back to Sujit. It returns here when Sujit generates it again.</>)
     : !scenarios.length ? (buyer ? <>No scenario saved yet. Save one from an Ask answer, or build one below with <b>New scenario</b>.</> : <>No scenario saved yet. Ask a question on Decide that allocates lines to vendors, then save it as a scenario.</>)
     : buyer ? <>Pick a scenario and generate the memo. Every number in it comes from the grid and the ledger.</>
-    : <>Sujit hasn&apos;t drafted the memo yet. Compare the scenarios below; the memo appears here when he generates it.</>;
+    : <>Sujit hasn&apos;t drafted the memo yet. Compare the scenarios below; the memo appears here when Sujit generates it.</>;
 
   const genControls = buyer && !locked && scenarios.length > 0 && (
     <>
