@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, CircleCheck, FlaskConical, List, LogOut, Menu, Moon, Plus, ScrollText, Settings, Sun } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleCheck, List, LogOut, Menu, Moon, Plus, ScrollText, Settings, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import s from "./shell.module.css";
 
@@ -54,14 +54,12 @@ export function ShellFrame({ buyer, user, counts, initialCollapsed, children }: 
             {buyer && item("/rfx/new", "New RFx", <Plus strokeWidth={1.8} />, path === "/rfx/new")}
             {item("/rfx?status=reviewing", "Needs review", <CircleCheck strokeWidth={1.8} />, onList && status === "reviewing", counts.reviewing)}
           </div>
-          {buyer && (
-            <div className={s.group}>
-              <div className={s.gh}>Admin</div>
-              {item("/settings", "Settings", <Settings strokeWidth={1.8} />, path === "/settings")}
-              {item("/settings#eval", "Evaluation", <FlaskConical strokeWidth={1.8} />, false)}
-              {item("/settings#model-calls", "Model calls", <ScrollText strokeWidth={1.8} />, false)}
-            </div>
-          )}
+          {/* One entry: General · Masters · Evaluation · Activity are tabs inside Settings (DECISIONS 2026-09-25). The approver gets the audit log only. */}
+          <div className={s.group}>
+            <div className={s.gh}>Admin</div>
+            {buyer ? item("/settings", "Settings", <Settings strokeWidth={1.8} />, path.startsWith("/settings"))
+              : item("/settings/activity?tab=audit", "Audit log", <ScrollText strokeWidth={1.8} />, path.startsWith("/settings"))}
+          </div>
           <span className={s.grow} />
           <UserMenu user={user} />
         </nav>

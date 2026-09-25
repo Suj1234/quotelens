@@ -43,3 +43,11 @@ export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00
 
 /** "clarification_sent" → "Clarification sent" — for status and kind values shown as labels. */
 export const cap = (s: string) => s.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+
+// "gap_pct" is a percentage; "annual_value_deprec_3pct" is rupees under a 3 % scenario (the digit names the scenario).
+export const isPctColumn = (c: string) => /pct|percent/i.test(c) && !/\d_?pct/i.test(c);
+const COUNT_WORDS = new Set(["lines", "count", "qty", "quantity", "items", "vendors", "days", "n", "num"]);
+/** A column of rupees, judged by its name (Ask answers: table, narrator, export). A count is never money even when its name
+ *  says "priced" or "total" (priced_lines, total_lines); original_* is in the vendor's own currency. */
+export const isMoneyColumn = (c: string) => /_inr$|price|value|total|spend|saving|impact|cost|amount/i.test(c) && !isPctColumn(c)
+  && !/^original_|rank|probability/i.test(c) && !c.toLowerCase().split("_").some((w) => COUNT_WORDS.has(w));

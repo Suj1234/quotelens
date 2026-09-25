@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import s from "@/app/signin.module.css";
@@ -18,6 +19,7 @@ export function SignInForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
   const pw = useRef<HTMLInputElement>(null);
 
   async function submit(e: React.FormEvent) {
@@ -44,7 +46,13 @@ export function SignInForm() {
       </div>
       <div style={{ marginTop: 12 }}>
         <label htmlFor="pw">Password</label>
-        <Input id="pw" ref={pw} type="password" placeholder="••••••••" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <div style={{ position: "relative" }}>
+          <Input id="pw" ref={pw} type={show ? "text" : "password"} placeholder="••••••••" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ paddingRight: 40 }} />
+          <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} title={show ? "Hide password" : "Show password"}
+            style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, display: "grid", placeItems: "center", border: 0, background: "transparent", color: "var(--muted)", cursor: "pointer", borderRadius: 4 }}>
+            {show ? <EyeOff size={16} strokeWidth={1.8} aria-hidden /> : <Eye size={16} strokeWidth={1.8} aria-hidden />}
+          </button>
+        </div>
       </div>
       <Button type="submit" variant="default" size="lg" className="w-full" style={{ marginTop: 18, height: 40 }} disabled={busy}>Continue</Button>
       {error && <p className={s.error} role="alert">{error}</p>}

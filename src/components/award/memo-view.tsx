@@ -15,7 +15,7 @@ export function MemoView({ m }: { m: MemoData }) {
     <div className="memo">
       <div className="eyebrow">Meridian Foods Pvt Ltd · Procurement</div>
       <h1>Award recommendation — RFx {m.rfx.code}</h1>
-      <div className="text-muted-foreground">{m.rfx.title} · prepared by {m.prepared.name} on {longDate(m.prepared.at)} · {m.approved ? `approved by ${m.approved.name} on ${longDate(m.approved.at)}` : "awaiting approval"}</div>
+      <div className="text-muted-foreground">{m.rfx.title} · {m.version ? `version ${m.version} · ` : ""}prepared by {m.prepared.name} on {longDate(m.prepared.at)} · {m.approved ? `approved by ${m.approved.name} on ${longDate(m.approved.at)}` : "awaiting approval"}</div>
 
       <h2>Recommendation</h2>
       <Paras text={m.narrative.recommendation} />
@@ -73,9 +73,6 @@ export function MemoView({ m }: { m: MemoData }) {
       <h2>Next steps</h2>
       <Paras text={m.narrative.next_steps} />
 
-      <h2>How the allocation was made</h2>
-      <p>{m.scenario.rule_text}.{m.scenario.question ? " Saved from an Ask answer; the query below chose the winners, and every price, runner-up and total was recomputed from the comparison." : " A fixed rule over the comparison grid."}</p>
-      {m.scenario.sql && <pre>{m.scenario.sql}</pre>}
       {m.narrative_unverified.length > 0 && <p style={{ color: "var(--amber)" }}>Numbers in the narrative not found in the data: {m.narrative_unverified.join(", ")}.</p>}
       <div className="sig">
         <div>Prepared — {m.prepared.name}, {m.prepared.title}</div>

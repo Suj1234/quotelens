@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AskCard } from "./ask-card";
 
 // DESIGN §3.7: the buyer opens Ask from the RFx header, the approver from the Comparison toolbar — the same 400px sheet.
-const AskCtx = createContext<{ open: () => void; locked: boolean } | null>(null);
+const AskCtx = createContext<{ open: () => void; locked: boolean; userId: string } | null>(null);
 export const useAsk = () => useContext(AskCtx);
 
 const SUGGESTIONS = [
@@ -19,11 +19,11 @@ const SUGGESTIONS = [
   "Which cells are you not sure about, and how much money rides on them?",
 ];
 
-export function AskProvider({ rfxId, locked = false, children }: { rfxId: string; locked?: boolean; children: React.ReactNode }) {
+export function AskProvider({ rfxId, userId, locked = false, children }: { rfxId: string; userId: string; locked?: boolean; children: React.ReactNode }) {
   const [isOpen, setOpen] = useState(false);
   const open = useCallback(() => setOpen(true), []);
   return (
-    <AskCtx.Provider value={{ open, locked }}>
+    <AskCtx.Provider value={{ open, locked, userId }}>
       {children}
       {isOpen && <AskSheet rfxId={rfxId} onClose={() => setOpen(false)} />}
     </AskCtx.Provider>
@@ -41,26 +41,31 @@ type Action = { tool: string; text: string; data?: unknown };
 export type Exchange = { key: string; q: string; reply?: string; actions?: Action[]; context?: string; error?: string; earlier?: AskAnswer };
 
 /** One Ask session with the analyst agent (P9 C13): this session's exchanges, the RFx's earlier answers, the message in flight. */
-export function useAskRunner(rfxId: string) {
-  // The conversation survives a reload and opens in the full-page Ask (new tab): kept in this browser, per RFx.
-  // ponytail: per browser, not per user; move to a table if two people share one browser.
-  const key = `ql-ask-${rfxId}`;
+/** fresh: start empty and keep nothing in the browser (Decide) — past answers are only under "Earlier questions". */
+export function useAskRunner(rfxId: string, { fresh = false }: { fresh?: boolean } = {}) {
+  // The conversation survives a reload and opens in the full-page Ask (new tab): kept per user and RFx, so two people on
+  // one browser never see each other's chat. Across browsers the user's own answers come back under "Earlier questions".
+  const userId = useAsk()?.userId ?? "anon";
+  const key = `ql-ask-${userId}-${rfxId}`;
   const [turns, setTurns] = useState<Exchange[]>([]);
   const loaded = useRef(false); // read after mount (server render has no storage); never save before it's read
   useEffect(() => {
+    if (fresh) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage exists only after mount; reading it in render would mismatch the server HTML
     try { setTurns((JSON.parse(localStorage.getItem(key) ?? "[]") as Exchange[]).filter((t) => !t.earlier)); } catch { /* blocked: start empty */ }
-  }, [key]);
+  }, [key, fresh]);
   useEffect(() => {
+    if (fresh) return;
     if (!loaded.current) { loaded.current = true; return; } // first run is the empty initial state, before the stored chat arrives
     try { localStorage.setItem(key, JSON.stringify(turns.slice(-20))); } catch { /* storage full or blocked: the chat still works */ }
-  }, [key, turns]);
+  }, [key, turns, fresh]);
   // Another tab (sheet ↔ full page) added a turn: show it here too.
   useEffect(() => {
+    if (fresh) return;
     const on = (e: StorageEvent) => { if (e.key === key && e.newValue) try { setTurns(JSON.parse(e.newValue)); } catch { /* ignore */ } };
     window.addEventListener("storage", on);
     return () => window.removeEventListener("storage", on);
-  }, [key]);
+  }, [key, fresh]);
   const [history, setHistory] = useState<AskAnswer[] | null>(null);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<{ q: string; steps: string[] } | null>(null);
@@ -208,7 +213,7 @@ export function PendingView({ p, elapsed }: { p: { q: string; steps: string[] };
   );
 }
 
-/** "Earlier questions · n": the RFx's last 20 answers (either user). Clicking a question opens its stored card right under it
+/** "Earlier questions · n": your last 20 answers on this RFx (per user, from the server). Clicking a question opens its stored card right under it
  * (not re-run, not added to the chat); clicking it again closes it. */
 export function EarlierQuestions({ earlier, rfxId }: { earlier: AskAnswer[]; rfxId: string }) {
   const [show, setShow] = useState(false);
@@ -223,7 +228,7 @@ export function EarlierQuestions({ earlier, rfxId }: { earlier: AskAnswer[]; rfx
             <div key={h.query_id} style={{ borderBottom: "1px solid var(--hair2)" }}>
               <button onClick={() => setOpen(open === h.query_id ? null : h.query_id)} aria-expanded={open === h.query_id} style={{ textAlign: "left", padding: "6px 0", fontSize: 12.5, width: "100%" }}>
                 {open === h.query_id ? "▾ " : "▸ "}{h.question}
-                <div className="hint">{h.asked_by ?? ""} · {shortDate(h.created_at)}{h.ok ? "" : " · no answer"}</div>
+                <div className="hint">{shortDate(h.created_at)}{h.ok ? "" : " · no answer"}</div>
               </button>
               {open === h.query_id && <div style={{ margin: "4px 0 10px" }}><AskCard a={h} rfxId={rfxId} /></div>}
             </div>

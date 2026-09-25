@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, Search } from "lucide-react";
 import { dateTime, inrShort, longDate } from "@/lib/format";
-import { DEFAULTS, STATUS_TABS, UNTITLED, applyFilters, deadlineText, inTab, nextStep, type Filters, type ListRow } from "@/lib/rfx-list";
+import { APPROVAL_TAB, DEFAULTS, STATUS_TABS, UNTITLED, applyFilters, deadlineText, inTab, nextStep, type Filters, type ListRow } from "@/lib/rfx-list";
 import { RowLink } from "./row-link";
 import { DateRange } from "./date-range";
 
@@ -31,7 +31,8 @@ export function RfxList({ rows, buyer }: { rows: ListRow[]; buyer: boolean }) {
 
   const shown = applyFilters(rows, f);
   const filtered = f.q || f.cfrom || f.cto || f.ufrom || f.uto || f.status !== "all";
-  const tabs = STATUS_TABS.filter((t) => t.key !== "closed" || rows.some((r) => r.status === "closed"));
+  const statusTabs = STATUS_TABS.filter((t) => t.key !== "closed" || rows.some((r) => r.status === "closed"));
+  const tabs = buyer ? statusTabs : [statusTabs[0], APPROVAL_TAB, ...statusTabs.slice(1)]; // the approver's work first, after All
 
   const th = (key: string, label: string, num = false) => (
     <th className={num ? "ra" : undefined} aria-sort={f.sort === key ? (f.dir === "asc" ? "ascending" : "descending") : undefined}>
@@ -79,8 +80,10 @@ export function RfxList({ rows, buyer }: { rows: ListRow[]; buyer: boolean }) {
             </thead>
             <tbody>
               {shown.map((r) => {
-                const href = r.status === "draft" && buyer ? `/rfx/new?id=${r.id}` : `/rfx/${r.id}`;
-                const step = nextStep(r);
+                // A memo to approve (approver) or redraft (buyer) opens on the Award tab.
+                const memoTurn = r.status !== "awarded" && (buyer ? r.memo === "sent_back" : r.memo === "draft");
+                const href = r.status === "draft" && buyer ? `/rfx/new?id=${r.id}` : memoTurn ? `/rfx/${r.id}/award` : `/rfx/${r.id}`;
+                const step = nextStep(r, buyer);
                 const due = deadlineText(r);
                 const untitled = r.status === "draft" && r.title === UNTITLED;
                 return (

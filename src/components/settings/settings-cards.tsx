@@ -4,16 +4,15 @@ import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Settings } from "@/lib/settings-schema";
-import { dateTime, longDate } from "@/lib/format";
+import { longDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { send } from "./api";
-import { CategoryTemplateCard } from "./category-template-card";
 
-type Change = { id: string; created_at: string; actor_name: string; text: string };
 const NEXT_RUN = "Applies from the next stage run; cells already written keep their state and chain.";
+export type GeneralTabKey = "communication" | "decision" | "currency";
 
-/** DESIGN §3.10 settings cards; TRD §17.13 (each save → PUT /api/settings → audit event settings.changed). */
-export function SettingsCards({ settings, jevKey, changes, category, vendors }: { settings: Settings; jevKey: boolean; changes: Change[]; category: string; vendors: { id: string; name: string; city: string | null }[] }) {
+/** Settings → General: one sub-tab's cards. DESIGN §3.10 cards; TRD §17.13 (each save → PUT /api/settings → audit event settings.changed). */
+export function GeneralCards({ tab, settings, jevKey }: { tab: GeneralTabKey; settings: Settings; jevKey: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   async function save(key: keyof Settings, value: unknown, done: string) {
@@ -24,38 +23,26 @@ export function SettingsCards({ settings, jevKey, changes, category, vendors }: 
     return !!r;
   }
 
-  return (
-    <>
-      <div className="grid2" style={{ marginTop: 18 }}>
-        <div className="card">
-          <div className="hd"><b>Email transport</b></div>
-          <div className="bd radios">
-            <label><input type="radio" name="em" checked readOnly /> <b>Mock</b> — outbox page, add-response sheet, vendor portal</label>
-            <label className="off"><input type="radio" name="em" disabled /> <b>Gmail</b> — SMTP with App Password; IMAP sync <span className="chip grey">Not in this build</span></label>
-            <label className="off"><input type="radio" name="em" disabled /> <b>Resend</b> — needs a verified domain <span className="chip grey">Not configured</span></label>
-            <div className="hint">All three raise the same “response received” event.</div>
-          </div>
+  if (tab === "communication") return (
+    <div className="grid2">
+      <div className="card">
+        <div className="hd"><b>Email transport</b></div>
+        <div className="bd radios">
+          <label><input type="radio" name="em" checked readOnly /> <b>Mock</b> — outbox page, add-response sheet, vendor portal</label>
+          <label className="off"><input type="radio" name="em" disabled /> <b>Gmail</b> — SMTP with App Password; IMAP sync <span className="chip grey">Not in this build</span></label>
+          <label className="off"><input type="radio" name="em" disabled /> <b>Resend</b> — needs a verified domain <span className="chip grey">Not configured</span></label>
+          <div className="hint">All three raise the same “response received” event. RFx emails go to each vendor&apos;s address in Masters → Vendors.</div>
         </div>
-
-        <DecisionCard settings={settings} jevKey={jevKey} busy={busy} save={save} />
-        <FxCard rates={settings.fx_rates} busy={busy === "fx_rates"} save={save} />
-        <PriceCheckCard p={settings.price_check} busy={busy === "price_check"} save={save} />
       </div>
-
-      <CategoryTemplateCard category={category} templates={settings.category_templates} vendors={vendors} busy={busy === "category_templates"} save={save} />
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="hd"><b>Recent changes</b><span className="hint">settings apply to every RFx, so their changes are listed here</span></div>
-        {changes.length ? (
-          <div className="tl" style={{ padding: "4px 14px" }}>
-            {changes.map((c) => (
-              <div className="ev" key={c.id}><span className="ts mono">{dateTime(c.created_at)}</span><span className="dir" /><span>{c.text} <span className="hint">· {c.actor_name}</span></span></div>
-            ))}
-          </div>
-        ) : <div className="bd hint">No changes yet — every value above is the seeded default.</div>}
-      </div>
-    </>
+    </div>
   );
+  if (tab === "decision") return (
+    <div className="grid2">
+      <DecisionCard settings={settings} jevKey={jevKey} busy={busy} save={save} />
+      <PriceCheckCard p={settings.price_check} busy={busy === "price_check"} save={save} />
+    </div>
+  );
+  return <div className="grid2"><FxCard rates={settings.fx_rates} busy={busy === "fx_rates"} save={save} /></div>;
 }
 
 type Save = (key: keyof Settings, value: unknown, done: string) => Promise<boolean>;
@@ -95,7 +82,7 @@ function PriceCheckCard({ p, busy, save }: { p: Settings["price_check"]; busy: b
     <div className="card">
       <div className="hd"><b>Price check</b></div>
       <div className="bd radios">
-        <div className="small">A price far from the other vendors&apos; prices for the same line, or one that works out to an unusual rupees-per-kg, is usually a unit slip. It gets a &ldquo;Check unit&rdquo; card; the cell keeps its state until you decide. The median needs at least 2 other vendors on the line. The usual ₹ per kg depends on the category, so it is set in the category template below.</div>
+        <div className="small">A price far from the other vendors&apos; prices for the same line, or one that works out to an unusual rupees-per-kg, is usually a unit slip. It gets a &ldquo;Check unit&rdquo; card; the cell keeps its state until you decide. The median needs at least 2 other vendors on the line. The usual ₹ per kg depends on the category, so it is set in Masters → Naming &amp; terms.</div>
         <dl className="kv" style={{ marginTop: 6, alignItems: "center" }}>
           <dt>Median ratio</dt><dd className="unit"><input className="ta mono num-in" type="number" step="0.1" min="1.2" max="10" value={ratio} onChange={(e) => setRatio(e.target.value)} aria-label="Median ratio" /> × the others&apos; median, up or down</dd>
         </dl>

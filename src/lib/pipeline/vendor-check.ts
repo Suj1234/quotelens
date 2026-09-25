@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { get } from "@/lib/storage";
 import type { ResponseRow } from "@/types/db";
 import type { ExtractSummary, Issuer } from "./extract";
+import { insertReviews } from "./reviews";
 
 // 0016 "Is this reply really from this vendor?" (DECISIONS 2026-09-25 "Vendor check"). The extractor only reads who the
 // document says it is from / to; this decides, over our own vendor list, whether that fits the vendor the reply came from.
@@ -100,4 +101,32 @@ export async function releaseCells(resp: { id: string; rfx_id: string; vendor_id
     if (e) throw e;
   }
   return (data ?? []).length;
+}
+
+/** Raise the "may not be from this vendor" card for a check that found a problem (never re-opens a decided one). Shared by flags and normalise. */
+export async function raiseVendorMismatch(resp: ResponseRow, vc: VendorCheck, stage: string) {
+  if (!vc.reasons.length) return;
+  const [{ count: priced }, { data: v }] = await Promise.all([
+    db().from("line_quotes").select("id", { count: "exact", head: true }).eq("response_id", resp.id).in("state", COUNTED).not("unit_price_inr_per_1000", "is", null),
+    db().from("vendors").select("name").eq("id", resp.vendor_id!).single(),
+  ]);
+  await insertReviews(resp, stage, [{ type: "vendor_mismatch", title: `This reply may not be from ${v?.name ?? "this vendor"}`,
+    detail: vc.reasons.join(" "), probability: vc.p_own, proposed_value: priced ?? 0, evidence: { lines: vc.lines, reasons: vc.reasons, provider: vc.provider } }]);
+}
+
+/** The reply's vendor-check card is open (waiting for the buyer) or the buyer excluded the reply. */
+export async function clarificationOnHold(responseId: string): Promise<boolean> {
+  const { data: card } = await db().from("review_items").select("status").eq("response_id", responseId).eq("type", "vendor_mismatch").maybeSingle();
+  return !!card && card.status !== "confirmed" && card.status !== "overridden";
+}
+
+/**
+ * A clarification reply replaces the vendor's prices and closes its cards, so it is checked before it may change anything
+ * (first replies are checked in flags and held after the fact). true = don't apply it: the card is open, or the reply was excluded.
+ */
+export async function clarificationHeld(resp: ResponseRow): Promise<boolean> {
+  await raiseVendorMismatch(resp, await vendorCheck(resp), "normalise");
+  if (!(await clarificationOnHold(resp.id))) return false;
+  await holdCells(resp.id); // prices this reply wrote before the check existed stay out of every total while the card is open
+  return true;
 }

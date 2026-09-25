@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { COUNTED, getComparison, type CellState, type GridCell } from "@/lib/comparison";
 import { getLedger } from "@/lib/rfx-tabs";
-import { longDate } from "@/lib/format";
+import { isMoneyColumn, longDate } from "@/lib/format";
 import type { Row } from "@/lib/query/result";
 
 // TRD §16 exports. Colours are DESIGN §1.1 light tokens (Excel has no dark mode).
@@ -125,7 +125,7 @@ export async function exportQuery(queryId: string, format: "xlsx" | "csv") {
   ws.addRow(cols).font = { bold: true, color: { argb: `FF${C.muted}` } };
   for (const r of rows) {
     const row = ws.addRow(cols.map((c) => r[c] ?? null));
-    cols.forEach((c, i) => { if (typeof r[c] === "number" && /_inr$|price|value|total|spend|saving|cost/i.test(c) && !/^original_|rank/i.test(c) && !(/pct/i.test(c) && !/\d_?pct/i.test(c))) row.getCell(i + 1).numFmt = MONEY; });
+    cols.forEach((c, i) => { if (typeof r[c] === "number" && isMoneyColumn(c)) row.getCell(i + 1).numFmt = MONEY; });
   }
   cols.forEach((c, i) => { ws.getColumn(i + 1).width = Math.min(48, Math.max(10, c.length + 4)); });
   const about = wb.addWorksheet("Question");

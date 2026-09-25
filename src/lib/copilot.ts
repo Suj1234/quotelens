@@ -67,7 +67,7 @@ function problemSummary(ls: LineIn[], rules: LineRules) {
   ];
 }
 
-/** The company template for this workspace's category (Settings → Category templates), or null. */
+/** The company template for this workspace's category (Settings → Masters), or null. */
 async function categoryTemplate(): Promise<CategoryTemplate | null> {
   return (await getSetting("category_templates"))[CATEGORY] ?? null;
 }
@@ -77,9 +77,9 @@ const termsText = (s: CategoryTemplate["standard_terms"]) =>
   `${s.currency} · ${UNIT[s.quote_unit] ?? s.quote_unit} · ${INCO[s.incoterm] ?? s.incoterm}${s.freight_included ? ", freight included" : ", freight extra"} · ${TAX[s.tax_basis]} · ${s.payment_terms_days}-day payment · ${s.validity_days}-day validity · ${s.contract_months}-month contract`;
 
 function templateBlock(t: CategoryTemplate | null, book: Draft["addressBook"]) {
-  if (!t) return `Company template for ${CATEGORY}: NONE in Settings. Ask the buyer for every commercial term and for the questionnaire; don't propose "standard" values. Tell them an admin can set a template in Settings.`;
+  if (!t) return `Company template for ${CATEGORY}: NONE in Settings → Masters. Ask the buyer for every commercial term and for the questionnaire; don't propose "standard" values. Tell them an admin can set the masters in Settings → Masters.`;
   const names = t.approved_vendor_ids.map((id) => book.find((b) => b.vendor_id === id)?.name).filter(Boolean);
-  return [`Company template for ${CATEGORY} (Settings → Category templates; source: ${t.source}):`,
+  return [`Company template for ${CATEGORY} (Settings → Masters; source: ${t.source}):`,
     `  Naming convention for RFx titles: ${t.title_pattern}`,
     `  Standard terms: ${termsText(t.standard_terms)}`,
     `  Every line must have: ${t.line_rules.required.map((f) => FIELD_LABEL[f]).join(", ")}. Recommended: ${t.line_rules.recommended.map((f) => FIELD_LABEL[f]).join(", ") || "none"}. Allowed ply: ${t.line_rules.allowed_ply.join(", ")}.`,
@@ -109,7 +109,7 @@ async function stateBlock(rfxId: string) {
     `Vendors on this RFx: ${d.vendors.map((v) => `${v.name}${t && !t.approved_vendor_ids.includes(v.vendor_id) ? " (not on the approved list)" : ""}`).join(", ") || "none"}`,
     `Address book: ${d.addressBook.map((v) => `${v.name} (${v.city ?? "—"}, ${v.email})`).join("; ") || "empty"}`,
     `Files the buyer has attached in this conversation: ${files.join(", ") || "none"}`,
-    `Currencies with an FX rate in Settings: INR${Object.keys(fx).map((c) => `, ${c}`).join("")}`,
+    `Currencies with an FX rate in Settings → General → Currency: INR${Object.keys(fx).map((c) => `, ${c}`).join("")}`,
     `Still missing before Issue: ${missingForIssue(d, t).join(", ") || "nothing — the RFx is complete"}`,
     "",
     templateBlock(t, d.addressBook),
@@ -292,7 +292,7 @@ function copilotTools(rfxId: string, user: { id: string }, confirmable: boolean)
         }
         if (a.currency !== undefined) {
           const c = a.currency.toUpperCase(), fx = await getSetting("fx_rates");
-          if (c !== "INR" && !fx[c]) throw new AppError("BAD_INPUT", `There's no ${c}→INR rate in Settings, so ${c} quotes couldn't be compared. Nothing changed — the buyer (or admin) adds the rate in Settings first. Available: INR, ${Object.keys(fx).join(", ") || "none"}.`);
+          if (c !== "INR" && !fx[c]) throw new AppError("BAD_INPUT", `There's no ${c}→INR rate in Settings, so ${c} quotes couldn't be compared. Nothing changed — the buyer (or admin) adds the rate in Settings → General → Currency first. Available: INR, ${Object.keys(fx).join(", ") || "none"}.`);
           a.currency = c;
         }
         const header = Object.fromEntries(Object.entries({
@@ -317,7 +317,7 @@ function copilotTools(rfxId: string, user: { id: string }, confirmable: boolean)
       parameters: z.object({}),
       run: async () => {
         const t = await template();
-        if (!t) throw new AppError("NO_TEMPLATE", `There is no template for ${CATEGORY} in Settings, so there are no standard terms. Ask the buyer for each term.`);
+        if (!t) throw new AppError("NO_TEMPLATE", `There are no masters for ${CATEGORY} in Settings → Masters, so there are no standard terms. Ask the buyer for each term.`);
         const s = t.standard_terms;
         await patchDraft(rfxId, { header: { currency: s.currency, quote_unit: s.quote_unit, incoterm: s.incoterm, freight_included_requested: s.freight_included, tax_basis: s.tax_basis, payment_terms_days: s.payment_terms_days, validity_days_requested: s.validity_days, contract_months: s.contract_months }, terms_set: true }, user);
         return { result: await after({ applied: termsText(s), source: t.source }), action: `Terms · your standard terms (${CATEGORY} template) · ${termsText(s)}` };
@@ -329,7 +329,7 @@ function copilotTools(rfxId: string, user: { id: string }, confirmable: boolean)
       step: () => "Adding questions from your library…",
       run: async ({ library_nos, all }) => {
         const t = await template();
-        if (!t?.question_library.length) throw new AppError("NO_TEMPLATE", `There is no question library for ${CATEGORY} in Settings. Draft questions with the buyer instead (add_questions).`);
+        if (!t?.question_library.length) throw new AppError("NO_TEMPLATE", `There is no question library for ${CATEGORY} in Settings → Masters. Draft questions with the buyer instead (add_questions).`);
         const nos = all ? t.question_library.map((_, i) => i + 1) : [...new Set(library_nos ?? [])];
         const bad = nos.filter((x) => !t.question_library[x - 1]);
         if (!nos.length || bad.length) throw new AppError("BAD_INPUT", bad.length ? `The library has no L${bad.join(", L")} (it has ${t.question_library.length}).` : "Say which library questions to add.");
@@ -402,7 +402,7 @@ function copilotTools(rfxId: string, user: { id: string }, confirmable: boolean)
         for (const v of new_vendors) {
           if (!/^\S+@\S+\.\S+$/.test(v.email)) throw new AppError("BAD_INPUT", `"${v.email}" isn't an email address. Nothing changed.`);
           const hit = d.addressBook.find((b) => low(b.email) === low(v.email));
-          const id = hit?.vendor_id ?? (await createVendor(v.name, v.email)).id;
+          const id = hit?.vendor_id ?? (await createVendor(v.name, v.email, user.id, {}, "copilot")).id;
           if (!ids.includes(id)) { ids.push(id); added.push(hit?.name ?? v.name); }
         }
         if (!added.length) throw new AppError("BAD_INPUT", notFound.length ? `Not in the address book: ${notFound.join(", ")}. Ask the buyer for the vendor's email to add them as new.` : "Those vendors are already on the RFx.");

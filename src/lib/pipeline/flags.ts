@@ -8,7 +8,7 @@ import { decideTerms, type TermsRow } from "./terms";
 import { COUNTED } from "@/lib/comparison";
 import { getSetting } from "@/lib/settings";
 import { outlierTitle, priceOutliers } from "@/lib/price-check";
-import { holdCells, releaseCells, vendorCheck } from "./vendor-check";
+import { holdCells, raiseVendorMismatch, releaseCells, vendorCheck } from "./vendor-check";
 
 export type Flag = "references_prior_pricing" | "freight_excluded" | "validity_short" | "currency_not_inr" | "total_discount_present" | "partial_quote" | "tax_basis_differs";
 export type FlagsSummary = { flags: Flag[]; lines_priced: number; lines_total: number; not_quoted: number; open_reviews: number; rfx_status: string; provider: string };
@@ -82,11 +82,7 @@ export async function flags(resp: ResponseRow): Promise<FlagsSummary> {
   // 0016 vendor check: is this reply really from this vendor? While its card is open, the reply's prices are held back;
   // a buyer's Keep / Exclude is never re-opened (insertReviews), and Exclude is re-applied after a re-run rebuilt the cells.
   const vc = await vendorCheck(resp);
-  if (vc.reasons.length) {
-    const { count: priced } = await db().from("line_quotes").select("id", { count: "exact", head: true }).eq("response_id", resp.id).in("state", COUNTED).not("unit_price_inr_per_1000", "is", null);
-    await insertReviews(resp, "flags", [{ type: "vendor_mismatch", title: `This reply may not be from ${(await db().from("vendors").select("name").eq("id", resp.vendor_id).single()).data?.name ?? "this vendor"}`,
-      detail: vc.reasons.join(" "), probability: vc.p_own, proposed_value: priced ?? 0, evidence: { lines: vc.lines, reasons: vc.reasons, provider: vc.provider } }]);
-  }
+  await raiseVendorMismatch(resp, vc, "flags");
   const { data: card } = await db().from("review_items").select("status, resolution").eq("response_id", resp.id).eq("type", "vendor_mismatch").maybeSingle();
   if (card?.status === "open") console.log(`[stage:flags] vendor check: ${await holdCells(resp.id)} price(s) held — ${vc.reasons.join(" ")}`);
   else if (!card) await releaseCells(resp, "confirmed"); // a re-run of flags alone that no longer finds a problem

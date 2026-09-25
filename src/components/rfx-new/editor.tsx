@@ -153,7 +153,7 @@ export function Editor({ edit, set, draft, sourceFile, onAttach, only }: {
             <dt>Response deadline</dt><dd><input type="date" className="inp mono" min={addDays(todayIST(), 1)} value={h.response_deadline ?? ""} onChange={(e) => setH({ response_deadline: e.target.value || null })} /></dd>
             <dt>Scope paragraph</dt><dd><textarea className="ta" style={{ minHeight: 90 }} value={h.cover_note ?? ""} onChange={(e) => setH({ cover_note: e.target.value || null })} /></dd>
           </dl>}
-          {!h.terms_set && <div className="fnote"><span>Not confirmed yet. These are your standard terms for this category (Settings → Category templates). Press Done to confirm them, or change any field first.</span></div>}
+          {!h.terms_set && <div className="fnote"><span>Not confirmed yet. These are your standard terms for this category (Settings → Masters). Press Done to confirm them, or change any field first.</span></div>}
         </div>
       )}
 

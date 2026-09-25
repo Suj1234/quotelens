@@ -171,7 +171,7 @@ const SECTIONS: Section[] = [
       <h3>A vendor quoted per kg and we buy per piece. What happens?</h3>
       <p>QuoteLens converts using the weight per piece on the RFx line. The conversion appears in the cell&rsquo;s source view and in the ledger. If there is no weight, the cell is marked amber for review.</p>
       <h3>A vendor quoted in USD.</h3>
-      <p>It is converted at the rate in <b>Settings → FX rates</b>. Changing a rate adds a new ledger entry; cells already converted keep their original chain.</p>
+      <p>It is converted at the rate in <b>Settings → General → Currency</b>. Changing a rate adds a new ledger entry; cells already converted keep their original chain.</p>
       <h3>Can I undo a review decision?</h3>
       <p>Yes, until the award is approved. Open the cell, then choose a different action from its review history. Both decisions stay in the audit trail.</p>
       <h3>A vendor sent two replies.</h3>

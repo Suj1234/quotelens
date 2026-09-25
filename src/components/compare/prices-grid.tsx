@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type { CellState, Grid, GridCell } from "@/lib/comparison";
 import { inrShort, money } from "@/lib/format";
-import { AskButton } from "@/components/ask/ask-sheet";
 import { DownloadButton } from "@/components/download-button";
 import { Conditions } from "./conditions";
 
@@ -43,7 +42,6 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
           <input type="checkbox" checked={inclDq} onChange={(e) => setInclDq(e.target.checked)} /> show disqualified vendors
         </label>
         <span style={{ flex: 1 }} />
-        {approver && <AskButton />}
         {/* DESIGN §2.8 Export (TRD: XLSX/CSV); the workbook uses the basis on screen */}
         <DownloadButton href={`/api/export/comparison?rfx=${rfxId}&format=xlsx&basis=${basis}`}>Export</DownloadButton>
         <DownloadButton href={`/api/export/comparison?rfx=${rfxId}&format=csv&basis=${basis}`} variant="ghost" size="sm">CSV</DownloadButton>
@@ -56,12 +54,18 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
               {vendors.map((v) => (
                 <th key={v.code}>
                   <div className="vh">
-                    <div className="nm">{v.name}<span className={`chip ${v.cleared === true ? "green" : v.cleared === false ? "red" : "amber"}`} title={v.cleared_note}>{v.cleared === true ? "✓" : v.cleared === false ? "✗" : "?"}</span></div>
-                    <div className="m">
-                      <span className="mono">{v.priced}/{grid.lines.length} priced</span>
-                    </div>
-                    <Conditions list={v.conditions} />
-                    <div className="tot">{inrShort(basis === "landed" ? v.total_landed : v.total_unit)} a year{view === "orig" ? " at unit price" : ""}</div>
+                    {v.held !== null ? <>
+                      {/* The vendor check holds this reply: nothing it says about the vendor counts yet, so show only that. */}
+                      <div className="nm">{v.name}<span className="chip red" title={v.held}>On hold</span></div>
+                      <div className="m" title={v.held}>May be another vendor&apos;s file. Out of every total until {approver ? "Sujit confirms" : "you confirm"} who sent it.</div>
+                    </> : <>
+                      <div className="nm">{v.name}<span className={`chip ${v.cleared === true ? "green" : v.cleared === false ? "red" : "amber"}`} title={v.cleared_note}>{v.cleared === true ? "✓" : v.cleared === false ? "✗" : "?"}</span></div>
+                      <div className="m">
+                        <span className="mono">{v.priced}/{grid.lines.length} priced</span>
+                      </div>
+                      <Conditions list={v.conditions} />
+                      <div className="tot">{inrShort(basis === "landed" ? v.total_landed : v.total_unit)} a year{view === "orig" ? " at unit price" : ""}</div>
+                    </>}
                   </div>
                 </th>
               ))}

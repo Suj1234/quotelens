@@ -44,15 +44,14 @@ export function EvalSection({ eligible, selected, last, vendors }: { eligible: E
   const vendorCodes = [...new Set((last?.per_cell ?? []).map((c) => c.vendor))];
 
   return (
-    <section id="eval">
-      <h2 style={{ marginTop: 28 }}>Eval — seed set</h2>
-      <p className="muted small" style={{ margin: "4px 0 12px" }}>The grid compared against a 150-cell answer key. Run before every demo.</p>
+    <section>
+      <p className="muted small" style={{ margin: "0 0 12px" }}>The grid compared against a 150-cell answer key. Run before every demo.</p>
       {!eligible.length ? (
         <div className="empty"><b>No RFx can be judged yet.</b> The answer key covers the seed replies — open an RFx and use Load seeded responses, then run its stages.</div>
       ) : (
         <>
           <div className="toolbar">
-            <select className="sel" value={selected?.id} aria-label="RFx to judge" onChange={(e) => router.push(`/settings?eval=${e.target.value}#eval`, { scroll: false })}>
+            <select className="sel" value={selected?.id} aria-label="RFx to judge" onChange={(e) => router.push(`/settings/eval?rfx=${e.target.value}`, { scroll: false })}>
               {eligible.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.set} set</option>)}
             </select>
             <Button variant="default" size="sm" disabled={running !== null} onClick={run}>{running !== null ? `Running… ${running}s` : "Run eval"}</Button>

@@ -187,6 +187,11 @@
   .seg { display: inline-flex; border: 1px solid var(--hair); border-radius: 5px; overflow: hidden; }
   .seg button { padding: 5px 11px; font-size: 12px; color: var(--muted); background: var(--surface); }
   .seg button.on { background: var(--ink); color: var(--paper); }
+  /* Settings sub-tabs: the .seg look, as links, under the .tabs row */
+  .subtabs { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--hair); border-radius: 5px; overflow: hidden; margin: 14px 0 16px; max-width: 100%; }
+  .subtabs a { padding: 5px 12px; font-size: 12.5px; color: var(--muted); background: var(--surface); text-decoration: none; border-right: 1px solid var(--hair2); }
+  .subtabs a:last-child { border-right: 0; }
+  .subtabs a.on { background: var(--ink); color: var(--paper); }
   .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); align-items: center; }
   .legend > span { display: inline-flex; align-items: center; gap: 5px; }
   .legend .sw, .legend .sw.cell { height: 12px; width: 12px; padding: 0; margin: 0; border: 1px solid var(--hair); border-radius: 2px; display: inline-block; flex: none; }
@@ -290,6 +295,7 @@
   .inp:focus, .sel:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .tl { display: flex; flex-direction: column; }
   .tl .ev { display: grid; grid-template-columns: 104px 16px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hair2); font-size: 12.5px; }
+  .tl.audit .ev { grid-template-columns: 104px 76px 1fr; }
   .tl .ev:last-child { border-bottom: 0; }
   .tl .ev .ts { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
   .tl .ev .dir { font-family: var(--font-mono); color: var(--faint); }
@@ -373,6 +379,12 @@
   .tpl section .eyebrow { margin-bottom: 8px; }
   .tpl-q { display: grid; grid-template-columns: 30px minmax(0, 1fr) 104px 104px 120px auto; gap: 8px; align-items: center; }
   .tpl-vendors { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12.5px; }
+  /* Masters → Vendor directory add / edit form */
+  .vd-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding: 4px 0; }
+  .vd-f { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); }
+  .vd-f .inp { width: 190px; max-width: 100%; }
+  .vd-notes { flex: 1 1 320px; } .vd-notes textarea { width: 100%; height: auto; padding: 5px 8px; }
+  .vd-actions { flex-basis: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   .tpl-vendors label { display: inline-flex; gap: 6px; align-items: center; }
   /* P9: section sheets on New RFx (view + edit) */
   .ssheet > .hd { align-items: flex-start; }

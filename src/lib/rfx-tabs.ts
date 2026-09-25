@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { signedUrl } from "@/lib/storage";
 import { stepText, type Step } from "@/lib/comparison";
 import { money } from "@/lib/format";
+import { describeChange, templateChanges, type Settings, type TemplatePart } from "@/lib/settings-schema";
 
 // TRD §17.9 / DESIGN §3.7 — Questionnaire, Documents, Ledger, Timeline tabs of the Comparison screen.
 
@@ -151,52 +152,102 @@ export function spans(ns: number[]): string {
 
 const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_basis", "validity_short", "missing_line"];
 
-export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string };
+export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string; rfx_id?: string | null; actor?: string; area?: SettingsArea };
+/** Which Settings sub-tab a workspace change belongs to, so each sub-tab lists its own history. */
+export type SettingsArea = "communication" | "decision" | "currency" | TemplatePart | "vendors";
+const KEY_AREA: Record<string, SettingsArea> = { email_mode: "communication", vendor_addresses: "communication", decision_provider: "decision", thresholds: "decision", price_check: "decision", fx_rates: "currency" };
+type AuditEvent = { event: string; actor: string; entity_id: string | null; payload: unknown; created_at: string; rfx_id: string | null };
 
 /** Audit events in words, oldest first (latest 150). Pipeline runs fold into one row per response (plus any failed stage). */
 export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
-  const [eQ, rQ, iQ, uQ] = await Promise.all([
-    db().from("audit_events").select("event, actor, entity_id, payload, created_at").eq("rfx_id", rfxId).order("created_at", { ascending: false }).limit(400),
-    db().from("responses").select("id, is_clarification, summary, vendors(name)").eq("rfx_id", rfxId),
-    db().from("review_items").select("id, title").eq("rfx_id", rfxId),
-    db().from("users").select("id, name"),
-  ]);
+  const eQ = await db().from("audit_events").select("event, actor, entity_id, payload, created_at, rfx_id").eq("rfx_id", rfxId).order("created_at", { ascending: false }).limit(400);
   if (eQ.error) throw eQ.error;
+  return (await eventRows(eQ.data ?? [], rfxId)).slice(0, 150).reverse(); // the latest 150, shown oldest first like the prototype
+}
+
+export type AuditFilter = { rfx?: string | null; who?: string | null };
+/** Settings → Activity → Audit log: every event, newest first (latest 500). rfx "workspace" = settings, masters, vendors; who "people" / "system" / a user id. */
+export async function getAuditLog(f: AuditFilter = {}): Promise<TimelineRow[]> {
+  let q = db().from("audit_events").select("event, actor, entity_id, payload, created_at, rfx_id").order("created_at", { ascending: false }).limit(500);
+  if (f.rfx === "workspace") q = q.is("rfx_id", null); else if (f.rfx) q = q.eq("rfx_id", f.rfx);
+  if (f.who === "people") q = q.neq("actor", "system"); else if (f.who) q = q.eq("actor", f.who);
+  const { data, error } = await q;
+  if (error) throw error;
+  return eventRows(data ?? [], f.rfx && f.rfx !== "workspace" ? f.rfx : null);
+}
+
+const lowerFirst = (t: string) => t[0].toLowerCase() + t.slice(1);
+const VFIELD: Record<string, string> = { name: "name", email: "email", contact_name: "contact", city: "city", state: "state", country: "country", default_currency: "currency", notes: "notes" };
+
+/** Events (newest first) → rows in words, newest first. rfxId scopes the lookups when the events are one RFx's. */
+async function eventRows(events: AuditEvent[], rfxId: string | null): Promise<TimelineRow[]> {
+  const resp = db().from("responses").select("id, is_clarification, summary, vendors(name)"), items = db().from("review_items").select("id, title");
+  const [rQ, iQ, uQ, vQ] = await Promise.all([
+    rfxId ? resp.eq("rfx_id", rfxId) : resp,
+    rfxId ? items.eq("rfx_id", rfxId) : items,
+    db().from("users").select("id, name"),
+    events.some((e) => e.event === "settings.changed") ? db().from("vendors").select("id, name") : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
   const vendorOf = (id: string | null) => ((rQ.data ?? []).find((r) => r.id === id)?.vendors as unknown as { name: string } | null)?.name ?? "a vendor";
   const clar = (id: string | null) => (rQ.data ?? []).find((r) => r.id === id);
   const who = (id: string) => (id === "system" ? "QuoteLens" : (uQ.data ?? []).find((u) => u.id === id)?.name ?? "Someone");
   const title = (id: string | null) => (iQ.data ?? []).find((i) => i.id === id)?.title ?? "an item";
+  const vendorName = (id: string) => (vQ.data ?? []).find((v) => v.id === id)?.name ?? "a removed vendor";
   const VERB: Record<string, string> = { confirm: "confirmed", override: "overrode", exclude: "excluded", map: "mapped", ignore: "ignored", "ask-vendor": "asked the vendor about", "mark-not-quoted": "treated as not quoted", dismiss: "dismissed", "accept-yes": "accepted as Yes", "treat-no": "treated as No", "enter-prices": "entered prices for", "set-freight": "changed the freight on" };
   const rows: TimelineRow[] = [];
-  for (const e of eQ.data ?? []) {
+  for (const e of events) {
     const p = e.payload as Record<string, unknown>;
+    const push = (dir: TimelineRow["dir"], text: string, area?: SettingsArea) => rows.push({ at: e.created_at, dir, text, rfx_id: e.rfx_id, actor: e.actor, area });
     if (e.event === "pipeline.stage") {
-      if (!p.ok) rows.push({ at: e.created_at, dir: "·", text: `Stage ${p.stage} failed for ${vendorOf(e.entity_id)}: ${String(p.error ?? "").slice(0, 120)}` });
+      if (!p.ok) push("·", `Stage ${p.stage} failed for ${vendorOf(e.entity_id)}: ${String(p.error ?? "").slice(0, 120)}`);
       else if (p.stage === "flags") {
         const r = clar(e.entity_id);
         const n = ((r?.summary as { normalise?: { clarification?: { lines: number[] } } } | undefined)?.normalise?.clarification?.lines ?? []).length;
-        rows.push({ at: e.created_at, dir: "·", text: r?.is_clarification ? `Processed ${vendorOf(e.entity_id)}'s clarification reply — ${n} ${n === 1 ? "cell" : "cells"} resolved` : `Processed ${vendorOf(e.entity_id)}'s reply — all six stages done` });
+        push("·", r?.is_clarification ? `Processed ${vendorOf(e.entity_id)}'s clarification reply — ${n} ${n === 1 ? "cell" : "cells"} resolved` : `Processed ${vendorOf(e.entity_id)}'s reply — all six stages done`);
       }
       continue;
     }
-    if (e.event === "response.received") rows.push({ at: e.created_at, dir: "←", text: `${p.clarification ? "Clarification reply" : "Reply"} received from ${(p.vendor as string | undefined) ?? vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})` });
-    else if (e.event === "clarification.sent") rows.push({ at: e.created_at, dir: "→", text: `${who(e.actor)} sent ${p.vendor} a clarification (${p.items} ${p.items === 1 ? "point" : "points"}: ${((p.titles as string[] | undefined) ?? []).map((t) => t.split(":")[0]).join(", ")})` });
-    else if (e.event === "email.synced") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} synced the inbox — ${p.new} new${p.skipped ? `, ${p.skipped} already received` : ""}${p.ignored ? `, ${p.ignored} ignored` : ""}` });
+    if (e.event === "response.received") push("←", `${p.clarification ? "Clarification reply" : "Reply"} received from ${(p.vendor as string | undefined) ?? vendorOf(e.entity_id)} (${p.source === "portal" && p.message_id ? "mailbox" : String(p.source ?? "").replaceAll("_", " ")})`);
+    else if (e.event === "clarification.sent") push("→", `${who(e.actor)} sent ${p.vendor} a clarification (${p.items} ${p.items === 1 ? "point" : "points"}: ${((p.titles as string[] | undefined) ?? []).map((t) => t.split(":")[0]).join(", ")})`);
+    else if (e.event === "email.synced") push("←", `${who(e.actor)} synced the inbox — ${p.new} new${p.skipped ? `, ${p.skipped} already received` : ""}${p.ignored ? `, ${p.ignored} ignored` : ""}`);
     // P7 (PRD #34): scenarios, overrides, the memo, send back and approval, in words.
-    else if (e.event === "scenario.saved") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} saved scenario “${p.name}”${p.total_short ? ` (${p.total_short})` : ""}${p.from_query ? " from an answer" : ""}` });
-    else if (e.event === "scenario.override") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} gave line ${p.line_no} of “${p.name}” to ${p.vendor} instead of ${p.from_vendor} — ${p.reason}` });
-    else if (e.event === "scenario.override_reverted") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} reverted the override on line ${p.line_no} of “${p.name}” (back to ${p.vendor})` });
-    else if (e.event === "scenario.deleted") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} deleted scenario “${p.name}”` });
-    else if (e.event === "award.memo") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} ${p.regenerated ? "generated the award memo again" : "generated the award memo"} from “${p.scenario}”` });
-    else if (e.event === "award.sent_back") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} sent the memo back: “${p.note}”` });
-    else if (e.event === "award.approved") rows.push({ at: e.created_at, dir: "·", text: `${who(e.actor)} approved the award — RFx locked` });
-    else if (e.event === "seed.responses_loaded") rows.push({ at: e.created_at, dir: "←", text: `${who(e.actor)} loaded the ${p.set} seeded responses (${p.responses})` });
+    else if (e.event === "scenario.saved") push("·", `${who(e.actor)} saved scenario “${p.name}”${p.total_short ? ` (${p.total_short})` : ""}${p.from_query ? " from an answer" : ""}`);
+    else if (e.event === "scenario.override") push("·", `${who(e.actor)} gave line ${p.line_no} of “${p.name}” to ${p.vendor} instead of ${p.from_vendor} — ${p.reason}`);
+    else if (e.event === "scenario.override_reverted") push("·", `${who(e.actor)} reverted the override on line ${p.line_no} of “${p.name}” (back to ${p.vendor})`);
+    else if (e.event === "scenario.refreshed") push("·", `${who(e.actor)} refreshed scenario “${p.name}” with the latest prices${Array.isArray(p.changed_lines) && p.changed_lines.length ? ` (${p.changed_lines.length} ${p.changed_lines.length === 1 ? "line" : "lines"} changed)` : ""}`);
+    else if (e.event === "scenario.deleted") push("·", `${who(e.actor)} deleted scenario “${p.name}”`);
+    else if (e.event === "scenario.renamed") push("·", `${who(e.actor)} renamed award option “${p.from}” to “${p.to}”`);
+    else if (e.event === "scenario.edited") push("·", `${who(e.actor)} changed what award option “${p.name}” asks for: “${p.to}”`);
+    else if (e.event === "award.memo") push("·", `${who(e.actor)} ${p.regenerated ? "drafted the award memo again" : "drafted the award memo"}${p.version ? ` (version ${p.version})` : ""} from “${p.scenario}”`);
+    else if (e.event === "award.sent_back") push("·", `${who(e.actor)} sent the memo back: “${p.note}”`);
+    else if (e.event === "award.approved") push("·", `${who(e.actor)} approved the award — RFx locked`);
+    else if (e.event === "seed.responses_loaded") push("←", `${who(e.actor)} loaded the ${p.set} seeded responses (${p.responses})`);
+    // Settings, masters and vendors belong to no RFx (DECISIONS 2026-09-25 "Settings in four tabs").
+    else if (e.event === "settings.changed") {
+      if (p.key === "category_templates") {
+        const b = (p.before ?? {}) as Settings["category_templates"], a = (p.after ?? {}) as Settings["category_templates"];
+        for (const c of Object.keys({ ...b, ...a }).filter((c) => JSON.stringify(b[c]) !== JSON.stringify(a[c]))) {
+          const ch = templateChanges(b[c], a[c], vendorName);
+          for (const part of [...new Set(ch.map((x) => x.part))]) // one row per Masters sub-tab the save touched
+            push("·", `${who(e.actor)} changed the ${c} masters — ${ch.filter((x) => x.part === part).map((x) => x.text).join("; ")}`, part);
+        }
+      } else push("·", `${who(e.actor)} changed ${lowerFirst(describeChange(String(p.key), p.before, p.after))}`, KEY_AREA[String(p.key)]);
+    } else if (e.event === "vendor.created") push("·", `${who(e.actor)} added vendor ${p.name} (${p.email})${p.via === "copilot" ? " through the co-pilot" : p.via === "unmatched reply" ? " from an unmatched reply" : p.via === "rfx" ? " on an RFx" : ""}`, "vendors");
+    else if (e.event === "vendor.updated") push("·", `${who(e.actor)} changed vendor ${p.name} — ${((p.changes as { field: string; before: unknown; after: unknown }[] | undefined) ?? []).map((c) => `${VFIELD[c.field] ?? c.field} ${c.before ?? "—"} → ${c.after ?? "—"}`).join(", ")}`, "vendors");
+    else if (e.event === "rfx.created") push("·", `${who(e.actor)} created the RFx`);
+    else if (e.event === "rfx.edited") push("·", `${who(e.actor)} edited the draft${p.via === "copilot" ? " through the co-pilot" : ""} — ${((p.changed as string[] | undefined) ?? []).join(", ") || "no change"}`);
+    else if (e.event === "rfx.frozen") push("→", `${who(e.actor)} issued the RFx — v${p.version} frozen (${p.lines} lines, ${p.questions} questions, ${p.vendors} vendors)`);
+    else if (e.event === "dispatch.sent") push("→", `RFx email sent to ${p.vendor} (${p.to})`);
+    else if (e.event === "dispatch.failed") push("→", `RFx email to ${p.vendor} failed: ${String(p.error ?? "").slice(0, 120)}`);
+    else if (e.event === "dispatch.redrafted") push("·", `${who(e.actor)} redrafted the RFx email to ${p.vendor}`);
+    else if (e.event === "ask.query") push("·", `${who(e.actor)} asked a question — ${p.ok ? `${p.rows} ${p.rows === 1 ? "row" : "rows"}` : "failed"}${p.best_guess ? ", with best guesses" : ""}`);
+    else if (e.event === "response.assign_vendor") push("·", `${who(e.actor)} assigned an unmatched reply to ${p.new ? "a new vendor" : "a vendor"}`);
     else if (e.event.startsWith("review.")) {
       const a = e.event.slice(7);
       if (a === "ask-vendor" && p.mode !== "mark_sent") continue; // drafts aren't events worth a row
       const verb = a === "confirm" && INFO.includes(String(p.type)) ? "acknowledged" : VERB[a] ?? a;
-      rows.push({ at: e.created_at, dir: a === "ask-vendor" ? "→" : "·", text: `${who(e.actor)} ${verb} “${title(e.entity_id).replace(/^“|”$/g, "")}”${p.reason ? ` — ${p.reason}` : ""}` });
-    } else rows.push({ at: e.created_at, dir: e.event.startsWith("dispatch") ? "→" : "·", text: `${who(e.actor)}: ${e.event.replaceAll(".", " ")}` });
+      push(a === "ask-vendor" ? "→" : "·", `${who(e.actor)} ${verb} “${title(e.entity_id).replace(/^“|”$/g, "")}”${p.reason ? ` — ${p.reason}` : ""}`);
+    } else push(e.event.startsWith("dispatch") ? "→" : "·", `${who(e.actor)}: ${e.event.replaceAll(".", " ")}`);
   }
-  return rows.slice(0, 150).reverse(); // the latest 150, shown oldest first like the prototype
+  return rows;
 }

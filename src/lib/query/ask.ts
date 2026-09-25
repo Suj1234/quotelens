@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { getComparison, type GridCell, type GridVendor } from "@/lib/comparison";
-import { money } from "@/lib/format";
+import { isMoneyColumn, money } from "@/lib/format";
 import { guardSql, rewriteBestGuess } from "./sql-guard";
 import { aggregates, chartSpec, primaryTotal, unverifiedNumbers, type Row } from "./result";
 
@@ -108,11 +108,12 @@ function unsureInScope(sql: string, rows: Row[], unsure: GridCell[], vendors: Gr
 
 /** Rows as the narrator sees them: money columns pre-formatted the Indian way (₹4,52,59,716) so it copies, not regroups. */
 const inIndianFormat = (r: Row): Row => Object.fromEntries(Object.entries(r).map(([k, v]) =>
-  [k, typeof v === "number" && /_inr$|price|value|total|spend|saving|impact|cost|amount/i.test(k) && !/pct|percent|rank/i.test(k) ? money(Math.round(v)) : v]));
+  [k, typeof v === "number" && isMoneyColumn(k) ? money(Math.round(v)) : v]));
 
 const clean = (sql: string) => sql.trim().replace(/;\s*$/, ""); // a trailing semicolon is harmless; anything else is the guard's call
 
-async function execute(sql: string): Promise<{ rows: Row[]; ms: number }> {
+/** Run guarded SQL (a saved answer's query is re-run by a scenario refresh, A1). */
+export async function execute(sql: string): Promise<{ rows: Row[]; ms: number }> {
   const t0 = Date.now();
   const { data, error } = await db().rpc("run_readonly_rows", { q: sql });
   if (error) throw new AppError("QUERY_FAILED", error.message, undefined, 400);
@@ -155,7 +156,10 @@ async function narrate(rfxId: string, input: Record<string, unknown>, allowed: u
 }
 
 /** TRD §13.1 (+ §13.2 when includeBestGuess; §13.3 via history). baseQueryId re-runs an earlier answer's SQL instead of planning. */
-export async function ask(o: { rfxId: string; question: string; userId: string; includeBestGuess?: boolean; baseQueryId?: string }): Promise<AskAnswer> {
+/** Added to the planner's question (never stored) when the words are meant to become an award option: one vendor per line. */
+const ALLOCATE = "\n(This request builds an award option: return one row per line_no with the vendor that gets that line, its price and annual_value_inr. Leave out lines the request doesn't cover.)";
+
+export async function ask(o: { rfxId: string; question: string; userId: string; includeBestGuess?: boolean; baseQueryId?: string; allocate?: boolean }): Promise<AskAnswer> {
   const t0 = Date.now();
   const question = o.question.trim();
   if (!question) throw new AppError("BAD_REQUEST", "Type a question first.");
@@ -181,7 +185,7 @@ export async function ask(o: { rfxId: string; question: string; userId: string; 
     baseSql = b.data.sql as string;
     rows = (await execute(baseSql)).rows;
   } else {
-    const r = await planAndRun(o.rfxId, question, history);
+    const r = await planAndRun(o.rfxId, o.allocate ? question + ALLOCATE : question, history);
     plan = r.plan;
     repairs = r.repairs;
     if ("error" in r && r.error) error = r.error;
@@ -270,11 +274,11 @@ type QueryRow = {
   duration_ms: number | null; plan: { columns?: string[]; total?: number | null; best_guess?: AskAnswer["best_guess"]; at_stake?: number } | null; users: { name: string } | null;
 };
 
-/** GET /api/ask/history — the RFx's last 20 answers, newest first, in the same shape as a live answer. */
-export async function askHistory(rfxId: string, limit = 20): Promise<AskAnswer[]> {
+/** GET /api/ask/history — this user's last 20 answers on the RFx, newest first, in the same shape as a live answer. */
+export async function askHistory(rfxId: string, userId: string, limit = 20): Promise<AskAnswer[]> {
   const { data, error } = await db().from("queries")
     .select("id, question, created_at, sql_ok, answer_text, computed_note, sql, result_rows, row_count, chart_spec, exclusions, unresolved_cells, duration_ms, plan, users(name)")
-    .eq("rfx_id", rfxId).order("created_at", { ascending: false }).limit(limit);
+    .eq("rfx_id", rfxId).eq("user_id", userId).order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data as unknown as QueryRow[]).map((q) => {
     const rows = q.result_rows ?? [];

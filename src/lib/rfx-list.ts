@@ -10,6 +10,8 @@ export type ListRow = {
   open_reviews: number; approved_at: string | null; annual_value: number | null;
   /** Vendor replies received but not yet through the six stages. */
   unread: number;
+  /** The award memo, while it isn't approved: drafted (waiting for the approver) or sent back to the buyer. */
+  memo: "draft" | "sent_back" | null;
 };
 
 export const STATUS_TABS: { key: string; label: string; statuses: RfxStatus[] | null }[] = [
@@ -21,13 +23,18 @@ export const STATUS_TABS: { key: string; label: string; statuses: RfxStatus[] | 
   { key: "closed", label: "Closed", statuses: ["closed"] },
 ];
 
+/** The approver's tab: memos drafted and waiting for approval (not a status of the RFx itself). */
+export const APPROVAL_TAB = { key: "approval", label: "Waiting for approval" };
+
 export type Tone = "amber" | "green" | "muted" | "";
 
 const unreadStep = (n: number): { text: string; tone: Tone } => ({ text: `${n} ${n === 1 ? "reply" : "replies"} not processed yet`, tone: "amber" });
 
-/** What the buyer does next with this event. */
-export function nextStep(r: ListRow): { text: string; tone: Tone } {
+/** What happens next with this event — for the buyer, or for the approver once a memo is drafted. */
+export function nextStep(r: ListRow, buyer = true): { text: string; tone: Tone } {
   const waiting = r.invited - r.responded;
+  if (r.status !== "awarded" && r.memo === "draft") return buyer ? { text: "Memo waiting for Priya", tone: "muted" } : { text: "Approve memo", tone: "amber" };
+  if (r.status !== "awarded" && r.memo === "sent_back") return buyer ? { text: "Memo sent back — draft it again", tone: "amber" } : { text: "Sent back to Sujit", tone: "muted" };
   switch (r.status) {
     case "draft": return r.lines === 0 ? { text: "Finish lines", tone: "muted" } : { text: "Ready to issue", tone: "" };
     case "issued":
@@ -67,6 +74,7 @@ const SORT: Record<string, (r: ListRow) => string | number | null> = {
 };
 
 export function inTab(r: ListRow, key: string) {
+  if (key === APPROVAL_TAB.key) return r.status !== "awarded" && r.memo === "draft";
   const tab = STATUS_TABS.find((t) => t.key === key);
   return !tab?.statuses || tab.statuses.includes(r.status);
 }

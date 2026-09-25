@@ -1,5 +1,5 @@
 // Line checks against the category template (P9). Pure — used by the co-pilot, the Issue check and the New RFx screen.
-// The template (Settings → Category template) decides WHICH fields are required; this file only knows how to test a field.
+// The template (Settings → Masters) decides WHICH fields are required; this file only knows how to test a field.
 import type { CategoryTemplate, LineField } from "@/lib/settings-schema";
 
 type Num = number | null | undefined;

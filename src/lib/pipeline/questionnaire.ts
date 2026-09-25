@@ -8,6 +8,7 @@ import { cleanEmail } from "@/lib/preprocess/email";
 import { get } from "@/lib/storage";
 import type { ResponseFile, ResponseRow, RfxQuestion } from "@/types/db";
 import { clarificationScope, resolveByReply } from "@/lib/clarify";
+import { clarificationOnHold } from "./vendor-check";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
 
 // TRD §9.7 P-QA-EXTRACT + two rules (v2, 2026-09-24; v1 in prompts/archive/): exact-question answers only, and a fixed reading of ranges.
@@ -46,6 +47,8 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
   const questions = qs as RfxQuestion[];
   // A clarification reply may answer questions that were unclear, missing or asked about (latest answer wins); it never touches the rest.
   const scope = resp.is_clarification ? (await clarificationScope(resp)).questionIds : null;
+  // A clarification held by the vendor check (normalise raised the card) answers nothing until the buyer keeps it.
+  if (resp.is_clarification && await clarificationOnHold(resp.id)) return { answered: 0, ambiguous: 0, missing: 0, failing: [], provider: null, sources: [] };
   if (scope && !scope.size) return { answered: 0, ambiguous: 0, missing: 0, failing: [], provider: null, sources: [] }; // nothing it may answer: no model calls
   await clearStageReviews(resp.id, "questionnaire");
 

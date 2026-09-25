@@ -3,7 +3,7 @@
 
 export type ALine = { id: string; line_no: number; description: string; annual_qty: number; ply: number | null; item_type: string | null; delivery_location: string | null };
 /** q_score = share of mandatory questions answered with passes = true (TRD §14.1). */
-export type AVendor = { id: string; name: string; code?: string; cleared: boolean | null; q_score: number };
+export type AVendor = { id: string; name: string; code?: string; cleared: boolean | null; q_score: number; validity_days?: number | null };
 /** guess_* = the system's best guess on an ambiguous / low-confidence cell (landed = guess + the vendor's freight). */
 export type ACell = { line_id: string; vendor_id: string; state: string; unit: number | null; landed: number | null; guess_unit: number | null; guess_landed: number | null };
 /** P10 D2–D3: a vendor's total-level discount and what it depends on (read from its quote; checked here per award option). */
@@ -53,6 +53,18 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 const gap = (win: number | null, ru: number | null) => (win && ru !== null ? r2((ru - win) / win * 100) : null);
 const annual = (price: number | null, line: ALine) => (price === null ? null : price * line.annual_qty / 1000);
 const byName = (a: Offer, b: Offer) => a.vendor.name.localeCompare(b.vendor.name);
+const days = (o: Offer) => o.vendor.validity_days ?? -1;
+/** Same price (or score): the better questionnaire score, then the quote valid longer, then the name — never the name alone when anything else differs. */
+const tieOrder = (a: Offer, b: Offer) => b.vendor.q_score - a.vendor.q_score || days(b) - days(a) || byName(a, b);
+/** "; same price as Beta — chosen for its better questionnaire score" when the runner-up tied the winner. */
+function tieNote(win: Offer, ru: Offer | undefined, tied: boolean, what = "price"): string {
+  if (!ru || !tied) return "";
+  const why = win.vendor.q_score !== ru.vendor.q_score ? "chosen for its better questionnaire score"
+    : days(win) !== days(ru) ? "chosen because its quote is valid longer" : "nothing else separates them, so chosen alphabetically";
+  return `; same ${what} as ${ru.vendor.name} — ${why}`;
+}
+const lowest = (qualified: boolean) => (qualified ? "Lowest price among vendors who cleared the questionnaire" : "Lowest price of all vendors");
+const GUESS = "; uses the system's best guess for a price still being checked";
 
 export function filterLabel(f: Filter): string {
   if (f.ply !== undefined) return `${f.ply}-ply`;
@@ -73,26 +85,25 @@ export function matches(f: Filter, l: ALine): boolean {
 function allocateLine(inp: Inputs, line: ALine, rule: SubRule, basis: Basis, bg: boolean, prefix = ""): SLine {
   const os = offers(inp, line, basis, rule.qualified_only, bg);
   const base = { rfx_line_id: line.id, line_no: line.line_no, single_source: os.length === 1 };
+  const say = (t: string) => (prefix ? prefix + t[0].toLowerCase() + t.slice(1) : t);
   if (!os.length) return { ...base, vendor_id: null, price: null, annual_value: null, runner_up_vendor_id: null, runner_up_price: null, gap_pct: null, best_guess: false,
-    reason: `${prefix}no ${rule.qualified_only ? "qualified " : ""}quote` };
+    reason: say(rule.qualified_only ? "No vendor who cleared the questionnaire has a usable price" : "No vendor has a usable price") };
   let ranked: Offer[], reason: string;
-  const who = rule.qualified_only ? "qualified" : "overall";
   if (rule.type === "weighted") {
     const w = rule.weights ?? { price: 0.7, questionnaire: 0.3 };
     const min = Math.min(...os.map((o) => o.price));
     const score = (o: Offer) => w.price * (min / o.price) + w.questionnaire * o.vendor.q_score;
-    ranked = [...os].sort((a, b) => score(b) - score(a) || byName(a, b));
-    reason = `weighted ${w.price}/${w.questionnaire}: score ${score(ranked[0]).toFixed(2)}`;
-    if (ranked[1] && score(ranked[1]) === score(ranked[0])) reason += ` (tie with ${ranked[1].vendor.name}; lower name wins)`;
+    ranked = [...os].sort((a, b) => score(b) - score(a) || tieOrder(a, b));
+    reason = `Best weighted score (${Math.round(w.price * 100)}% price, ${Math.round(w.questionnaire * 100)}% questionnaire): ${score(ranked[0]).toFixed(2)}`
+      + tieNote(ranked[0], ranked[1], !!ranked[1] && score(ranked[1]) === score(ranked[0]), "score");
   } else {
-    ranked = [...os].sort((a, b) => a.price - b.price || byName(a, b));
-    reason = `cheapest ${who}${basis === "landed" ? " (landed)" : ""}`;
-    if (ranked[1] && ranked[1].price === ranked[0].price) reason += ` (tie with ${ranked[1].vendor.name} at the same price; lower name wins)`;
+    ranked = [...os].sort((a, b) => a.price - b.price || tieOrder(a, b));
+    reason = lowest(rule.qualified_only) + (basis === "landed" ? " (landed cost)" : "") + tieNote(ranked[0], ranked[1], !!ranked[1] && ranked[1].price === ranked[0].price);
   }
   const [win, ru] = ranked;
-  if (win.guess) reason += " — best guess";
+  if (win.guess) reason += GUESS;
   return { ...base, vendor_id: win.vendor.id, price: win.price, annual_value: annual(win.price, line), best_guess: win.guess,
-    runner_up_vendor_id: ru?.vendor.id ?? null, runner_up_price: ru?.price ?? null, gap_pct: gap(win.price, ru?.price ?? null), reason: prefix + reason };
+    runner_up_vendor_id: ru?.vendor.id ?? null, runner_up_price: ru?.price ?? null, gap_pct: gap(win.price, ru?.price ?? null), reason: say(reason) };
 }
 
 /** TRD §14.1: cheapest_per_line, grouped (uncovered lines unallocated and flagged), weighted. */
@@ -102,8 +113,8 @@ export function allocate(inp: Inputs, rule: Rule): SLine[] {
   if (rule.type === "grouped") {
     return lines.map((l) => {
       const g = (rule.groups ?? []).find((x) => matches(x.filter, l));
-      if (!g) return { rfx_line_id: l.id, line_no: l.line_no, vendor_id: null, price: null, annual_value: null, runner_up_vendor_id: null, runner_up_price: null, gap_pct: null, single_source: false, best_guess: false, reason: "not covered by any group" };
-      return allocateLine(inp, l, g.rule, rule.price_basis, bg, `${filterLabel(g.filter)} group: `);
+      if (!g) return { rfx_line_id: l.id, line_no: l.line_no, vendor_id: null, price: null, annual_value: null, runner_up_vendor_id: null, runner_up_price: null, gap_pct: null, single_source: false, best_guess: false, reason: "No group covers this line" };
+      return allocateLine(inp, l, g.rule, rule.price_basis, bg, `${filterLabel(g.filter)} lines: `);
     });
   }
   if (rule.type === "from_query") throw new Error("from_query scenarios are built by fromQuery()");
@@ -112,7 +123,7 @@ export function allocate(inp: Inputs, rule: Rule): SLine[] {
 
 /**
  * TRD §13.5: winners copied from a saved answer; prices, runner-up and gap recomputed from the comparison (never the query's own numbers).
- * The reason says whether the pick is the cheapest qualified / overall quote or simply the query's choice.
+ * A query can't see a tie, so when another eligible vendor has the same price the tie rule picks (A3). The reason says why in words.
  */
 export function fromQuery(inp: Inputs, winners: Map<number, string>, rule: Rule): SLine[] {
   const bg = !!rule.include_best_guess;
@@ -121,16 +132,20 @@ export function fromQuery(inp: Inputs, winners: Map<number, string>, rule: Rule)
     const base = { rfx_line_id: l.id, line_no: l.line_no };
     const cell = vid ? inp.cells.find((c) => c.line_id === l.id && c.vendor_id === vid) : undefined;
     const p = cell ? priceOf(cell, rule.price_basis, bg) : null;
-    if (!vid || !p) return { ...base, vendor_id: null, price: null, annual_value: null, runner_up_vendor_id: null, runner_up_price: null, gap_pct: null, single_source: false, best_guess: false,
-      reason: vid ? "the answer picked a vendor with no counted price on this line" : "not in the answer" };
+    const vendor = inp.vendors.find((v) => v.id === vid);
+    if (!vid || !p || !vendor) return { ...base, vendor_id: null, price: null, annual_value: null, runner_up_vendor_id: null, runner_up_price: null, gap_pct: null, single_source: false, best_guess: false,
+      reason: vid ? "The answer picked a vendor with no usable price on this line" : "Not in the answer" };
     const pool = offers(inp, l, rule.price_basis, !!rule.qualified_only, bg);
-    const others = pool.filter((o) => o.vendor.id !== vid).sort((a, b) => a.price - b.price || byName(a, b));
+    const pick: Offer = { vendor, ...p };
+    const all = [pick, ...pool.filter((o) => o.vendor.id !== vid)];
+    const win = all.filter((o) => o.price === p.price).sort(tieOrder)[0];
+    const others = all.filter((o) => o !== win).sort((a, b) => a.price - b.price || tieOrder(a, b));
     const minQ = Math.min(...offers(inp, l, rule.price_basis, true, bg).map((o) => o.price));
     const minAll = Math.min(...offers(inp, l, rule.price_basis, false, bg).map((o) => o.price));
-    const reason = p.price === minQ ? "cheapest qualified" : p.price === minAll ? "cheapest overall" : "as chosen by the query";
-    return { ...base, vendor_id: vid, price: p.price, annual_value: annual(p.price, l), best_guess: p.guess, single_source: others.length === 0,
-      runner_up_vendor_id: others[0]?.vendor.id ?? null, runner_up_price: others[0]?.price ?? null, gap_pct: gap(p.price, others[0]?.price ?? null),
-      reason: reason + (rule.price_basis === "landed" ? " (landed)" : "") + (p.guess ? " — best guess" : "") };
+    const reason = (win.price === minQ ? lowest(true) : win.price === minAll ? lowest(false) : "Chosen by the answer (not the lowest price)")
+      + (rule.price_basis === "landed" ? " (landed cost)" : "") + tieNote(win, others[0], !!others[0] && others[0].price === win.price) + (win.guess ? GUESS : "");
+    return { ...base, vendor_id: win.vendor.id, price: win.price, annual_value: annual(win.price, l), best_guess: win.guess, single_source: others.length === 0,
+      runner_up_vendor_id: others[0]?.vendor.id ?? null, runner_up_price: others[0]?.price ?? null, gap_pct: gap(win.price, others[0]?.price ?? null), reason };
   });
 }
 
@@ -204,6 +219,15 @@ export function baseline(inp: Inputs, basis: Basis, qualifiedOnly: boolean, incl
   const best = cands.filter((c) => c.n === most).sort((a, b) => a.total - b.total || a.v.name.localeCompare(b.v.name))[0];
   return { vendor_id: best.v.id, total: best.total, total_quoted: best.quoted, discount: best.discount, lines_priced: best.n,
     note: most === inp.lines.length ? null : `No ${qualifiedOnly ? "qualified " : ""}vendor priced all ${inp.lines.length} lines; ${best.v.name} priced ${most}, and the baseline covers those lines only.` };
+}
+
+/** Fallback title when the AI can't write one: drop "create a scenario with…", fix the first letter, keep it short. */
+export function tidyTitle(text: string): string {
+  let t = text.replace(/\s+/g, " ").trim()
+    .replace(/^(please\s+)?(create|make|build|save|give me|show me)\s+(me\s+)?(a|an|the)?\s*(new\s+)?(scenario|sceanrio|scenerio|option|split|award)\s*(with|for|where|that|:|-)?\s*/i, "");
+  if (/^[a-z][A-Z]/.test(t)) t = t.toLowerCase(); // "cREATE…" (caps lock) → plain case
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  return t.length > 80 ? `${t.slice(0, 77).replace(/\s+\S*$/, "")}…` : t || text.trim().slice(0, 80);
 }
 
 /** The rule in plain words (scenarios.rule_text, memo part 6). */

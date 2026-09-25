@@ -44,12 +44,13 @@ every off-spec change goes in DECISIONS.md.
 - [x] C13 Totals check: the vendor's own grand total vs the sum of its line prices × quantities → a card when they differ.
 
 ## Phase 5 — Proof
-- [ ] T0 Re-process the existing RFx so stored prices follow the new rules (Balaji's cells were stored 3% off; ₹180 freight rows).
-      Needs the human's go (changes live RFx data): scripts/reprocess.ts MER-0419 MER-0422 MER-0423 MER-0424.
+- [x] T0 Re-process the existing RFx so stored prices follow the new rules (Balaji's cells were stored 3% off; ₹180 freight rows).
+      2026-09-25, human's go: MER-0419/0422/0423/0424 — 21 replies ok, 0 errors. MER-0419 Balaji line 1 ₹70,610 (was ₹68,492);
+      no ₹180 freight rows; Decide: Balaji alone ₹4.58 cr quoted → ₹4.45 cr (met), cheapest per line ₹4.53 cr.
 - [x] T1 scripts/test-four-buttons.ts: every shown button PASS (target 48/48 on the kinds that occur; no GAP, no FAIL).
 - [x] T2 scripts/test-vendor-check.ts (10 genuine replies, 0 false alarms; both wrong-vendor cases held) and scripts/test-review-actions.ts pass; 123 unit tests green; tsc + lint clean.
 - [x] T3 Discount test: Balaji all-30 option gets −3%, the split doesn't (MER-0419 numbers: ₹4.45 cr vs ₹4.53 cr).
 - [ ] T4 Browser pass: Settings, Comparison header hover, Review cards, Decide / Award totals.
-      2026-09-25: Comparison, Review, Decide render with no app console errors; numbers on live RFx are stale until T0
-      (Anand freight card still says ₹180; Balaji cells still stored 3% off). Re-check after T0.
+      2026-09-25: Comparison, Review, Decide render with no app console errors; after T0 the Decide totals match T3.
+      Award totals not checked in the browser (no saved scenario on MER-0419).
 - [ ] T5 DECISIONS.md + PROGRESS.md.

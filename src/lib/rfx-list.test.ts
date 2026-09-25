@@ -3,7 +3,7 @@ import { DEFAULTS, applyFilters, deadlineText, nextStep, presetRange, type ListR
 
 const row = (o: Partial<ListRow>): ListRow => ({
   id: o.code ?? "x", code: "MER-0001", title: "Corrugated packaging", status: "draft",
-  created: "2026-09-20T10:00:00Z", updated: "2026-09-24T10:00:00Z", deadline: null, lines: 30, invited: 5, responded: 0, open_reviews: 0, approved_at: null, annual_value: null, unread: 0, ...o,
+  created: "2026-09-20T10:00:00Z", updated: "2026-09-24T10:00:00Z", deadline: null, lines: 30, invited: 5, responded: 0, open_reviews: 0, approved_at: null, annual_value: null, unread: 0, memo: null, ...o,
 });
 const rows = [
   row({ code: "MER-0417", status: "awarded", annual_value: 45_300_000, approved_at: "2026-09-24T09:00:00Z", responded: 5 }),
@@ -14,6 +14,15 @@ const rows = [
 const now = new Date("2026-09-25T06:00:00Z");
 
 describe("rfx list", () => {
+  it("a drafted memo is the approver's next step and fills the Waiting for approval tab; a sent-back one is the buyer's", () => {
+    const drafted = row({ code: "MER-0424", status: "reviewing", open_reviews: 3, responded: 5, memo: "draft" });
+    expect(nextStep(drafted, false)).toEqual({ text: "Approve memo", tone: "amber" });
+    expect(nextStep(drafted)).toEqual({ text: "Memo waiting for Priya", tone: "muted" });
+    const back = { ...drafted, memo: "sent_back" as const };
+    expect(nextStep(back)).toEqual({ text: "Memo sent back — draft it again", tone: "amber" });
+    expect(nextStep(back, false)).toEqual({ text: "Sent back to Sujit", tone: "muted" });
+    expect(applyFilters([...rows, drafted, { ...back, code: "MER-0425" }], { ...DEFAULTS, status: "approval" }).map((r) => r.code)).toEqual(["MER-0424"]);
+  });
   it("filters by tab, search and date ranges (IST days, inclusive)", () => {
     expect(applyFilters(rows, { ...DEFAULTS, status: "draft" }).map((r) => r.code)).toEqual(["MER-0420", "MER-0418"]);
     expect(applyFilters(rows, { ...DEFAULTS, q: "0419" }).map((r) => r.code)).toEqual(["MER-0419"]);

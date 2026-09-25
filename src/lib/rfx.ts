@@ -25,6 +25,7 @@ export async function listRfx(): Promise<RfxListRow[]> {
     lines: r.rfx_lines[0]?.count ?? 0,
     invited: r.rfx_vendors[0]?.count ?? 0,
     // Same rule as the Overview: a vendor's reply that hasn't been through the six stages keeps the event from "Ready to award".
+    memo: award?.status === "draft" || award?.status === "sent_back" ? award.status : null,
     unread: r.responses.filter((x) => x.vendor_id && readingOf(x.pipeline_status, x.stage_errors, x.updated_at).state !== "read").length,
     responded: new Set(r.responses.filter((x) => x.vendor_id && !x.is_clarification).map((x) => x.vendor_id)).size,
     annual_value: award?.status === "approved" && award.scenarios?.total_inr != null ? Number(award.scenarios.total_inr) : null,

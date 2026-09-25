@@ -33,6 +33,8 @@ export type MemoData = {
     overrides: { line_no: number; vendor: string; instead_of: string | null; reason: string }[];
   };
   narrative: Narrative; narrative_unverified: string[]; generated_at: string;
+  /** Memo history: 1 for the first draft, +1 each time it is drafted again (absent on memos drafted before 0018). */
+  version?: number;
 };
 
 const FONTS = path.join(process.cwd(), "src/lib/award/fonts");
@@ -55,7 +57,6 @@ const s = StyleSheet.create({
   num: { textAlign: "right", fontFamily: "PlexMono", fontSize: 7.2 },
   kv: { flexDirection: "row", paddingVertical: 2, borderBottom: `0.5 solid ${HAIR2}` },
   k: { width: 170, color: MUTED },
-  pre: { fontFamily: "PlexMono", fontSize: 6.8, backgroundColor: "#F1F0EB", padding: 6, color: "#3A3D43" },
   sig: { flexDirection: "row", marginTop: 26, gap: 24 },
   sigcell: { flex: 1, borderTop: `0.75 solid ${INK}`, paddingTop: 5 },
   foot: { position: "absolute", bottom: 22, left: 40, right: 40, color: "#9EA2A9", fontSize: 7, flexDirection: "row", justifyContent: "space-between" },
@@ -104,7 +105,7 @@ export function renderMemoPdf(m: MemoData): Promise<Buffer> {
         <Text style={s.h1}>Award recommendation — RFx {m.rfx.code}</Text>
         <Text style={s.sub}>
           {m.rfx.title} · {m.rfx.category}{m.rfx.frozen_at ? ` · issued ${longDate(m.rfx.frozen_at)}` : ""}{m.rfx.deadline ? ` · deadline ${longDate(m.rfx.deadline)}` : ""} · {m.rfx.contract_months}-month contract
-          {"\n"}Prepared by {m.prepared.name} on {longDate(m.prepared.at)} · {m.approved ? `approved by ${m.approved.name} on ${longDate(m.approved.at)}` : "awaiting approval"}
+          {"\n"}{m.version ? `Version ${m.version} · ` : ""}Prepared by {m.prepared.name} on {longDate(m.prepared.at)} · {m.approved ? `approved by ${m.approved.name} on ${longDate(m.approved.at)}` : "awaiting approval"}
         </Text>
         <Text style={s.h2}>Recommendation</Text>
         <Paras text={m.narrative.recommendation} />
@@ -153,9 +154,6 @@ export function renderMemoPdf(m: MemoData): Promise<Buffer> {
         <Paras text={m.narrative.next_steps} />
 
         {/* 6 · Rule, query, signatures */}
-        <Text style={s.h2} minPresenceAhead={60}>How the allocation was made</Text>
-        <Text style={s.p}>{m.scenario.rule_text}.{m.scenario.question ? ` Saved from the answer to “${m.scenario.question}”; the query below chose the winners, and every price, runner-up and total was recomputed from the comparison.` : " Computed by a fixed rule over the comparison grid (no model involved)."}</Text>
-        {m.scenario.sql && <Text style={s.pre}>{m.scenario.sql}</Text>}
         {m.narrative_unverified.length > 0 && <Text style={[s.p, { color: "#9A6A00" }]}>Numbers in the narrative not found in the data: {m.narrative_unverified.join(", ")}.</Text>}
         <View style={s.sig} wrap={false}>
           <View style={s.sigcell}><Text>Prepared — {m.prepared.name}, {m.prepared.title}</Text><Text style={{ color: MUTED }}>{longDate(m.prepared.at)}</Text></View>

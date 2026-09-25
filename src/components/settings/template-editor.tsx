@@ -1,30 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import type { CategoryTemplate, LineField, Settings } from "@/lib/settings-schema";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import type { CategoryTemplate, LineField, Settings, TemplatePart } from "@/lib/settings-schema";
 import { LINE_FIELDS } from "@/lib/settings-schema";
 import { FIELD_LABEL } from "@/lib/line-rules";
 import { Button } from "@/components/ui/button";
+import { send } from "./api";
 
-// P9: Settings → Category templates. The company's standard for a category — what the co-pilot proposes and what Issue
-// requires. Industry equivalent: sourcing/event template + supplier-qualification question library + approved vendor list.
+// P9: the category template — the company's standard for a category, what the co-pilot proposes and what Issue requires.
+// Settings → Masters shows it as three sub-tabs plus the approved ticks in the Vendor directory (DECISIONS 2026-09-25); each edits its own part and saves the whole template.
+// Industry equivalent: sourcing/event template + supplier-qualification question library + approved vendor list.
 
-type Save = (key: keyof Settings, value: unknown, done: string) => Promise<boolean>;
-type Vendor = { id: string; name: string; city: string | null };
 type Level = "required" | "recommended" | "optional";
 
-export function CategoryTemplateCard({ category, templates, vendors, busy, save }: {
-  category: string; templates: Settings["category_templates"]; vendors: Vendor[]; busy: boolean; save: Save;
+// Approved vendors are ticked in the Vendor directory (one row per vendor), not here.
+export type EditorPart = Exclude<TemplatePart, "approved">;
+const PART: Record<EditorPart, [string, string]> = {
+  terms: ["Naming & terms", "The co-pilot suggests titles in this shape and proposes these terms as the company standard; a price outside the usual band gets a “Check unit” card."],
+  lines: ["Line fields", "Issue is blocked while a line misses a required field; the co-pilot asks for recommended ones."],
+  questions: ["Question library", "The co-pilot offers these questions (by L-number) with their answer types, mandatory flags and disqualify rules."],
+};
+
+export function TemplateEditor({ part, category, templates }: {
+  part: EditorPart; category: string; templates: Settings["category_templates"];
 }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function save(key: keyof Settings, value: unknown, done: string) {
+    setBusy(true);
+    const r = await send("/api/settings", "PUT", { key, value });
+    setBusy(false);
+    if (r) { toast(`Saved — ${done}`); router.refresh(); }
+    return !!r;
+  }
   const saved = templates[category] ?? null;
   const [t, setT] = useState<CategoryTemplate | null>(saved);
   const dirty = JSON.stringify(t) !== JSON.stringify(saved);
   const set = (p: Partial<CategoryTemplate>) => setT((x) => (x ? { ...x, ...p } : x));
 
   if (!t) return (
-    <div className="card" style={{ marginTop: 16 }}>
-      <div className="hd"><b>Category template · {category}</b></div>
-      <div className="bd hint">No template yet: the co-pilot asks the buyer for every term and question. Run <span className="mono">npm run seed:template</span> to create it from MER-0417.</div>
+    <div className="card">
+      <div className="hd"><b>{PART[part][0]} · {category}</b></div>
+      <div className="bd hint">No masters for {category} yet: the co-pilot asks the buyer for every term and question. Run <span className="mono">npm run seed:template</span> to create them from MER-0417.</div>
     </div>
   );
 
@@ -40,24 +59,24 @@ export function CategoryTemplateCard({ category, templates, vendors, busy, save 
   const setQ = (i: number, p: Partial<CategoryTemplate["question_library"][number]>) => set({ question_library: q.map((x, j) => (j === i ? { ...x, ...p } : x)) });
 
   return (
-    <div className="card" style={{ marginTop: 16 }}>
+    <div className="card">
       <div className="hd">
-        <div><b>Category template · {category}</b><div className="hint" style={{ marginTop: 2 }}>The co-pilot proposes these terms, questions and vendors and says they come from here. Issue is blocked while a line misses a required field.</div></div>
+        <div><b>{PART[part][0]} · {category}</b><div className="hint" style={{ marginTop: 2 }}>{PART[part][1]}</div></div>
         <div style={{ display: "flex", gap: 8 }}>
           {dirty && <Button size="sm" variant="ghost" onClick={() => setT(saved)}>Discard</Button>}
-          <Button size="sm" variant="default" disabled={!dirty || busy} onClick={() => save("category_templates", { ...templates, [category]: t }, `${category} template. New drafts and the co-pilot use it from the next message.`)}>{busy ? "Saving…" : "Save template"}</Button>
+          <Button size="sm" variant="default" disabled={!dirty || busy} onClick={() => save("category_templates", { ...templates, [category]: t }, `${PART[part][0].toLowerCase()} for ${category}. New drafts and the co-pilot use it from the next message.`)}>{busy ? "Saving…" : "Save"}</Button>
         </div>
       </div>
       <div className="bd tpl">
         <p className="hint">Source: {t.source}</p>
 
-        <section style={{ gridColumn: "1 / -1" }}>
+        {part === "terms" && <><section style={{ gridColumn: "1 / -1" }}>
           <div className="eyebrow">Naming convention</div>
           <input className="inp" style={{ width: "100%", maxWidth: 520 }} value={t.title_pattern} onChange={(e) => set({ title_pattern: e.target.value })} aria-label="Title naming convention" />
-          <p className="hint" style={{ marginTop: 4 }}>The co-pilot suggests titles in this shape, filling each part from what the buyer says, and asks for any part it doesn&apos;t know.</p>
+          <p className="hint" style={{ marginTop: 4 }}>Filled from what the buyer says; the co-pilot asks for any part it doesn&apos;t know.</p>
         </section>
 
-        <section>
+        <section style={{ gridColumn: "1 / -1", maxWidth: 760 }}>
           <div className="eyebrow">Standard terms</div>
           <dl className="kv terms-form">
             <dt>Currency</dt><dd><input className="inp mono" style={{ width: 80 }} value={s.currency} onChange={(e) => setS({ currency: e.target.value.toUpperCase().slice(0, 3) })} /></dd>
@@ -70,9 +89,9 @@ export function CategoryTemplateCard({ category, templates, vendors, busy, save 
             <dt>Contract</dt><dd className="unit"><Int v={s.contract_months} on={(v) => setS({ contract_months: v })} /> months</dd>
             <dt>Usual price</dt><dd className="unit">₹<Int v={t.price_band?.rs_per_kg_min ?? 0} on={(v) => set({ price_band: { rs_per_kg_min: v, rs_per_kg_max: t.price_band?.rs_per_kg_max ?? v + 1 } })} /> to ₹<Int v={t.price_band?.rs_per_kg_max ?? 0} on={(v) => set({ price_band: { rs_per_kg_min: t.price_band?.rs_per_kg_min ?? 0, rs_per_kg_max: v } })} /> per kg <span className="hint">— a price outside this gets a &ldquo;Check unit&rdquo; card</span></dd>
           </dl>
-        </section>
+        </section></>}
 
-        <section>
+        {part === "lines" && <section style={{ gridColumn: "1 / -1", maxWidth: 760 }}>
           <div className="eyebrow">Line fields</div>
           <table className="t" style={{ fontSize: 12.5 }}>
             <thead><tr><th>Field</th><th>Required</th><th>Recommended</th><th>Optional</th></tr></thead>
@@ -87,9 +106,9 @@ export function CategoryTemplateCard({ category, templates, vendors, busy, save 
             <input className="inp mono" style={{ width: 90 }} value={t.line_rules.allowed_ply.join(", ")}
               onChange={(e) => set({ line_rules: { ...t.line_rules, allowed_ply: e.target.value.split(",").map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0) } })} />
           </div>
-        </section>
+        </section>}
 
-        <section style={{ gridColumn: "1 / -1" }}>
+        {part === "questions" && <section style={{ gridColumn: "1 / -1" }}>
           <div className="eyebrow">Question library <span className="mono">{q.length}</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {q.map((x, i) => (
@@ -104,18 +123,7 @@ export function CategoryTemplateCard({ category, templates, vendors, busy, save 
             ))}
             <div><Button size="sm" variant="ghost" onClick={() => set({ question_library: [...q, { text: "", answer_type: "yes_no", mandatory: true, disqualify_if: null }] })}>Add question</Button></div>
           </div>
-        </section>
-
-        <section style={{ gridColumn: "1 / -1" }}>
-          <div className="eyebrow">Approved vendors <span className="mono">{t.approved_vendor_ids.length}</span></div>
-          <div className="tpl-vendors">
-            {vendors.map((v) => (
-              <label key={v.id}><input type="checkbox" checked={t.approved_vendor_ids.includes(v.id)}
-                onChange={(e) => set({ approved_vendor_ids: e.target.checked ? [...t.approved_vendor_ids, v.id] : t.approved_vendor_ids.filter((x) => x !== v.id) })} /> {v.name}{v.city && <span className="hint"> · {v.city}</span>}</label>
-            ))}
-          </div>
-          <p className="hint" style={{ marginTop: 6 }}>The co-pilot suggests only these. Others can still be invited when the buyer asks; they are marked &ldquo;not on the approved list&rdquo;.</p>
-        </section>
+        </section>}
       </div>
     </div>
   );

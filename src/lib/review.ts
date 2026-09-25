@@ -213,7 +213,7 @@ export async function listReview(rfxId: string, f: { vendor?: string; type?: str
         : r.type === "total_mismatch" ? `Stated total: ${Number(r.evidence.stated).toLocaleString("en-IN")}\nSum of the lines: ${Number(r.evidence.sum).toLocaleString("en-IN")}`
         : r.detail;
       const qf = quoteFile(r.response_id);
-      if (text) evidence = { kind: "text", text, caption: r.type === "fx_assumption" ? "Settings → FX rates" : `Terms read from ${qf?.original_name ?? "the email body"}` };
+      if (text) evidence = { kind: "text", text, caption: r.type === "fx_assumption" ? "Settings → General → Currency" : `Terms read from ${qf?.original_name ?? "the email body"}` };
     }
     const name = v?.name ?? "The vendor";
     // "Enter prices…": the lines this card is about — "same as last year" lines, or the lines the vendor didn't quote.
@@ -375,6 +375,15 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
         const n = await releaseCells({ id: r.response_id!, rfx_id: r.rfx_id, vendor_id: r.vendor_id }, "reviewed", "Buyer confirmed the reply is from this vendor");
         await ledger("other", `Reply kept as this vendor's after the vendor check (${n} prices released) — ${r.detail ?? ""}`.trim(), { released: n });
         resolution = { ...resolution, note: `Kept as this vendor's reply · ${n} prices count` };
+        // A clarification held before it changed anything is applied now (decided first, so normalise doesn't hold it again).
+        const { data: rr } = await db().from("responses").select("is_clarification").eq("id", r.response_id!).single();
+        if (rr?.is_clarification) {
+          await db().from("review_items").update({ status, resolution, updated_at: at }).eq("id", r.id);
+          for (const s of ["normalise", "questionnaire", "flags"] as const) {
+            const ev = await runStage(r.response_id!, s, user.id);
+            if (ev.status === "error") throw new AppError("STAGE_FAILED", `Kept, but applying the reply failed at ${s}: ${ev.error}. Retry it from the reply's page.`, undefined, 500);
+          }
+        }
         break;
       }
       if (["ambiguous_unit", "low_confidence_read", "conflict"].includes(r.type) && r.proposed_state !== "mapped") {
@@ -594,6 +603,8 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
         await db().from("review_items").delete().eq("response_id", r.response_id).in("status", ["open", "asked_vendor"]).neq("id", r.id);
         await db().from("questionnaire_answers").delete().eq("response_id", r.response_id).neq("state", "reviewed");
       }
+      // A "clarification" that is really another vendor's file is that vendor's own reply, not an answer to our questions.
+      if (r.type === "vendor_mismatch") await db().from("responses").update({ is_clarification: false, supersedes_response_id: null }).eq("id", r.response_id).eq("is_clarification", true);
       await ledger("other", `Reply moved to ${v.name} by the buyer.`, { from_vendor: r.vendor_id, to_vendor: body.vendor_id });
       await assignVendor(r.response_id, { vendor_id: body.vendor_id }, user);
       break;

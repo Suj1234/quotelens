@@ -11,7 +11,7 @@ export default async function AwardPage({ params }: PageProps<"/rfx/[id]/award">
   const [rfx, scenarios, award, inp] = await Promise.all([getRfx(id), listScenarios(id), getAward(id), loadInputs(id)]);
   const uniq = <T,>(xs: (T | null)[]) => [...new Set(xs.filter((x): x is T => x !== null && x !== undefined))].sort();
   return (
-    <AwardScreen rfxId={id} code={rfx.code} buyer={user.role !== "approver"} locked={rfx.status === "awarded"} scenarios={scenarios} award={award}
+    <AwardScreen rfxId={id} code={rfx.code} buyer={user.role !== "approver"} me={user.id} locked={rfx.status === "awarded"} scenarios={scenarios} award={award}
       options={Object.fromEntries(scenarios.map((s) => [s.id, overrideOptions(inp, s)]))}
       groupValues={{ ply: uniq(inp.lines.map((l) => l.ply)).sort((a, b) => a - b), item_type: uniq(inp.lines.map((l) => l.item_type)), delivery_location: uniq(inp.lines.map((l) => l.delivery_location)) }} />
   );

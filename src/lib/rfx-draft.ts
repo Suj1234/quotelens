@@ -162,7 +162,7 @@ export async function patchDraft(id: string, body: PatchBody, user: { id: string
   }
   if (body.vendors) {
     const ids = [...body.vendors.vendor_ids];
-    for (const n of body.vendors.new ?? []) ids.push((await createVendor(n.name, n.email)).id);
+    for (const n of body.vendors.new ?? []) ids.push((await createVendor(n.name, n.email, user.id)).id);
     await setVendors(id, r.code, ids);
     changed.push(`vendors (${ids.length})`);
   }

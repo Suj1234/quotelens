@@ -12,7 +12,7 @@ export default async function NewRfxPage({ searchParams }: PageProps<"/rfx/new">
   const draft = typeof id === "string" ? await getDraft(id) : null;
   if (draft && (draft.rfx.status !== "draft" || draft.rfx.version !== 0)) redirect(`/rfx/${draft.rfx.id}`);
   const first = user.name.split(" ")[0];
-  const template = (await getSetting("category_templates"))[CATEGORY]; // Settings → Category templates
+  const template = (await getSetting("category_templates"))[CATEGORY]; // Settings → Masters
   return <NewRfx key={draft?.rfx.id ?? "new"} initial={draft} buyerName={first} opening={openingLine(first)} category={CATEGORY}
     rules={template?.line_rules ?? NO_RULES} standard={template?.standard_terms ?? null} />;
 }

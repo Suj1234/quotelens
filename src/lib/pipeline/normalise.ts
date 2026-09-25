@@ -9,6 +9,7 @@ import { parseUnit, toPer1000Factor, type UnitKey } from "@/lib/normalise/units"
 import { longDate, money } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
 import { clarificationScope, resolveByReply } from "@/lib/clarify";
+import { clarificationHeld } from "./vendor-check";
 import type { ResponseRow, Rfx, RfxLine } from "@/types/db";
 import type { ExtractedItem, MapSummary } from "./map";
 import { clearStageReviews, insertReviews, type ReviewInput } from "./reviews";
@@ -21,6 +22,8 @@ type Assumption = { id: string; kind: string; description: string; value: unknow
 export type NormaliseSummary = {
   cells: number; states: Partial<Record<State, number>>; assumptions: number; reviews: number; terms: TermsDecision; freight_included: boolean; kept_buyer_cells: number;
   clarification?: { lines: number[]; unanswered: number[]; out_of_scope: number; resolved_cards: number };
+  /** A clarification held by the vendor check: it changed nothing (Review → Replies to sort). */
+  held?: boolean;
 };
 
 const SRC_WORD: Record<string, string> = { image: "photo", pdf: "PDF", cell: "sheet", text: "text" };
@@ -36,6 +39,12 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const clar = resp.is_clarification ? await clarificationScope(resp) : null;
   const main = clar && resp.supersedes_response_id ? (await db().from("responses").select("*").eq("id", resp.supersedes_response_id).maybeSingle<ResponseRow>()).data : null;
   const termsOf = main ?? resp;
+  // A clarification replaces prices and closes cards, so "is this reply really from this vendor?" is asked before it may do either.
+  if (clar && await clarificationHeld(resp)) {
+    const ms = main?.summary.normalise as NormaliseSummary | undefined;
+    return { cells: 0, states: {}, assumptions: 0, reviews: 1, terms: ms?.terms as TermsDecision, freight_included: ms?.freight_included ?? true, kept_buyer_cells: 0, held: true,
+      clarification: { lines: [], unanswered: [], out_of_scope: 0, resolved_cards: 0 } };
+  }
 
   const [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ, fx, th] = await Promise.all([
     db().from("rfx").select("*").eq("id", resp.rfx_id).single<Rfx>(),

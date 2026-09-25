@@ -14,6 +14,7 @@ import { unverifiedNumbers } from "@/lib/query/result";
 import { listScenarios } from "@/lib/scenarios";
 import { discountText } from "@/lib/scenarios/allocate";
 import { renderMemoPdf, type MemoData, type Narrative } from "./memo";
+import { memoChanges, type MemoChanges } from "./changes";
 
 // TRD §14.3 / §16: generate (buyer) → draft; send back (approver, with a note) → sent_back; approve (approver) → approved + RFx awarded (locked).
 
@@ -38,6 +39,7 @@ async function buildMemo(rfxId: string, scenarioId: string, preparedBy: SessionU
   if (error) throw error;
   const sc = scenarios.find((x) => x.id === scenarioId);
   if (!sc) throw new AppError("NOT_FOUND", "That scenario isn't on this RFx.", undefined, 404);
+  if (sc.outdated) throw new AppError("OUTDATED", `Prices changed since “${sc.name}” was saved (line${sc.changed_lines.length === 1 ? "" : "s"} ${sc.changed_lines.join(", ")}). Refresh it first, so the memo uses today's numbers.`, undefined, 409);
   const annual = new Map(grid.lines.map((l) => [l.line_no, l.annual_qty]));
   const winners = new Set(sc.lines.map((l) => l.vendor).filter(Boolean) as string[]);
 
@@ -116,20 +118,45 @@ async function narrate(rfxId: string, m: Omit<MemoData, "narrative" | "narrative
   return { narrative: out, unverified: [...p.bad, ...p.missing] };
 }
 
-const pdfPath = (rfxId: string, awardId: string) => `rfx/${rfxId}/outbound/award/${awardId}.pdf`;
+// One PDF per version (memo history): drafting again never overwrites the memo that was sent back.
+const pdfPath = (rfxId: string, awardId: string, version: number) => `rfx/${rfxId}/outbound/award/${awardId}-v${version}.pdf`;
 
 export type AwardView = {
   id: string; status: "draft" | "sent_back" | "approved"; scenario_id: string; memo: MemoData; pdf_url: string;
   sent_back_note: string | null; sent_back_at: string | null; sent_back_by: string | null; stale: boolean;
+  /** Why the memo can't be approved as it stands: the option was changed after drafting, or today's prices give a different result (A1). */
+  stale_reason: "changed" | "prices" | null;
+  /** Every drafted memo, oldest first, with what the approver did and what changed since the version before. */
+  history: MemoVersion[];
+};
+export type MemoVersion = {
+  version: number; scenario_name: string | null; total: number | null; prepared_by: string | null; prepared_at: string | null; pdf_url: string | null;
+  sent_back_note: string | null; sent_back_by: string | null; sent_back_at: string | null; approved_by: string | null; approved_at: string | null;
+  changes: MemoChanges | null; current: boolean;
 };
 export async function getAward(rfxId: string): Promise<AwardView | null> {
   const { data, error } = await db().from("awards").select("*, sb:users!awards_sent_back_by_fkey(name)").eq("rfx_id", rfxId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   const memo = data.memo_json as MemoData;
-  const sc = data.status === "approved" ? null : (await listScenarios(rfxId)).find((s) => s.id === data.scenario_id);
-  return { id: data.id, status: data.status, scenario_id: data.scenario_id, memo, pdf_url: `/api/export/memo/${data.id}`, sent_back_note: data.sent_back_note, sent_back_at: data.sent_back_at, sent_back_by: (data.sb as unknown as { name: string } | null)?.name ?? null,
-    stale: !!sc && sc.fingerprint !== memo.scenario.fingerprint };
+  const [sc, { data: vs, error: ve }] = await Promise.all([
+    data.status === "approved" ? null : listScenarios(rfxId).then((l) => l.find((s) => s.id === data.scenario_id)),
+    db().from("award_versions").select("*, pb:users!award_versions_prepared_by_fkey(name), sbb:users!award_versions_sent_back_by_fkey(name), ab:users!award_versions_approved_by_fkey(name)")
+      .eq("award_id", data.id).order("version"),
+  ]);
+  if (ve) throw ve;
+  const nm = (u: unknown) => (u as { name: string } | null)?.name ?? null;
+  const rows = vs ?? [];
+  const history: MemoVersion[] = rows.map((v, i) => {
+    const prev = rows[i - 1]?.memo_json as MemoData | null | undefined;
+    const cur = v.memo_json as MemoData | null;
+    return { version: v.version, scenario_name: v.scenario_name, total: v.total_inr === null ? null : Number(v.total_inr), prepared_by: nm(v.pb), prepared_at: v.prepared_at,
+      pdf_url: v.memo_path ? `/api/export/memo/${data.id}?v=${v.version}` : null, sent_back_note: v.sent_back_note, sent_back_by: nm(v.sbb), sent_back_at: v.sent_back_at,
+      approved_by: nm(v.ab), approved_at: v.approved_at, changes: prev && cur ? memoChanges(prev, cur) : null, current: i === rows.length - 1 };
+  });
+  return { id: data.id, status: data.status, scenario_id: data.scenario_id, memo, pdf_url: `/api/export/memo/${data.id}`, sent_back_note: data.sent_back_note, sent_back_at: data.sent_back_at, sent_back_by: (data.sb as unknown as { name: string } | null)?.name ?? null, history,
+    stale: !!sc && (sc.fingerprint !== memo.scenario.fingerprint || sc.outdated),
+    stale_reason: !sc ? null : sc.outdated ? "prices" : sc.fingerprint !== memo.scenario.fingerprint ? "changed" : null };
 }
 
 /** POST /api/award/{rfx}/generate — buyer/admin. A new memo replaces the draft (or a sent-back one); never an approved one. */
@@ -139,16 +166,30 @@ export async function generateMemo(rfxId: string, scenarioId: string, user: Sess
   if (prev?.status === "approved") throw new AppError("LOCKED", "The award is approved; the memo can't be replaced.", undefined, 409);
   const base = await buildMemo(rfxId, scenarioId, user);
   const { narrative, unverified } = await narrate(rfxId, base);
-  const memo: MemoData = { ...base, narrative, narrative_unverified: unverified };
   const id = prev?.id ?? crypto.randomUUID();
-  await put("outbound", pdfPath(rfxId, id), await renderMemoPdf(memo), "application/pdf");
-  const row = { rfx_id: rfxId, scenario_id: scenarioId, memo_path: pdfPath(rfxId, id), memo_json: memo, prepared_by: user.id, prepared_at: memo.prepared.at,
+  const { data: last } = await db().from("award_versions").select("version").eq("award_id", id).order("version", { ascending: false }).limit(1).maybeSingle();
+  const version = (last?.version ?? 0) + 1;
+  const memo: MemoData = { ...base, narrative, narrative_unverified: unverified, version };
+  const path = pdfPath(rfxId, id, version);
+  await put("outbound", path, await renderMemoPdf(memo), "application/pdf");
+  const row = { rfx_id: rfxId, scenario_id: scenarioId, memo_path: path, memo_json: memo, prepared_by: user.id, prepared_at: memo.prepared.at,
     approved_by: null, approved_at: null, status: "draft", sent_back_note: null, sent_back_by: null, sent_back_at: null };
   const w = prev ? await db().from("awards").update(row).eq("id", id).neq("status", "approved") : await db().from("awards").insert({ id, ...row });
   if (w.error) throw w.error;
+  const vi = await db().from("award_versions").insert({ award_id: id, rfx_id: rfxId, version, scenario_id: scenarioId, scenario_name: memo.scenario.name,
+    total_inr: memo.totals.total_after ?? memo.totals.total, memo_json: memo, memo_path: path, prepared_by: user.id, prepared_at: memo.prepared.at });
+  if (vi.error) throw vi.error;
   await audit({ rfx_id: rfxId, actor: user.id, event: "award.memo", entity_type: "award", entity_id: id,
-    payload: { scenario: memo.scenario.name, total: memo.totals.total, regenerated: !!prev, unverified: unverified.length } });
+    payload: { scenario: memo.scenario.name, total: memo.totals.total, regenerated: !!prev, unverified: unverified.length, version } });
   return getAward(rfxId);
+}
+
+/** The approver's decision on the newest version (memo history). */
+async function stampLatest(awardId: string, fields: Record<string, unknown>) {
+  const { data: v } = await db().from("award_versions").select("id").eq("award_id", awardId).order("version", { ascending: false }).limit(1).maybeSingle();
+  if (!v) return; // a memo drafted before 0018 and not backfilled: nothing to stamp
+  const { error } = await db().from("award_versions").update(fields).eq("id", v.id);
+  if (error) throw error;
 }
 
 /** POST /api/award/{rfx}/approve — approver. Re-renders the PDF with the approver's signature, locks the RFx. */
@@ -156,15 +197,19 @@ export async function approveAward(rfxId: string, user: SessionUser) {
   await assertOpen({ rfx: rfxId });
   const a = await getAward(rfxId);
   if (!a || a.status !== "draft") throw new AppError("NO_DRAFT", a?.status === "sent_back" ? "The memo was sent back; wait for Sujit to generate it again." : "There is no drafted memo to approve.", undefined, 409);
-  if (a.stale) throw new AppError("STALE", "The scenario changed after this memo was drafted; the buyer needs to generate the memo again.", undefined, 409);
+  if (a.stale) throw new AppError("STALE", a.stale_reason === "prices"
+    ? "Prices changed since this memo was drafted; the buyer needs to refresh the option and draft the memo again."
+    : "The option changed after this memo was drafted; the buyer needs to draft the memo again.", undefined, 409);
   const at = new Date().toISOString();
   const memo: MemoData = { ...a.memo, approved: { name: user.name, title: TITLE[user.role] ?? user.role, at } };
-  await put("outbound", pdfPath(rfxId, a.id), await renderMemoPdf(memo), "application/pdf");
+  const { data: cur } = await db().from("awards").select("memo_path").eq("id", a.id).single();
+  await put("outbound", cur?.memo_path ?? pdfPath(rfxId, a.id, memo.version ?? 1), await renderMemoPdf(memo), "application/pdf");
   const w = await db().from("awards").update({ status: "approved", approved_by: user.id, approved_at: at, memo_json: memo }).eq("id", a.id).eq("status", "draft").select("id");
   if (w.error) throw w.error;
   if (!w.data?.length) throw new AppError("NO_DRAFT", "The memo changed while you were approving it; reload and try again.", undefined, 409);
   const r = await db().from("rfx").update({ status: "awarded", updated_at: at }).eq("id", rfxId);
   if (r.error) throw r.error;
+  await stampLatest(a.id, { approved_by: user.id, approved_at: at, memo_json: memo });
   await audit({ rfx_id: rfxId, actor: user.id, event: "award.approved", entity_type: "award", entity_id: a.id, payload: { scenario: memo.scenario.name, total: memo.totals.total } });
   return getAward(rfxId);
 }
@@ -178,6 +223,7 @@ export async function sendBack(rfxId: string, note: string, user: SessionUser) {
     .eq("rfx_id", rfxId).eq("status", "draft").select("id");
   if (w.error) throw w.error;
   if (!w.data?.length) throw new AppError("NO_DRAFT", "There is no drafted memo to send back.", undefined, 409);
+  await stampLatest(w.data[0].id, { sent_back_note: text.slice(0, 2000), sent_back_by: user.id, sent_back_at: new Date().toISOString() });
   await audit({ rfx_id: rfxId, actor: user.id, event: "award.sent_back", entity_type: "award", entity_id: w.data[0].id, payload: { note: text.slice(0, 500) } });
   return getAward(rfxId);
 }

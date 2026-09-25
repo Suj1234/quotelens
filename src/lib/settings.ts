@@ -12,7 +12,7 @@ const DEFAULTS: Settings = {
   email_mode: "mock", decision_provider: "auto", thresholds: { act: 0.85, review: 0.6 },
   fx_rates: {}, vendor_addresses: {},
   price_check: PRICE_CHECK_DEFAULT, // P9 Q3: 2× median (the ₹/kg band is in the category template, P10 S4)
-  category_templates: {}, // none until seeded (scripts/seed-template.ts) or set in Settings; the co-pilot then asks for everything
+  category_templates: {}, // none until seeded (scripts/seed-template.ts) or set in Settings → Masters; the co-pilot then asks for everything
 };
 
 export async function getSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {

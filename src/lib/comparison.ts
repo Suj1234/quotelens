@@ -16,6 +16,8 @@ export type GridCell = {
 };
 export type GridVendor = {
   id: string; code: string; name: string; cleared: boolean | null; cleared_note: string; priced: number; lines: number;
+  /** The vendor-check card's reasons while its reply is on hold (heldVendors), else null. */
+  held: string | null;
   freight_included: boolean | null; currency: string | null; validity_days: number | null; validity_short: boolean;
   /** P10 D5: everything the vendor attached to its prices (chips + hover). */
   conditions: Condition[];
@@ -66,8 +68,19 @@ export function whereText(l: Loc | null | undefined): string {
   return `${l.source === "email" ? "Email line" : "Para"} ${l.line ?? "?"}${q ? `: ${q}` : ""}`;
 }
 
+/**
+ * Vendors whose own (non-clarification) reply waits on the vendor check → the card's reasons. While it waits, nothing that
+ * reply says about the vendor counts: prices (holdCells), questionnaire (v_vendor_status, 0018), discount and terms (here, loadInputs).
+ */
+export async function heldVendors(rfxId: string): Promise<Map<string, string>> {
+  const { data, error } = await db().from("review_items").select("vendor_id, detail, responses!inner(is_clarification)")
+    .eq("rfx_id", rfxId).eq("type", "vendor_mismatch").in("status", ["open", "asked_vendor"]).eq("responses.is_clarification", false);
+  if (error) throw error;
+  return new Map((data ?? []).filter((r) => r.vendor_id).map((r) => [r.vendor_id as string, r.detail ?? ""]));
+}
+
 export async function getComparison(rfxId: string): Promise<Grid> {
-  const [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ, conds] = await Promise.all([
+  const [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ, conds, held] = await Promise.all([
     db().from("rfx").select("validity_days_requested").eq("id", rfxId).single(),
     db().from("rfx_lines").select("id, line_no, sku, description, annual_qty, delivery_location").eq("rfx_id", rfxId).order("line_no"),
     db().from("v_vendor_status").select("*").eq("rfx_id", rfxId),
@@ -75,6 +88,7 @@ export async function getComparison(rfxId: string): Promise<Grid> {
     db().from("responses").select("id, vendor_id, received_at, response_terms(currency, validity_days, validity_until, freight_included)").eq("rfx_id", rfxId).order("received_at", { ascending: false }),
     db().from("questionnaire_answers").select("vendor_id, state, passes, answer_raw, rfx_questions(q_no, disqualify_if, mandatory)").eq("rfx_id", rfxId),
     vendorConditions(rfxId),
+    heldVendors(rfxId),
   ]);
   for (const q of [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ]) if (q.error) throw q.error;
   const lines = (linesQ.data as Pick<RfxLine, "id" | "line_no" | "sku" | "description" | "annual_qty" | "delivery_location">[]);
@@ -116,15 +130,17 @@ export async function getComparison(rfxId: string): Promise<Grid> {
     const pending = answers.filter((a) => a.state === "ambiguous").map((a) => `Q${a.rfx_questions.q_no} unclear`);
     const missing = answers.filter((a) => a.state === "missing" && a.rfx_questions.mandatory).map((a) => `Q${a.rfx_questions.q_no} not answered`);
     const annual = (c: GridCell, v: number | null) => (v ?? 0) * (lines.find((l) => l.line_no === c.line_no)!.annual_qty) / 1000;
+    const hold = held.get(s.vendor_id) ?? null;
     return {
-      id: s.vendor_id, code: s.vendor_code, name: s.vendor, cleared: s.cleared_questionnaire,
-      cleared_note: s.cleared_questionnaire === true ? "Cleared the questionnaire" : [...failing, ...missing, ...pending].join(" · ")
+      id: s.vendor_id, code: s.vendor_code, name: s.vendor, cleared: s.cleared_questionnaire, held: hold,
+      cleared_note: hold !== null ? "Reply on hold: its answers don't count until the buyer confirms who sent it"
+        : s.cleared_questionnaire === true ? "Cleared the questionnaire" : [...failing, ...missing, ...pending].join(" · ")
         // Answers read but no pass/fail question in this RFx: nothing to clear, but not "not read" either.
         || (qa.some((a) => a.vendor_id === s.vendor_id) ? "No pass/fail questions" : "Questionnaire not read yet"),
       priced: mine.length, lines: s.lines_total, freight_included: t?.freight_included ?? s.freight_included, currency: t?.currency ?? null,
       validity_days: t?.validity_days ?? null, validity_short: !!t?.validity_days && t.validity_days < requested,
       total_unit: mine.reduce((a, c) => a + annual(c, c.unit), 0), total_landed: mine.reduce((a, c) => a + annual(c, c.landed), 0),
-      conditions: conds.get(s.vendor_id) ?? [],
+      conditions: hold !== null ? [] : conds.get(s.vendor_id) ?? [], // the held reply's terms may be another vendor's
     };
   });
   return { lines, vendors, cells, validity_requested: requested };

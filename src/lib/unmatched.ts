@@ -52,7 +52,7 @@ export async function assignVendor(responseId: string, body: { vendor_id?: strin
   if (!resp) throw new AppError("NOT_FOUND", "Response not found", undefined, 404);
   let vendorId = body.vendor_id ?? null;
   if (!vendorId) {
-    vendorId = (await createVendor(body.new_vendor?.name, body.new_vendor?.email)).id;
+    vendorId = (await createVendor(body.new_vendor?.name, body.new_vendor?.email, user.id, {}, "unmatched reply")).id;
   } else {
     const { data: v } = await db().from("vendors").select("id").eq("id", vendorId).maybeSingle();
     if (!v) throw new AppError("BAD_INPUT", "That vendor doesn't exist.", undefined, 400);

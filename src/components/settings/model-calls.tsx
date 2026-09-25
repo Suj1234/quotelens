@@ -34,11 +34,17 @@ export function ModelCalls({ initial, rfx }: { initial: ModelCallRow[]; rfx: { i
     </select>
   );
   const failed = rows.filter((r) => !r.ok).length;
+  const sum = (f: (r: ModelCallRow) => number | null) => rows.reduce((a, r) => a + (Number(f(r)) || 0), 0);
+  const inr = sum((r) => r.cost_inr), usd = sum((r) => r.cost_usd), tokens = sum((r) => r.input_tokens) + sum((r) => r.output_tokens);
 
   return (
-    <section id="model-calls">
-      <h2 style={{ marginTop: 28 }}>Model calls</h2>
-      <p className="muted small" style={{ margin: "4px 0 12px" }}>Every call, with purpose and provider. Nothing is hidden.</p>
+    <section>
+      <p className="muted small" style={{ margin: "0 0 12px" }}>Every call, with purpose, provider and cost. Nothing is hidden.</p>
+      <div className="grid3" style={{ marginBottom: 12 }}>
+        <div className="card bd stat"><span className="v">{rows.length}{rows.length === 200 && <span className="muted" style={{ fontSize: 14 }}> latest</span>}</span><span className="l">calls{failed ? ` · ${failed} failed` : " · none failed"}</span></div>
+        <div className="card bd stat"><span className="v">{k(tokens)}</span><span className="l">tokens in + out</span></div>
+        <div className="card bd stat"><span className="v">{inr ? `₹${inr.toFixed(2)}` : usd ? `$${usd.toFixed(4)}` : "—"}</span><span className="l">{inr ? `cost of these calls ($${usd.toFixed(4)})` : "cost — needs a USD rate in General → Currency"}</span></div>
+      </div>
       <div className="card">
         <div className="hd">
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -52,7 +58,7 @@ export function ModelCalls({ initial, rfx }: { initial: ModelCallRow[]; rfx: { i
         {rows.length ? (
           <div className="evalrows">
             <table className="t">
-              <thead><tr><th>Time</th><th>RFx</th><th>Purpose</th><th>Provider</th><th>Model</th><th className="num">In</th><th className="num">Out</th><th className="num">Latency</th><th>Result</th></tr></thead>
+              <thead><tr><th>Time</th><th>RFx</th><th>Purpose</th><th>Provider</th><th>Model</th><th className="num">In</th><th className="num">Out</th><th className="num">Latency</th><th className="num">Cost</th><th>Result</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <Fragment key={r.id}>
@@ -64,9 +70,10 @@ export function ModelCalls({ initial, rfx }: { initial: ModelCallRow[]; rfx: { i
                       <td className="mono xs">{r.model}</td>
                       <td className="num">{k(r.input_tokens)}</td><td className="num">{k(r.output_tokens)}</td>
                       <td className="num">{r.latency_ms == null ? "—" : `${(r.latency_ms / 1000).toFixed(1)}s`}</td>
+                      <td className="num">{r.cost_inr != null ? `₹${Number(r.cost_inr).toFixed(3)}` : r.cost_usd != null ? `$${Number(r.cost_usd).toFixed(5)}` : "—"}</td>
                       <td>{r.ok ? <span className="chip green">OK</span> : <span className="chip red">Failed</span>}</td>
                     </tr>
-                    {open === r.id && <tr><td colSpan={9} className="xs" style={{ background: "var(--tint)", whiteSpace: "pre-wrap" }}>{r.error ?? "No error text was recorded."}</td></tr>}
+                    {open === r.id && <tr><td colSpan={10} className="xs" style={{ background: "var(--tint)", whiteSpace: "pre-wrap" }}>{r.error ?? "No error text was recorded."}</td></tr>}
                   </Fragment>
                 ))}
               </tbody>

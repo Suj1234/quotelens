@@ -30,7 +30,7 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
   const statusText = rfx.status === "draft" || rfx.status === "awarded" || rfx.status === "closed" ? LABEL[rfx.status]
     : responded === 0 ? `${LABEL[rfx.status]} — awaiting ${invited} responses` : `${LABEL[rfx.status]} · ${responded} of ${invited} responded`;
   return (
-    <AskProvider rfxId={id} locked={locked}>
+    <AskProvider rfxId={id} userId={user.id} locked={locked}>
       <div className="rfxhead">
         <div className="top">
           <div>
@@ -43,8 +43,8 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
               {rfx.response_deadline && <><span>·</span><span>Deadline {longDate(rfx.response_deadline)}</span></>}
             </div>
           </div>
-          {/* DESIGN §2.3: header buttons are the buyer's (Sync inbox · Ask); the approver asks from the Comparison toolbar. */}
-          {user.role !== "approver" && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{rfx.status !== "draft" && !locked && <><SyncInboxButton rfxId={id} /><SyncPoller rfxId={id} /></>}<AskButton /></div>}
+          {/* DESIGN §2.3: buyer Sync inbox · Ask. The approver has Ask here too, on every tab (DECISIONS 2026-09-25 "Ask chat per user"). */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{user.role !== "approver" && rfx.status !== "draft" && !locked && <><SyncInboxButton rfxId={id} /><SyncPoller rfxId={id} /></>}<AskButton /></div>
         </div>
         {/* DESIGN §2.3 / §4: approver Decide · Comparison · Award; buyer Overview · Responses · Review · Comparison · Award. */}
         <RfxTabs id={id} tabs={user.role === "approver"

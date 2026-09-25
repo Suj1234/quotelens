@@ -131,3 +131,10 @@ export function formatEval(r: EvalResult): string {
 }
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+/** Settings → Evaluation → Run history: every stored run of one RFx, newest first (totals only). */
+export async function evalHistory(rfxId: string): Promise<{ id: string; ran_at: string; totals: EvalTotals }[]> {
+  const { data, error } = await db().from("eval_runs").select("id, ran_at, totals").eq("rfx_id", rfxId).order("ran_at", { ascending: false }).limit(100);
+  if (error) throw error;
+  return data as { id: string; ran_at: string; totals: EvalTotals }[];
+}
