@@ -155,7 +155,7 @@ const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_b
 export type TimelineRow = { at: string; dir: "←" | "→" | "·"; text: string; rfx_id?: string | null; actor?: string; area?: SettingsArea };
 /** Which Settings sub-tab a workspace change belongs to, so each sub-tab lists its own history. */
 export type SettingsArea = "communication" | "decision" | "currency" | TemplatePart | "vendors";
-const KEY_AREA: Record<string, SettingsArea> = { email_mode: "communication", vendor_addresses: "communication", decision_provider: "decision", thresholds: "decision", price_check: "decision", fx_rates: "currency" };
+const KEY_AREA: Record<string, SettingsArea> = { email_mode: "communication", vendor_addresses: "communication", decision_provider: "decision", thresholds: "decision", price_check: "decision", ask_limit: "decision", fx_rates: "currency" };
 type AuditEvent = { event: string; actor: string; entity_id: string | null; payload: unknown; created_at: string; rfx_id: string | null };
 
 /** Audit events in words, oldest first (latest 150). Pipeline runs fold into one row per response (plus any failed stage). */
@@ -240,6 +240,7 @@ async function eventRows(events: AuditEvent[], rfxId: string | null): Promise<Ti
     else if (e.event === "dispatch.sent") push("→", `RFx email sent to ${p.vendor} (${p.to})`);
     else if (e.event === "dispatch.failed") push("→", `RFx email to ${p.vendor} failed: ${String(p.error ?? "").slice(0, 120)}`);
     else if (e.event === "dispatch.redrafted") push("·", `${who(e.actor)} redrafted the RFx email to ${p.vendor}`);
+    else if (e.event === "ask.turn") continue; // P11 #6: the question-limit counter, not an event worth a row (ask.query is)
     else if (e.event === "ask.query") push("·", `${who(e.actor)} asked a question — ${p.ok ? `${p.rows} ${p.rows === 1 ? "row" : "rows"}` : "failed"}${p.best_guess ? ", with best guesses" : ""}`);
     else if (e.event === "response.assign_vendor") push("·", `${who(e.actor)} assigned an unmatched reply to ${p.new ? "a new vendor" : "a vendor"}`);
     else if (e.event.startsWith("review.")) {

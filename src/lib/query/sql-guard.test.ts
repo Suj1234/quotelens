@@ -109,3 +109,13 @@ describe("P9 C2: documents and vendor terms views", () => {
     expect(guardSql(`select * from response_files where rfx_id = '${RFX}'`, RFX).ok).toBe(false);
   });
 });
+
+describe("P11 #10 #11: line stats, messages and review cards views", () => {
+  it("accepts queries on the new views and still scopes them to the RFx", () => {
+    expect(guardSql(`select line_no, lowest_vendor, gap_to_second_pct from v_line_stats where rfx_id = '${RFX}' and gap_to_second_pct > 20`, RFX)).toEqual({ ok: true });
+    expect(guardSql(`select vendor, kind, received_at from v_messages where rfx_id = '${RFX}' and direction = 'inbound'`, RFX)).toEqual({ ok: true });
+    expect(guardSql(`select vendor, title from v_review_cards where rfx_id = '${RFX}' and status = 'asked_vendor'`, RFX)).toEqual({ ok: true });
+    expect(guardSql(`select * from v_messages`, RFX).ok).toBe(false);
+    expect(guardSql(`select body_text from v_messages where rfx_id = '${RFX}'`, RFX).ok).toBe(false); // bodies are not in the view
+  });
+});

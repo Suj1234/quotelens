@@ -1,6 +1,6 @@
 import "server-only";
 import { ApiError, type Content, type Part } from "@google/genai";
-import { BaseLlm, FunctionTool, Gemini, InMemorySessionService, LlmAgent, LogLevel, Runner, createEvent, setLogLevel, type LlmRequest, type LlmResponse } from "@google/adk";
+import { BaseLlm, FunctionTool, Gemini, InMemorySessionService, LlmAgent, LogLevel, Runner, StreamingMode, createEvent, setLogLevel, type LlmRequest, type LlmResponse } from "@google/adk";
 import type { z } from "zod";
 import { modelId } from "@/lib/ai/gemini";
 import { AppError, requireEnv } from "@/lib/errors";
@@ -14,7 +14,8 @@ import { logModelCall } from "@/lib/log";
 setLogLevel(LogLevel.WARN); // ADK logs every request at INFO
 
 type Ctx = { purpose: string; rfx_id?: string | null };
-export type AgentEvent = { type: "step"; text: string } | { type: "action"; tool: string; text: string };
+/** draft (P11 #17): the reply as the model writes it, the whole text so far; the checked reply in `done` replaces it. */
+export type AgentEvent = { type: "step"; text: string } | { type: "action"; tool: string; text: string } | { type: "draft"; text: string };
 export type Action = { tool: string; text: string; data?: unknown; result?: unknown };
 
 export type AgentTool<S extends z.ZodObject = z.ZodObject> = {
@@ -71,6 +72,8 @@ export type RunOpts = Ctx & {
   check?: (tool: string) => Promise<void>;
   onEvent?: (e: AgentEvent) => void;
   maxLlmCalls?: number; timeoutMs?: number; temperature?: number;
+  /** Stream the reply text as draft events (P11 #17). */
+  stream?: boolean;
   model?: BaseLlm; // tests only
 };
 
@@ -109,10 +112,15 @@ export async function runAgent(o: RunOpts): Promise<{ reply: string; actions: Ac
   const texts: string[] = [];
   const signal = AbortSignal.timeout(o.timeoutMs ?? 100_000);
   try {
-    for await (const ev of runner.runAsync({ userId: "u", sessionId: session.id, newMessage: { role: "user", parts: o.message } satisfies Content, runConfig: { maxLlmCalls: o.maxLlmCalls ?? 8 }, abortSignal: signal })) {
+    let draft = "";
+    const runConfig = { maxLlmCalls: o.maxLlmCalls ?? 8, ...(o.stream ? { streamingMode: StreamingMode.SSE } : {}) };
+    for await (const ev of runner.runAsync({ userId: "u", sessionId: session.id, newMessage: { role: "user", parts: o.message } satisfies Content, runConfig, abortSignal: signal })) {
       if (ev.errorCode) throw new Error(`${ev.errorCode}: ${ev.errorMessage ?? ""}`); // the step limit arrives this way too
       if (ev.author !== o.name) continue;
       const t = (ev.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
+      // SSE: partial events carry pieces of the text; the final event of each model call carries all of it.
+      if (ev.partial) { if (t) { draft += t; o.onEvent?.({ type: "draft", text: draft }); } continue; }
+      draft = "";
       if (t.trim()) texts.push(t.trim());
     }
   } catch (e) {

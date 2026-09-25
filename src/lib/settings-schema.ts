@@ -48,6 +48,8 @@ export const SettingSchemas = {
   category_templates: z.record(z.string().trim().min(1), CategoryTemplate),
   // P9 D2: price sanity check — flag > ratio× / < 1/ratio× the other vendors' median (the ₹/kg band is per category, P10 S4).
   price_check: z.object({ median_ratio: z.number().min(1.2, "The ratio must be at least 1.2.").max(10) }).strict(),
+  // P11 #6: Ask questions per user per window.
+  ask_limit: z.object({ questions: z.number().int().min(1, "Allow at least 1 question.").max(1000), minutes: z.number().int().min(1).max(1440, "The window is at most a day (1,440 minutes).") }).strict(),
 };
 
 export type Settings = {
@@ -58,6 +60,7 @@ export type Settings = {
   vendor_addresses: Record<string, string>;
   category_templates: Record<string, CategoryTemplate>;
   price_check: { median_ratio: number };
+  ask_limit: { questions: number; minutes: number };
 };
 
 const PROVIDER_WORD: Record<string, string> = { auto: "Auto", gemini: "Gemini only", jev: "Jev only" };
@@ -69,6 +72,7 @@ export function describeChange(key: string, before: unknown, after: unknown, ven
     case "thresholds": { const b = before as Settings["thresholds"], a = after as Settings["thresholds"]; return `Thresholds: act ${b?.act} → ${a.act}, review ${b?.review} → ${a.review}`; }
     case "fx_rates": return `FX rates: ${fxWords(before as Settings["fx_rates"])} → ${fxWords(after as Settings["fx_rates"])}`;
     case "email_mode": return `Email transport: ${before} → ${after}`;
+    case "ask_limit": { const b = before as Settings["ask_limit"], a = after as Settings["ask_limit"]; return `Ask limit: ${b?.questions} per ${b?.minutes} min → ${a.questions} per ${a.minutes} min`; }
     case "price_check": { const b = before as Settings["price_check"], a = after as Settings["price_check"]; return `Price check: ${b?.median_ratio}× → ${a.median_ratio}× median`; }
     case "category_templates": {
       const b = (before ?? {}) as Settings["category_templates"], a = (after ?? {}) as Settings["category_templates"];

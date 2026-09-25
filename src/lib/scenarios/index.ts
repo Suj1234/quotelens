@@ -21,28 +21,13 @@ export function withDiscounts(inp: Inputs, share: { vendor_id: string; lines: nu
   return { total_after: total - d.saving, discounts: d.lines.map((x) => ({ vendor: name(x.vendor_id), pct: x.pct, condition: x.condition, met: x.met, why: x.why, saving: x.saving })) };
 }
 
-// TRD §6.18, §13.5, §14.1–14.2: scenarios saved by rule (Award tab) or from an Ask answer; per-line overrides.
-
-/** The comparison as the allocation engine sees it (same cells, states and qualification as the grid and Ask). */
-export async function loadInputs(rfxId: string): Promise<Inputs> {
-  const [lQ, vQ, cQ, aQ, dQ, rQ, held] = await Promise.all([
-    db().from("rfx_lines").select("id, line_no, description, annual_qty, ply, item_type, delivery_location").eq("rfx_id", rfxId).order("line_no"),
-    db().from("v_vendor_status").select("vendor_id, vendor, vendor_code, cleared_questionnaire, validity_days").eq("rfx_id", rfxId),
-    db().from("line_quotes").select("rfx_line_id, vendor_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value").eq("rfx_id", rfxId),
-    db().from("questionnaire_answers").select("vendor_id, passes, rfx_questions(mandatory)").eq("rfx_id", rfxId),
-    // P10 D3: each vendor's total-level discount as read from its quote (and as the buyer settled it on the card).
+/** P10 D3: each vendor's total-level discount as read from its quote (and as the buyer settled it on the card); also Ask's discount note (P11 #4). */
+export async function loadDiscounts(rfxId: string): Promise<ADiscount[]> {
+  const [dQ, held] = await Promise.all([
     db().from("assumptions").select("vendor_id, value, basis, created_at").eq("rfx_id", rfxId).eq("kind", "discount_treatment").is("superseded_by", null).order("created_at", { ascending: false }),
-    db().from("rfx").select("payment_terms_days").eq("id", rfxId).single(),
     heldVendors(rfxId),
   ]);
-  for (const q of [lQ, vQ, cQ, aQ]) if (q.error) throw q.error;
-  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-  const answers = (aQ.data ?? []) as unknown as { vendor_id: string; passes: boolean | null; rfx_questions: { mandatory: boolean } }[];
-  const mandatory = (id: string) => answers.filter((a) => a.vendor_id === id && a.rfx_questions.mandatory);
-  // Freight per vendor = landed − unit on its priced cells (the same rule as v_comparison_bestguess), added to best guesses.
-  const freight = new Map<string, number>();
-  for (const c of cQ.data ?? []) if (c.unit_price_inr_per_1000 !== null && c.landed_price_inr_per_1000 !== null)
-    freight.set(c.vendor_id, Math.max(freight.get(c.vendor_id) ?? 0, Number(c.landed_price_inr_per_1000) - Number(c.unit_price_inr_per_1000)));
+  if (dQ.error) throw dQ.error;
   const discounts: ADiscount[] = [];
   // Per vendor: the buyer's row if there is one (a re-run of normalise keeps it), else the newest system row; only "per_award" counts.
   const rows = [...(dQ.data ?? [])].sort((a, b) => Number(b.basis === "buyer_entered") - Number(a.basis === "buyer_entered"));
@@ -54,6 +39,29 @@ export async function loadInputs(rfxId: string): Promise<Inputs> {
     if (!v.pct || v.treatment !== "per_award") continue;
     discounts.push({ vendor_id: a.vendor_id, pct: Number(v.pct), condition: v.condition ?? null, kind: v.kind ?? "unclear", min_lines: v.min_lines ?? null, min_value_inr: v.min_value_inr ?? null, payment_days: v.payment_days ?? null });
   }
+  return discounts;
+}
+
+// TRD §6.18, §13.5, §14.1–14.2: scenarios saved by rule (Award tab) or from an Ask answer; per-line overrides.
+
+/** The comparison as the allocation engine sees it (same cells, states and qualification as the grid and Ask). */
+export async function loadInputs(rfxId: string): Promise<Inputs> {
+  const [lQ, vQ, cQ, aQ, discounts, rQ] = await Promise.all([
+    db().from("rfx_lines").select("id, line_no, description, annual_qty, ply, item_type, delivery_location").eq("rfx_id", rfxId).order("line_no"),
+    db().from("v_vendor_status").select("vendor_id, vendor, vendor_code, cleared_questionnaire, validity_days").eq("rfx_id", rfxId),
+    db().from("line_quotes").select("rfx_line_id, vendor_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value").eq("rfx_id", rfxId),
+    db().from("questionnaire_answers").select("vendor_id, passes, rfx_questions(mandatory)").eq("rfx_id", rfxId),
+    loadDiscounts(rfxId),
+    db().from("rfx").select("payment_terms_days").eq("id", rfxId).single(),
+  ]);
+  for (const q of [lQ, vQ, cQ, aQ]) if (q.error) throw q.error;
+  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const answers = (aQ.data ?? []) as unknown as { vendor_id: string; passes: boolean | null; rfx_questions: { mandatory: boolean } }[];
+  const mandatory = (id: string) => answers.filter((a) => a.vendor_id === id && a.rfx_questions.mandatory);
+  // Freight per vendor = landed − unit on its priced cells (the same rule as v_comparison_bestguess), added to best guesses.
+  const freight = new Map<string, number>();
+  for (const c of cQ.data ?? []) if (c.unit_price_inr_per_1000 !== null && c.landed_price_inr_per_1000 !== null)
+    freight.set(c.vendor_id, Math.max(freight.get(c.vendor_id) ?? 0, Number(c.landed_price_inr_per_1000) - Number(c.unit_price_inr_per_1000)));
   return {
     discounts, payment_days: rQ.data?.payment_terms_days ?? null,
     lines: (lQ.data ?? []).map((l) => ({ ...l, annual_qty: Number(l.annual_qty), ply: n(l.ply) })),

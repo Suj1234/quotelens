@@ -1,6 +1,7 @@
 "use client";
 
 import { useAskRunner, EarlierQuestions, ExchangeView, PendingView } from "@/components/ask/ask-sheet";
+import { AskSendCtx } from "@/components/ask/ask-card";
 import { Button } from "@/components/ui/button";
 
 // DESIGN §2.14 Ask box + §3.8 (reworked, DECISIONS 2026-09-25 "Decide for Priya"): the box, three suggestions (asked ones
@@ -12,7 +13,7 @@ export function DecideAsk({ rfxId, suggestions }: { rfxId: string; suggestions: 
   const asked = new Set(turns.map((t) => t.q));
   const left = suggestions.filter((q) => !asked.has(q));
   return (
-    <>
+    <AskSendCtx.Provider value={ask}>
       <div className="askbox" style={{ marginTop: 22 }}>
         <textarea placeholder="Ask about this event — cost, risk, a vendor, a line…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Ask a question"
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(text); } }} />
@@ -33,6 +34,6 @@ export function DecideAsk({ rfxId, suggestions }: { rfxId: string; suggestions: 
         </div>
       )}
       <div style={{ marginTop: 16 }}><EarlierQuestions earlier={earlier} rfxId={rfxId} /></div>
-    </>
+    </AskSendCtx.Provider>
   );
 }

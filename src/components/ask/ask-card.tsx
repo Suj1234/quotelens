@@ -1,18 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/download-button";
 import type { AskAnswer } from "@/lib/query/ask";
-import { allocationColumn, type ChartSpec, type Row } from "@/lib/query/result";
+import { allocationColumn, type Row } from "@/lib/query/result";
 import { inrShort, isMoneyColumn, isPctColumn, money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { ProvenanceDrawer } from "@/components/compare/drawer";
 import { useAsk } from "./ask-sheet";
+import { AskChart } from "./charts";
+
+/** P11 #16: sends a follow-up to the analyst conversation the card sits in (absent where there is none: follow-ups hide). */
+export const AskSendCtx = createContext<((message: string) => void) | null>(null);
 
 const PAGE = 25;
 const isPct = isPctColumn, isMoney = isMoneyColumn;
 const label = (c: string) => c === "line_no" ? "Line" : c === "q_no" ? "Q" : (c.replace(/_inr$/, "").replaceAll("_", " ").replace(/^./, (x) => x.toUpperCase()));
+/** P11 #15: prices in the comparison are ₹ per 1000 pieces (the vendor's own figure, original_*, is not). */
+const perThousand = (c: string) => /price/i.test(c) && !/^original_|rank|pct|percent|_inr$|annual|total/i.test(c);
 
 function fmt(c: string, v: unknown): { text: string; num: boolean } {
   if (v === null || v === undefined || v === "") return { text: "—", num: false };
@@ -26,41 +33,38 @@ function fmt(c: string, v: unknown): { text: string; num: boolean } {
   return { text: n.toLocaleString("en-IN", { maximumFractionDigits: 2 }), num: true };
 }
 
-/** DESIGN §2.15: label · track · value, one colour, no library. */
-function Bars({ spec }: { spec: ChartSpec }) {
-  const y = spec.series[0].y;
-  const max = Math.max(...spec.data.map((d) => Math.abs(Number(d[y]) || 0)), 1);
-  const moneyish = isMoney(y) || y === "value";
-  return (
-    <div style={{ marginTop: 10 }}>
-      <div className="text-muted-foreground" style={{ fontSize: 11, marginBottom: 4 }}>{spec.title}</div>
-      {spec.data.map((d, i) => {
-        const v = Number(d[y]) || 0;
-        return (
-          <div className="bar" key={i}>
-            <span className="lbl" title={String(d[spec.x])}>{String(d[spec.x])}</span>
-            <span className="trk"><span className="fill" style={{ width: `${(Math.abs(v) / max * 100).toFixed(1)}%` }} /></span>
-            <span className="v">{moneyish ? inrShort(v) : v.toLocaleString("en-IN")}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+const sortValue = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === null || v === undefined || v === "" ? null : String(v));
 
-function Rows({ columns, rows }: { columns: string[]; rows: Row[] }) {
+/** P11 #14 #15: sortable columns, sticky header, units on prices; a row with a line and a vendor opens that cell's source. */
+function Rows({ columns, rows, cellOf, onOpen }: { columns: string[]; rows: Row[]; cellOf: (r: Row) => string | null; onOpen: (key: string) => void }) {
   const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<{ c: string; dir: 1 | -1 } | null>(null);
+  const sorted = !sort ? rows : [...rows].sort((a, b) => {
+    const x = sortValue(a[sort.c]), y = sortValue(b[sort.c]);
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1; // blanks last either way
+    return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en-IN", { numeric: true })) * sort.dir;
+  });
   const pages = Math.ceil(rows.length / PAGE);
-  const slice = rows.slice(page * PAGE, page * PAGE + PAGE);
+  const slice = sorted.slice(page * PAGE, page * PAGE + PAGE);
+  const by = (c: string) => { setPage(0); setSort(sort?.c === c ? (sort.dir === 1 ? { c, dir: -1 } : null) : { c, dir: 1 }); };
   return (
     <>
       <div className="rows">
         <table className="t">
-          <thead><tr>{columns.map((c) => <th key={c} className={rows.some((r) => fmt(c, r[c]).num) ? "num" : undefined}>{label(c)}</th>)}</tr></thead>
+          <thead><tr>{columns.map((c) => (
+            <th key={c} className={rows.some((r) => fmt(c, r[c]).num) ? "num" : undefined} aria-sort={sort?.c === c ? (sort.dir === 1 ? "ascending" : "descending") : undefined}>
+              <button onClick={() => by(c)} title="Sort">{label(c)}{perThousand(c) && <span className="unit">₹/1000 pcs</span>}{sort?.c === c ? (sort.dir === 1 ? " ↑" : " ↓") : ""}</button>
+            </th>))}</tr></thead>
           <tbody>
-            {slice.map((r, i) => (
-              <tr key={i}>{columns.map((c) => { const f = fmt(c, r[c]); return <td key={c} className={f.num ? "num mono" : undefined}>{f.text}</td>; })}</tr>
-            ))}
+            {slice.map((r, i) => {
+              const key = cellOf(r);
+              return (
+                <tr key={i} className={key ? "open-src" : undefined} onClick={key ? () => onOpen(key) : undefined} title={key ? "Open where this price came from" : undefined}
+                  tabIndex={key ? 0 : undefined} onKeyDown={key ? (e) => { if (e.key === "Enter") onOpen(key); } : undefined}>
+                  {columns.map((c) => { const f = fmt(c, r[c]); return <td key={c} className={f.num ? "num mono" : undefined}>{f.text}</td>; })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -117,6 +121,16 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
   }
 
   const unsureInScope = a.exclusions.some((e) => e.cells) || a.columns.includes("state");
+  // P11 #14: the cell a row points at — its line and its vendor (by code, or by name through the RFx's vendor list).
+  const [cell, setCell] = useState<string | null>(null);
+  const vcol = cur.columns.find((c) => c === "vendor_code") ?? cur.columns.find((c) => c === "vendor") ?? cur.columns.find((c) => /vendor/i.test(c) && !/runner|second|next|alt|count|_id$/i.test(c));
+  const cellOf = (r: Row): string | null => {
+    if (!vcol || !cur.columns.includes("line_no") || r.line_no === null || r.line_no === undefined) return null;
+    const v = String(r[vcol] ?? ""), code = (cur.vendors ?? []).find((x) => x.code === v || x.name === v)?.code;
+    return code ? `${r.line_no}:${code}` : null;
+  };
+  const send = useContext(AskSendCtx);
+  const followUps = send ? cur.follow_ups ?? [] : []; // questions only, so a locked RFx keeps them
   return (
     <div className="qa">
       <div className="q qhead">
@@ -126,6 +140,8 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
       <div className="a">{cur.answer_text}</div>
       {!collapsed && <>
       {cur.exclusions.length > 0 && <div className="excl">Excluded: {exclText(cur)}</div>}
+      {cur.truncated && <div className="excl">More than {cur.rows.length.toLocaleString("en-IN")} rows — only the first {cur.rows.length.toLocaleString("en-IN")} are kept, so no total or chart is shown. Ask a narrower question.</div>}
+      {cur.discount_note && <div className="note">{cur.discount_note}</div>}
       {a.ok && (
         <div className="how">
           How I computed this: {cur.computed_note || "one query over the comparison."}{" "}
@@ -133,8 +149,12 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
         </div>
       )}
       {sqlOpen && cur.sql && <pre>{cur.sql}</pre>}
-      {cur.chart_spec && <Bars spec={cur.chart_spec} />}
-      {cur.rows.length > 0 && <Rows key={cur.query_id} columns={cur.columns} rows={cur.rows} />}
+      {cur.chart_spec && <AskChart spec={cur.chart_spec} vendors={cur.vendors ?? []} />}
+      {cur.rows.length > 0 && <Rows key={cur.query_id} columns={cur.columns} rows={cur.rows} cellOf={cellOf} onOpen={setCell} />}
+      {cell && <ProvenanceDrawer key={cell} rfxId={rfxId} cellKey={cell} basis={cur.columns.some((c) => /landed/i.test(c)) ? "landed" : "unit"} canReview={false} onClose={() => setCell(null)} />}
+      {followUps.length > 0 && (
+        <div className="fu sugg">{followUps.map((f) => <button key={f.label} onClick={() => send!(f.message)}>{f.label}</button>)}</div>
+      )}
       {a.ok && a.rows.length === 0 && <div className="hint" style={{ marginTop: 8 }}>The query returned no rows.</div>}
       {bg?.best_guess && (
         <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>

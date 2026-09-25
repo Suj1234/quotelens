@@ -13,6 +13,11 @@ export const VIEWS: Record<string, string[]> = {
   v_documents: ["rfx_id", "vendor", "vendor_code", "file_name", "mime", "page_count", "kind", "caption", "source", "is_clarification", "received_at"],
   v_vendor_terms: ["rfx_id", "vendor", "vendor_code", "currency", "payment_days", "payment_terms_raw", "validity_days", "validity_until", "freight_included", "freight_terms_raw",
     "taxes_included", "tax_terms_raw", "total_discount_pct", "total_discount_condition", "references_prior_pricing", "references_prior_pricing_text", "other_notes"],
+  // P11 (migration 0019)
+  v_line_stats: ["rfx_id", "line_no", "description", "ply", "item_type", "annual_qty", "quotes", "qualified_quotes", "lowest_price", "lowest_vendor", "second_price", "second_vendor",
+    "median_price", "highest_price", "spread_pct", "gap_to_second_pct", "lowest_qualified_price", "lowest_qualified_vendor", "lowest_annual_value"],
+  v_messages: ["rfx_id", "vendor", "vendor_code", "direction", "kind", "subject", "status", "sent_at", "received_at", "attachments"],
+  v_review_cards: ["rfx_id", "vendor", "vendor_code", "line_no", "type", "title", "status", "created_at", "updated_at"],
 };
 
 // Every table in migrations 0001–0005 (+ the migration log). Named anywhere → rejected, even as an alias.

@@ -40,6 +40,7 @@ export function GeneralCards({ tab, settings, jevKey }: { tab: GeneralTabKey; se
     <div className="grid2">
       <DecisionCard settings={settings} jevKey={jevKey} busy={busy} save={save} />
       <PriceCheckCard p={settings.price_check} busy={busy === "price_check"} save={save} />
+      <AskLimitCard l={settings.ask_limit} busy={busy === "ask_limit"} save={save} />
     </div>
   );
   return <div className="grid2"><FxCard rates={settings.fx_rates} busy={busy === "fx_rates"} save={save} /></div>;
@@ -89,6 +90,29 @@ function PriceCheckCard({ p, busy, save }: { p: Settings["price_check"]; busy: b
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Button size="sm" disabled={!dirty || busy} onClick={() => save("price_check", { median_ratio: Number(ratio) }, `price check ${ratio}×. ${NEXT_RUN}`)}>{busy ? "Saving…" : "Save price check"}</Button>
           <span className="hint">{NEXT_RUN}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** P11 #6: how many questions one person can ask in a window (every Ask message and every Award "describe a split" counts). */
+function AskLimitCard({ l, busy, save }: { l: Settings["ask_limit"]; busy: boolean; save: Save }) {
+  const [q, setQ] = useState(String(l.questions));
+  const [m, setM] = useState(String(l.minutes));
+  const dirty = Number(q) !== l.questions || Number(m) !== l.minutes;
+  return (
+    <div className="card">
+      <div className="hd"><b>Ask limit</b></div>
+      <div className="bd radios">
+        <div className="small">Each Ask message runs several AI calls. The limit is per person; over it, Ask says when to try again.</div>
+        <dl className="kv" style={{ marginTop: 6, alignItems: "center" }}>
+          <dt>Questions</dt><dd className="unit"><input className="ta mono num-in" type="number" step="1" min="1" max="1000" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Questions" /> per person</dd>
+          <dt>Window</dt><dd className="unit"><input className="ta mono num-in" type="number" step="1" min="1" max="1440" value={m} onChange={(e) => setM(e.target.value)} aria-label="Window in minutes" /> minutes</dd>
+        </dl>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Button size="sm" disabled={!dirty || busy} onClick={() => save("ask_limit", { questions: Number(q), minutes: Number(m) }, `Ask limit ${q} per ${m} min`)}>{busy ? "Saving…" : "Save Ask limit"}</Button>
+          <span className="hint">Applies from the next question.</span>
         </div>
       </div>
     </div>

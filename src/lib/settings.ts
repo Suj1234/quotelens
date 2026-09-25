@@ -12,6 +12,7 @@ const DEFAULTS: Settings = {
   email_mode: "mock", decision_provider: "auto", thresholds: { act: 0.85, review: 0.6 },
   fx_rates: {}, vendor_addresses: {},
   price_check: PRICE_CHECK_DEFAULT, // P9 Q3: 2× median (the ₹/kg band is in the category template, P10 S4)
+  ask_limit: { questions: 30, minutes: 10 }, // P11 #6 (the human, 25 Sep 2026)
   category_templates: {}, // none until seeded (scripts/seed-template.ts) or set in Settings → Masters; the co-pilot then asks for everything
 };
 

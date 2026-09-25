@@ -14,6 +14,10 @@
   --indigo: #4757A6; --indigo-bg: #E7EAF6; --red: #A93A2E; --red-bg: #F7E6E3;
   --shadow: 0 12px 32px rgba(20,22,26,.10);
   --rail: 56px; --sheet: 400px; --drawer: 480px;
+  /* P11 #12 chart colours (dataviz reference palette, validated on --surface light + dark): one fixed colour per vendor in grid
+     order (--v1…--v8), a one-hue ramp for the heatmap, a blue ↔ red pair for signed changes. Text never wears these. */
+  --v1: #2a78d6; --v2: #eb6834; --v3: #1baf7a; --v4: #eda100; --v5: #e87ba4; --v6: #008300; --v7: #4a3aa7; --v8: #e34948;
+  --seq-lo: #cde2fb; --seq-hi: #5598e7; --div-pos: #2a78d6; --div-neg: #e34948;
 
   /* shadcn variables mapped onto our tokens (never shadcn defaults) */
   --background: var(--paper); --foreground: var(--ink);
@@ -35,6 +39,8 @@
     --accent: #57B3AE; --accent-ink: #86CFCA; --accent-tint: #1F3231; --amber: #E2A650; --amber-bg: #3A2E18;
     --green: #72C08C; --green-bg: #1D3326; --indigo: #9DA8EA; --indigo-bg: #272C47; --red: #E48D81; --red-bg: #3F2420;
     --shadow: 0 12px 32px rgba(0,0,0,.45);
+    --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181; --v6: #008300; --v7: #9085e9; --v8: #e66767;
+    --seq-lo: #104281; --seq-hi: #3987e5; --div-pos: #3987e5; --div-neg: #e66767;
   }
 }
 :root[data-theme="dark"] {
@@ -44,6 +50,8 @@
   --accent: #57B3AE; --accent-ink: #86CFCA; --accent-tint: #1F3231; --amber: #E2A650; --amber-bg: #3A2E18;
   --green: #72C08C; --green-bg: #1D3326; --indigo: #9DA8EA; --indigo-bg: #272C47; --red: #E48D81; --red-bg: #3F2420;
   --shadow: 0 12px 32px rgba(0,0,0,.45);
+  --v1: #3987e5; --v2: #d95926; --v3: #199e70; --v4: #c98500; --v5: #d55181; --v6: #008300; --v7: #9085e9; --v8: #e66767;
+  --seq-lo: #104281; --seq-hi: #3987e5; --div-pos: #3987e5; --div-neg: #e66767;
 }
 
 @theme inline {
@@ -347,6 +355,39 @@
   .bar .trk { flex: 1; height: 10px; background: var(--tint2); border-radius: 2px; overflow: hidden; }
   .bar .fill { display: block; height: 100%; background: var(--accent); }
   .bar .v { font-family: var(--font-mono); width: 80px; text-align: right; }
+  /* P11 #12 chart forms (components/ask/charts.tsx) */
+  .tip { position: relative; }
+  .tip[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); z-index: 6; background: var(--ink); color: var(--paper); font-family: var(--font-sans); font-size: 11px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+  .bar.div .trk { position: relative; overflow: visible; background: transparent; }
+  .bar.div .trk .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--hair); }
+  .bar.div .trk .fill { position: absolute; top: 0; height: 100%; }
+  .share-bar { display: flex; gap: 2px; height: 14px; }
+  .share-bar > span { display: block; min-width: 3px; }
+  .share-bar > span:first-child { border-radius: 4px 0 0 4px; }
+  .share-bar > span:last-child { border-radius: 0 4px 4px 0; }
+  .share-bar > span:only-child { border-radius: 4px; }
+  .share-legend { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: 12px; }
+  .share-legend > div { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+  .share-legend > div > span { white-space: nowrap; }
+  .share-legend i { width: 9px; height: 9px; border-radius: 2px; }
+  .share-legend .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink2); }
+  .share-legend > div > :last-child { text-align: right; }
+  .heat { overflow: auto; max-height: 320px; border: 1px solid var(--hair2); border-radius: 5px; }
+  .heat table { border-collapse: separate; border-spacing: 2px; font-size: 11px; width: 100%; }
+  .heat th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 500; text-align: right; padding: 4px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 1; }
+  .heat th:first-child, .heat td.ln { text-align: left; color: var(--muted); }
+  .heat td { padding: 4px 6px; text-align: right; border-radius: 3px; color: var(--ink); white-space: nowrap; }
+  .heat td.low { box-shadow: inset 2px 0 0 var(--accent); font-weight: 600; }
+  .heat-key { display: inline-block; width: 90px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, var(--seq-lo), var(--seq-hi)); }
+  /* P11 #15: sortable, sticky-header answer tables; #14: rows that open a cell's source */
+  .qa .rows thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .qa .rows th button { font: inherit; color: inherit; display: inline-flex; gap: 3px; align-items: center; }
+  .qa .rows th button:hover { color: var(--ink); }
+  .qa .rows tr.open-src { cursor: pointer; }
+  .qa .rows tr.open-src:hover td { background: var(--tint); }
+  .qa .rows th .unit { font-weight: 400; color: var(--faint); }
+  .qa .fu { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .qa .note { margin-top: 8px; font-size: 12px; color: var(--ink2); }
   /* prototype: suggestion chips, drop zone, co-pilot */
   .sugg { display: flex; gap: 6px; flex-wrap: wrap; }
   .sugg button { border: 1px solid var(--hair); border-radius: 14px; padding: 3px 10px; font-size: 12px; color: var(--ink2); background: var(--surface); text-align: left; }

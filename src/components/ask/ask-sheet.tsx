@@ -4,9 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { AskAnswer } from "@/lib/query/ask";
-import { inrShort, shortDate } from "@/lib/format";
+import { inrShort, money, shortDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { AskCard } from "./ask-card";
+import { ProvenanceDrawer } from "@/components/compare/drawer";
+import { AskCard, AskSendCtx } from "./ask-card";
 
 // DESIGN §3.7: the buyer opens Ask from the RFx header, the approver from the Comparison toolbar — the same 400px sheet.
 const AskCtx = createContext<{ open: () => void; locked: boolean; userId: string } | null>(null);
@@ -37,6 +38,8 @@ export function AskButton() {
 }
 
 type Action = { tool: string; text: string; data?: unknown };
+/** The message in flight: its steps so far and the reply text as the model writes it (replaced by the checked reply). */
+type Pending = { q: string; steps: string[]; draft?: string };
 /** One exchange: the user's message and the analyst's reply with what its tools did; or an earlier answer reopened. */
 export type Exchange = { key: string; q: string; reply?: string; actions?: Action[]; context?: string; error?: string; earlier?: AskAnswer };
 
@@ -68,7 +71,7 @@ export function useAskRunner(rfxId: string, { fresh = false }: { fresh?: boolean
   }, [key, fresh]);
   const [history, setHistory] = useState<AskAnswer[] | null>(null);
   const [text, setText] = useState("");
-  const [pending, setPending] = useState<{ q: string; steps: string[] } | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     fetch(`/api/ask/history?rfx=${rfxId}`).then((r) => r.json()).then((b) => setHistory(b.items ?? [])).catch(() => setHistory([]));
@@ -102,7 +105,8 @@ export function useAskRunner(rfxId: string, { fresh = false }: { fresh?: boolean
         const lines = buf.split("\n"); buf = lines.pop() ?? "";
         for (const l of lines.filter(Boolean)) {
           const ev = JSON.parse(l);
-          if (ev.type === "step") setPending((p) => (p ? { ...p, steps: [...p.steps, ev.text] } : p));
+          if (ev.type === "step") setPending((p) => (p ? { ...p, steps: [...p.steps, ev.text], draft: "" } : p));
+          else if (ev.type === "draft") setPending((p) => (p ? { ...p, draft: ev.text } : p)); // P11 #17: the reply as it is written
           else if (ev.type === "done") done = { key: crypto.randomUUID(), q: message, reply: ev.reply, actions: ev.actions, context: ev.context };
           else if (ev.type === "error") throw new Error(`${ev.error} (${ev.code})`);
         }
@@ -138,7 +142,9 @@ export function ExchangeView({ t, rfxId }: { t: Exchange; rfxId: string }) {
       })()}
       {acts.map((a, i) => {
         const d = (a.data ?? {}) as Record<string, string>;
-        if (a.tool === "query_data") return <AskCard key={i} a={a.data as AskAnswer} rfxId={rfxId} />;
+        if (a.tool === "query_data" || a.tool === "show_chart") return <AskCard key={i} a={a.data as AskAnswer} rfxId={rfxId} />;
+        if (a.tool === "what_if") return <WhatIfView key={i} d={a.data as WhatIfData} />;
+        if (a.tool === "explain_cell") return <CellLink key={i} rfxId={rfxId} d={a.data as { line_no: number; vendor_code: string; vendor: string }} />;
         if (a.tool === "export") return <div key={i} className="ask-act"><Button asChild size="sm"><a href={d.url} download>Download · {d.label}</a></Button></div>;
         if (a.tool === "draft_clarification") return <ClarDraft key={i} rfxId={rfxId} d={a.data as ClarData} />;
         if (a.tool === "compare_scenarios") return <CompareView key={i} d={a.data as CompareData} />;
@@ -151,6 +157,41 @@ export function ExchangeView({ t, rfxId }: { t: Exchange; rfxId: string }) {
         );
         return null;
       })}
+    </div>
+  );
+}
+
+type WhatIfData = { rule: string; changes: string[]; before: { quoted: number; after: number }; after: { quoted: number; after: number }; diff: number;
+  changed: { line_no: number; from: string; to: string }[]; share: { vendor: string; lines: number; value: number }[] };
+/** P11 #9: before and after, worked out by the award engine; nothing is saved. */
+function WhatIfView({ d }: { d: WhatIfData }) {
+  const disc = d.before.quoted !== d.before.after || d.after.quoted !== d.after.after;
+  return (
+    <div className="qa">
+      <div className="hint">What if: {d.changes.join("; ")} · {d.rule}</div>
+      <div className="rows" style={{ maxHeight: "none" }}>
+        <table className="t">
+          <thead><tr><th /><th className="num">Before</th><th className="num">After</th><th className="num">Change</th></tr></thead>
+          <tbody>
+            <tr><td>Total as quoted</td><td className="num mono">{money(Math.round(d.before.quoted))}</td><td className="num mono">{money(Math.round(d.after.quoted))}</td><td className="num mono">{signed(d.after.quoted - d.before.quoted)}</td></tr>
+            {disc && <tr><td>After vendor discounts</td><td className="num mono">{money(Math.round(d.before.after))}</td><td className="num mono">{money(Math.round(d.after.after))}</td><td className="num mono">{signed(d.diff)}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {d.changed.length > 0 && <div className="small" style={{ marginTop: 8, fontSize: 12 }}>{d.changed.length} line{d.changed.length === 1 ? "" : "s"} change vendor: {d.changed.slice(0, 8).map((l) => `line ${l.line_no} ${l.from} → ${l.to}`).join("; ")}{d.changed.length > 8 ? "; …" : ""}</div>}
+      <div className="hint" style={{ marginTop: 6 }}>Nothing is saved. Save a scenario to keep an option.</div>
+    </div>
+  );
+}
+const signed = (n: number) => (Math.round(n) === 0 ? "—" : `${n > 0 ? "+" : "−"}${money(Math.round(Math.abs(n)))}`);
+
+/** P11 #8: the traced price, one click from its source. */
+function CellLink({ rfxId, d }: { rfxId: string; d: { line_no: number; vendor_code: string; vendor: string } }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ask-act">
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>Open the source · line {d.line_no} · {d.vendor}</Button>
+      {open && <ProvenanceDrawer rfxId={rfxId} cellKey={`${d.line_no}:${d.vendor_code}`} basis="unit" canReview={false} onClose={() => setOpen(false)} />}
     </div>
   );
 }
@@ -201,13 +242,14 @@ function ClarDraft({ rfxId, d }: { rfxId: string; d: ClarData }) {
 }
 
 /** The message in flight: what the agent is doing, step by step. */
-export function PendingView({ p, elapsed }: { p: { q: string; steps: string[] }; elapsed: number }) {
+export function PendingView({ p, elapsed }: { p: Pending; elapsed: number }) {
   return (
     <div className="ask-ex">
       <div className="msg me">{p.q}</div>
       <div className="msg cp">
-        {p.steps.map((s, i) => <div key={i} className="text-muted-foreground" style={{ fontSize: 12.5 }}>{i < p.steps.length - 1 ? `✓ ${s.replace(/…$/, "")}` : s}</div>)}
-        <div className="text-muted-foreground" style={{ fontSize: 12.5 }}>{p.steps.length ? "" : "Thinking… "}<span className="mono">{(elapsed / 1000).toFixed(1)} s</span></div>
+        {p.steps.map((s, i) => <div key={i} className="text-muted-foreground" style={{ fontSize: 12.5 }}>{i < p.steps.length - 1 || p.draft ? `✓ ${s.replace(/…$/, "")}` : s}</div>)}
+        {p.draft && <div style={{ marginTop: p.steps.length ? 6 : 0 }}>{p.draft}</div>}
+        <div className="text-muted-foreground" style={{ fontSize: 12.5 }}>{p.steps.length || p.draft ? "" : "Thinking… "}<span className="mono">{(elapsed / 1000).toFixed(1)} s</span></div>
       </div>
     </div>
   );
@@ -252,7 +294,7 @@ export function AskChat({ rfxId, page = false, onClose }: { rfxId: string; page?
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [turns.length, pending?.steps.length]);
   const asked = new Set(turns.map((t) => t.q));
   return (
-    <>
+    <AskSendCtx.Provider value={ask}>
       <div className="hd">
         <b>Ask</b>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -278,7 +320,7 @@ export function AskChat({ rfxId, page = false, onClose }: { rfxId: string; page?
           <Button size="sm" variant="default" disabled={!text.trim() || !!pending} onClick={() => ask(text)}>{pending ? "Working…" : "Ask"}</Button>
         </div>
       </div>
-    </>
+    </AskSendCtx.Provider>
   );
 }
 
