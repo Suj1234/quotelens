@@ -42,3 +42,8 @@ next-env.d.ts
 
 !.env.example
 .gstack/
+
+# product training video (local only)
+video/
+docs/QuoteLens_One_Page_Note_Sujeet_Kumar.pdf
+docs/one_page_note.html
