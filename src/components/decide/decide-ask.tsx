@@ -8,10 +8,8 @@ import { Button } from "@/components/ui/button";
 // drop out), this visit's exchanges newest first, then the user's own past answers collapsed under "Earlier questions" (as in
 // the Ask sheet); nothing from an earlier visit opens by default (DECISIONS 2026-09-25 "Ask chat per user").
 // P9 C13–C14: the same analyst agent as the Ask sheet; a suggestion fills the box instead of sending.
-export function DecideAsk({ rfxId, suggestions }: { rfxId: string; suggestions: string[] }) {
-  const { turns, earlier, text, setText, pending, elapsed, ask } = useAskRunner(rfxId, { fresh: true });
-  const asked = new Set(turns.map((t) => t.q));
-  const left = suggestions.filter((q) => !asked.has(q));
+export function DecideAsk({ rfxId }: { rfxId: string }) {
+  const { turns, earlier, text, setText, pending, elapsed, ask, next: left } = useAskRunner(rfxId, { fresh: true });
   return (
     <AskSendCtx.Provider value={ask}>
       <div className="askbox" style={{ marginTop: 22 }}>

@@ -13,12 +13,6 @@ import { AskCard, AskSendCtx } from "./ask-card";
 const AskCtx = createContext<{ open: () => void; locked: boolean; userId: string } | null>(null);
 export const useAsk = () => useContext(AskCtx);
 
-const SUGGESTIONS = [
-  "Cheapest vendor per line, only among vendors who cleared the questionnaire",
-  "What does that save versus awarding everything to the cheapest single vendor?",
-  "Which lines have only one qualified quote?",
-  "Which cells are you not sure about, and how much money rides on them?",
-];
 
 export function AskProvider({ rfxId, userId, locked = false, children }: { rfxId: string; userId: string; locked?: boolean; children: React.ReactNode }) {
   const [isOpen, setOpen] = useState(false);
@@ -70,11 +64,13 @@ export function useAskRunner(rfxId: string, { fresh = false }: { fresh?: boolean
     return () => window.removeEventListener("storage", on);
   }, [key, fresh]);
   const [history, setHistory] = useState<AskAnswer[] | null>(null);
+  // The questions offered above the box: worked out from this RFx's data on the server (lib/query/suggest.ts).
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    fetch(`/api/ask/history?rfx=${rfxId}`).then((r) => r.json()).then((b) => setHistory(b.items ?? [])).catch(() => setHistory([]));
+    fetch(`/api/ask/history?rfx=${rfxId}`).then((r) => r.json()).then((b) => { setHistory(b.items ?? []); setSuggestions(b.suggestions ?? []); }).catch(() => setHistory([]));
   }, [rfxId]);
   useEffect(() => {
     if (!pending) return;
@@ -123,7 +119,10 @@ export function useAskRunner(rfxId: string, { fresh = false }: { fresh?: boolean
   const shown = new Set(turns.flatMap((t) => [t.earlier?.query_id, ...(t.actions ?? []).map((a) => (a.data as AskAnswer | undefined)?.query_id)]));
   const earlier = (history ?? []).filter((h) => !shown.has(h.query_id));
   const clear = () => setTurns([]);
-  return { turns, earlier, text, setText, pending, elapsed, ask, clear };
+  // Always three: the first ones not asked yet in this conversation; asking one brings the next in.
+  const asked = new Set(turns.map((t) => t.q));
+  const next = suggestions.filter((q) => !asked.has(q)).slice(0, 3);
+  return { turns, earlier, text, setText, pending, elapsed, ask, clear, next };
 }
 
 const ASKED = new Set(["save_scenario", "compare_scenarios", "override_scenario_line", "draft_award_memo"]);
@@ -283,7 +282,7 @@ export function EarlierQuestions({ earlier, rfxId }: { earlier: AskAnswer[]; rfx
 
 /** The Ask conversation: the side sheet (with "Open in new tab") and the full page /rfx/{id}/ask share it. */
 export function AskChat({ rfxId, page = false, onClose }: { rfxId: string; page?: boolean; onClose?: () => void }) {
-  const { turns, earlier, text, setText, pending, elapsed, ask, clear } = useAskRunner(rfxId);
+  const { turns, earlier, text, setText, pending, elapsed, ask, clear, next } = useAskRunner(rfxId);
   const log = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!onClose) return;
@@ -292,7 +291,6 @@ export function AskChat({ rfxId, page = false, onClose }: { rfxId: string; page?
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [turns.length, pending?.steps.length]);
-  const asked = new Set(turns.map((t) => t.q));
   return (
     <AskSendCtx.Provider value={ask}>
       <div className="hd">
@@ -311,7 +309,7 @@ export function AskChat({ rfxId, page = false, onClose }: { rfxId: string; page?
       </div>
       <div className="ft">
         <div className="sugg">
-          {SUGGESTIONS.filter((s) => !asked.has(s)).slice(0, 3).map((s) => <button key={s} disabled={!!pending} onClick={() => setText(s)}>{s}</button>)}
+          {next.map((s) => <button key={s} disabled={!!pending} onClick={() => setText(s)}>{s}</button>)}
         </div>
         <textarea className="ta" style={{ minHeight: 52, resize: "none" }} placeholder="Ask about prices, coverage, terms, documents… or say what to do" value={text}
           onChange={(e) => setText(e.target.value)}

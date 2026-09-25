@@ -11,8 +11,6 @@ import { Button } from "@/components/ui/button";
 import { DecideAsk } from "@/components/decide/decide-ask";
 
 const UNSURE = ["low_confidence", "ambiguous", "references_prior", "conflict"];
-const SUGGESTIONS = ["What does the cheapest-per-line split save versus awarding everything to the cheapest single vendor?",
-  "Which lines have only one qualified quote?", "Which cells are you not sure about, and how much money rides on them?"];
 
 // DESIGN §3.8 Decide — the approver's default tab, reworked on the human's review (DECISIONS 2026-09-25 "Decide for Priya"):
 // is there something for me (status) → can I trust it (only when something is in doubt) → what it costs → Ask.
@@ -90,7 +88,7 @@ export default async function DecidePage({ params }: PageProps<"/rfx/[id]/decide
         </div>
       </div></div>
 
-      <DecideAsk rfxId={id} suggestions={SUGGESTIONS} />
+      <DecideAsk rfxId={id} />
     </div>
   );
 }

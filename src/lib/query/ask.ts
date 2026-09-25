@@ -7,6 +7,7 @@ import { audit } from "@/lib/log";
 import { getComparison, type GridCell, type GridVendor } from "@/lib/comparison";
 import { isMoneyColumn, money } from "@/lib/format";
 import { guardSql, rewriteBestGuess } from "./sql-guard";
+import { suggestQuestions } from "./suggest";
 import { aggregates, CHART_TYPES, chartSpec, followUps, primaryTotal, unverifiedNumbers, type ChartSpec, type ChartType, type FollowUp, type Row } from "./result";
 
 // TRD §9.8 P-SQL, plus later views and guard notes (DECISIONS P4-T2). v2: export note; v3: unsure cells have no price; v4: allocations one row per line; v5: no v_assumptions fan-out in totals; v6 (P9 C2): v_documents, v_vendor_terms; v7 (P11 #10 #11 #18): column dictionary with units and allowed values, v_line_stats, v_messages, v_review_cards, five generic query patterns (v1–v6 in prompts/archive/).
@@ -420,4 +421,23 @@ export async function askTurn(rfxId: string, userId: string, via: "analyst" | "a
   if (error) throw error;
   if ((count ?? 0) >= lim.questions) throw new AppError("RATE_LIMITED", `You've asked ${lim.questions} questions in the last ${lim.minutes} minutes — the limit set in Settings. Try again in a few minutes.`, undefined, 429);
   await audit({ rfx_id: rfxId, actor: userId, event: "ask.turn", payload: { via } });
+}
+
+/** The questions offered above the Ask box, from this RFx's own data (suggest.ts). */
+export async function rfxSuggestions(rfxId: string): Promise<string[]> {
+  const [vs, terms, cells, scen] = await Promise.all([
+    db().from("v_vendor_status").select("vendor, status, cleared_questionnaire, lines_priced, lines_total, freight_included").eq("rfx_id", rfxId),
+    db().from("v_vendor_terms").select("vendor, currency, total_discount_pct").eq("rfx_id", rfxId),
+    db().from("line_quotes").select("id", { count: "exact", head: true }).eq("rfx_id", rfxId).in("state", UNSURE),
+    db().from("scenarios").select("id", { count: "exact", head: true }).eq("rfx_id", rfxId),
+  ]);
+  for (const q of [vs, terms, cells, scen]) if (q.error) throw q.error;
+  return suggestQuestions({
+    vendors: (vs.data ?? []).map((v) => {
+      const t = (terms.data ?? []).find((x) => x.vendor === v.vendor);
+      return { name: v.vendor, cleared: v.cleared_questionnaire, status: v.status, lines_priced: Number(v.lines_priced), lines_total: Number(v.lines_total),
+        freight_included: v.freight_included, currency: t?.currency ?? null, discount_pct: t?.total_discount_pct === null || t?.total_discount_pct === undefined ? null : Number(t.total_discount_pct) };
+    }),
+    unsure_cells: cells.count ?? 0, scenarios: scen.count ?? 0,
+  });
 }
