@@ -6,6 +6,7 @@ import { countWord, inrShort, longDate, shortDate, cap } from "@/lib/format";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
+import { seedPickVendors } from "@/lib/responses";
 import { ReadReplies } from "@/components/rfx/read-replies";
 import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { RowLink } from "@/components/rfx/row-link";
@@ -76,7 +77,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
       </div>
 
       <div className="card" style={{ marginTop: 18 }}>
-        <div className="hd"><b>Vendors</b><span style={{ display: "flex", gap: 10, alignItems: "center" }}><span className="hint">{o.mode === "mock" ? "Mock email" : o.mode === "gmail" ? "Gmail" : o.mode} · <Link href="/settings">change</Link> · click a row for the response</span>{o.mode === "mock" && !locked && <LoadSeed rfxId={id} />}</span></div>
+        <div className="hd"><b>Vendors</b><span style={{ display: "flex", gap: 10, alignItems: "center" }}><span className="hint">{o.mode === "mock" ? "Mock email" : o.mode === "gmail" ? "Gmail" : o.mode} · <Link href="/settings">change</Link> · click a row for the response</span>{o.mode === "mock" && !locked && <LoadSeed rfxId={id} vendors={await seedPickVendors(id)} />}</span></div>
         <div style={{ overflowX: "auto" }}>
           <table className="t">
             <thead><tr><th>Vendor</th><th>Reply format</th><th>Received</th><th className="num">Priced</th><th>Valid to</th><th>Questionnaire</th><th className="num">Needs you</th><th /></tr></thead>

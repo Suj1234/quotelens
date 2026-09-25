@@ -10,7 +10,7 @@ export type RfxListRow = ListRow;
 export async function listRfx(): Promise<RfxListRow[]> {
   const { data, error } = await db()
     .from("rfx")
-    .select("id, code, title, status, response_deadline, created_at, updated_at, rfx_lines(count), rfx_vendors(count), review_items(count), responses(vendor_id, is_clarification, pipeline_status, stage_errors, updated_at), awards(status, approved_at, scenarios(total_inr))")
+    .select("id, code, title, status, response_deadline, created_at, updated_at, rfx_lines(count), rfx_vendors(vendor_id), review_items(count), responses(vendor_id, is_clarification, pipeline_status, stage_errors, updated_at), awards(status, approved_at, scenarios(total_inr))")
     .in("review_items.status", ["open", "asked_vendor"]) // waiting on a vendor still needs a decision
     .order("code", { ascending: false });
   if (error) throw error;
@@ -23,11 +23,11 @@ export async function listRfx(): Promise<RfxListRow[]> {
     open_reviews: r.review_items[0]?.count ?? 0,
     approved_at: award?.status === "approved" ? award.approved_at : null,
     lines: r.rfx_lines[0]?.count ?? 0,
-    invited: r.rfx_vendors[0]?.count ?? 0,
+    invited: r.rfx_vendors.length,
     // Same rule as the Overview: a vendor's reply that hasn't been through the six stages keeps the event from "Ready to award".
     memo: award?.status === "draft" || award?.status === "sent_back" ? award.status : null,
     unread: r.responses.filter((x) => x.vendor_id && readingOf(x.pipeline_status, x.stage_errors, x.updated_at).state !== "read").length,
-    responded: new Set(r.responses.filter((x) => x.vendor_id && !x.is_clarification).map((x) => x.vendor_id)).size,
+    responded: new Set(r.responses.filter((x) => x.vendor_id && !x.is_clarification && r.rfx_vendors.some((v) => v.vendor_id === x.vendor_id)).map((x) => x.vendor_id)).size, // invited vendors only (never "5 of 4")
     annual_value: award?.status === "approved" && award.scenarios?.total_inr != null ? Number(award.scenarios.total_inr) : null,
     };
   });

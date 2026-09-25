@@ -10,5 +10,8 @@ export const POST = route(async (req: Request, ctx: RouteContext<"/api/rfx/[id]/
   const { id } = await ctx.params;
   await assertOpen({ rfx: id });
   const set = new URL(req.url).searchParams.get("set") === "realistic" ? "realistic" : "clean";
-  return { response_ids: await loadSeedResponses(id, set, user.id) };
+  const body = await req.json().catch(() => ({}));
+  const vendorIds = Array.isArray(body?.vendor_ids) ? body.vendor_ids.filter((v: unknown): v is string => typeof v === "string") : undefined;
+  const { ids, rerun } = await loadSeedResponses(id, set, user.id, vendorIds);
+  return { response_ids: ids, rerun_ids: rerun };
 });

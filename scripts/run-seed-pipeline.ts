@@ -21,7 +21,7 @@ const t0 = Date.now();
 let ids: string[];
 if (from === "classify") {
   console.log(`[seed-pipeline] loading ${set} seed responses into ${code}…`);
-  ids = await loadSeedResponses(rfx.id, set, "system");
+  ids = (await loadSeedResponses(rfx.id, set, "system")).ids;
 } else {
   const { data } = await db().from("responses").select("id").eq("rfx_id", rfx.id).eq("source", "seed");
   ids = (data ?? []).map((r) => r.id);

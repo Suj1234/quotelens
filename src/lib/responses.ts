@@ -122,55 +122,91 @@ export async function seedReply(vendorCode: string, set: "clean" | "realistic" =
   return { files, emailText: e.email ? (await get("seed", `seed/${e.email}`)).toString("utf8") : null };
 }
 
-/**
- * Replace this RFx's previously seeded responses (and their pipeline outputs) with a fresh copy of the dataset.
- * Responses from other sources are left untouched.
- */
-export async function loadSeedResponses(rfxId: string, set: "clean" | "realistic", actor: string): Promise<string[]> {
-  const { data: rfx } = await db().from("rfx").select("code, title").eq("id", rfxId).single();
-  if (!rfx) throw new AppError("NOT_FOUND", "RFx not found", undefined, 404);
-  const { data: vendors } = await db().from("vendors").select("id, short_code");
-  const vendorId = (code: string) => vendors?.find((v) => v.short_code === code)?.id ?? null;
+/** Vendor short codes the dataset has a sample reply for (the same five in both sets). */
+export const SEED_VENDORS = SEED_SETS.clean.map((e) => e.vendor);
 
-  await clearResponses(rfxId, "seed");
-
-  const ids: string[] = [];
-  for (const e of SEED_SETS[set]) {
-    const reply = await seedReply(e.vendor, set);
-    ids.push(await createResponse({
-      rfxId, vendorId: vendorId(e.vendor), source: "seed", files: reply!.files, emailText: reply!.emailText, actor, subject: `Re: RFx ${rfx.code} - ${rfx.title}`,
-    }));
-  }
-  await audit({ rfx_id: rfxId, actor, event: "seed.responses_loaded", payload: { set, responses: ids.length } });
-  return ids;
+export type SeedPickVendor = { id: string; name: string; available: boolean; replied: boolean; seeded: boolean };
+/** The picker's rows: every invited vendor, whether the dataset has a reply for it and how it has replied so far. */
+export async function seedPickVendors(rfxId: string): Promise<SeedPickVendor[]> {
+  const [{ data: inv }, { data: resp }] = await Promise.all([
+    db().from("rfx_vendors").select("vendor_id, vendors(name, short_code)").eq("rfx_id", rfxId),
+    db().from("responses").select("vendor_id, source").eq("rfx_id", rfxId).eq("is_clarification", false),
+  ]);
+  return (inv ?? []).map((v) => {
+    const ven = v.vendors as unknown as { name: string; short_code: string };
+    const mine = (resp ?? []).filter((r) => r.vendor_id === v.vendor_id);
+    return { id: v.vendor_id, name: ven.name, available: SEED_VENDORS.includes(ven.short_code), replied: mine.some((r) => r.source !== "seed"), seeded: mine.some((r) => r.source === "seed") };
+  }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Delete responses of one source for an RFx, with everything later stages wrote for them. */
-async function clearResponses(rfxId: string, source: string) {
+/**
+ * Replace this RFx's previously seeded responses (and their pipeline outputs) with a fresh copy of the dataset,
+ * for the invited vendors picked (default: every invited vendor the dataset has a reply for). Never a vendor not on the RFx.
+ * Responses from other sources are kept; `rerun` lists the ones whose cells the removed seed replies had replaced
+ * (original first, then clarifications), for the caller to run again before the new seed replies.
+ */
+export async function loadSeedResponses(rfxId: string, set: "clean" | "realistic", actor: string, vendorIds?: string[]): Promise<{ ids: string[]; rerun: string[] }> {
+  const { data: rfx } = await db().from("rfx").select("code, title").eq("id", rfxId).single();
+  if (!rfx) throw new AppError("NOT_FOUND", "RFx not found", undefined, 404);
+  const { data: invited } = await db().from("rfx_vendors").select("vendor_id, vendors(short_code)").eq("rfx_id", rfxId);
+  const picked = (invited ?? []).map((v) => ({ id: v.vendor_id as string, code: (v.vendors as unknown as { short_code: string }).short_code }))
+    .filter((v) => (!vendorIds || vendorIds.includes(v.id)) && SEED_VENDORS.includes(v.code));
+  if (vendorIds && !picked.length) throw new AppError("BAD_INPUT", "Pick at least one invited vendor with a sample reply.", undefined, 400);
+
+  const rerun = await clearResponses(rfxId, "seed");
+
+  const ids: string[] = [];
+  for (const e of SEED_SETS[set].filter((x) => picked.some((v) => v.code === x.vendor))) {
+    const reply = await seedReply(e.vendor, set);
+    ids.push(await createResponse({
+      rfxId, vendorId: picked.find((v) => v.code === e.vendor)!.id, source: "seed", files: reply!.files, emailText: reply!.emailText, actor, subject: `Re: RFx ${rfx.code} - ${rfx.title}`,
+    }));
+  }
+  await audit({ rfx_id: rfxId, actor, event: "seed.responses_loaded", payload: { set, responses: ids.length, vendors: picked.map((v) => v.code), rerun: rerun.length } });
+  return { ids, rerun };
+}
+
+/**
+ * Delete responses of one source for an RFx, with everything later stages wrote for them. A vendor with no other reply is
+ * reset completely (clarifications, ledger, status). A vendor who also replied another way keeps that reply, its
+ * clarifications, the buyer's ledger rows and decisions; its remaining replies are returned to be run again,
+ * since cells are one per line × vendor and the removed reply's cells go with it.
+ */
+async function clearResponses(rfxId: string, source: string): Promise<string[]> {
   const { data: base } = await db().from("responses").select("id, vendor_id, communication_id").eq("rfx_id", rfxId).eq("source", source);
-  if (!base?.length) return;
-  const vendorIds = base.map((r) => r.vendor_id).filter(Boolean);
-  // Clarification replies to these vendors go too (they answer the replies being replaced), with the clarification emails and their mock mail.
-  const { data: clars } = vendorIds.length ? await db().from("responses").select("id, vendor_id, communication_id").eq("rfx_id", rfxId).eq("is_clarification", true).in("vendor_id", vendorIds) : { data: [] };
-  const data = [...base, ...(clars ?? []).filter((c) => !base.some((b) => b.id === c.id))];
+  if (!base?.length) return [];
+  const baseIds = base.map((r) => r.id);
+  const vendorIds = [...new Set(base.map((r) => r.vendor_id).filter(Boolean))] as string[];
+  const { data: others } = vendorIds.length ? await db().from("responses").select("id, vendor_id, communication_id, is_clarification, supersedes_response_id, received_at").eq("rfx_id", rfxId).in("vendor_id", vendorIds).not("id", "in", `(${baseIds.join(",")})`) : { data: [] };
+  const other = others ?? [];
+  // Vendors who replied another way too: only the seed reply and the clarifications answering it go.
+  const kept = new Set(other.filter((r) => !r.is_clarification).map((r) => r.vendor_id as string));
+  const whole = vendorIds.filter((v) => !kept.has(v));
+  const clars = other.filter((r) => r.is_clarification && (whole.includes(r.vendor_id as string) || baseIds.includes(r.supersedes_response_id as string)));
+  const data = [...base, ...clars];
   const ids = data.map((r) => r.id);
   // Children before line_quotes: review items and ledger rows point at cells.
   for (const t of ["review_items", "questionnaire_answers"]) {
     const { error } = await db().from(t).delete().in("response_id", ids);
     if (error) throw error;
   }
-  if (vendorIds.length) {
-    const { error } = await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", vendorIds);
+  if (whole.length) {
+    const { error } = await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", whole);
+    if (error) throw error;
+  }
+  if (kept.size) {
+    // The re-run writes the pipeline's rows again; the buyer's stay (normalise re-runs keep buyer rows).
+    const { error } = await db().from("assumptions").delete().eq("rfx_id", rfxId).in("vendor_id", [...kept]).neq("basis", "buyer_entered");
     if (error) throw error;
   }
   // The reloaded vendors start again as invited (flags sets responded); a clarification asked during testing doesn't linger.
-  if (vendorIds.length) await db().from("rfx_vendors").update({ status: "invited" }).eq("rfx_id", rfxId).in("vendor_id", vendorIds).in("status", ["responded", "clarification_sent", "clarified"]);
+  if (whole.length) await db().from("rfx_vendors").update({ status: "invited" }).eq("rfx_id", rfxId).in("vendor_id", whole).in("status", ["responded", "clarification_sent", "clarified"]);
   const lq = await db().from("line_quotes").delete().in("response_id", ids);
   if (lq.error) throw lq.error;
   const del = await db().from("responses").delete().in("id", ids);
   if (del.error) throw del.error;
   const inbound = data.map((r) => r.communication_id).filter(Boolean);
-  const { data: outClar } = vendorIds.length ? await db().from("communications").select("id, message_id, eml_path").eq("rfx_id", rfxId).eq("kind", "clarification").in("vendor_id", vendorIds) : { data: [] };
+  const { data: outClar } = whole.length ? await db().from("communications").select("id, message_id, eml_path").eq("rfx_id", rfxId).eq("kind", "clarification").in("vendor_id", whole) : { data: [] };
   const { data: inComms } = inbound.length ? await db().from("communications").select("message_id, eml_path").in("id", inbound) : { data: [] };
   const msgIds = [...(outClar ?? []), ...(inComms ?? [])].map((c) => c.message_id).filter(Boolean) as string[];
   const { data: box } = msgIds.length ? await db().from("mock_mailbox").select("id, direction, eml_path").eq("rfx_id", rfxId).or(`message_id.in.(${msgIds.map((m) => `"${m}"`).join(",")}),in_reply_to.in.(${msgIds.map((m) => `"${m}"`).join(",")})`) : { data: [] };
@@ -178,6 +214,8 @@ async function clearResponses(rfxId: string, source: string) {
   if (box?.length) await db().from("mock_mailbox").delete().in("id", box.map((b) => b.id));
   const files = { outbound: (outClar ?? []).map((c) => c.eml_path), raw: [...(inComms ?? []).map((c) => c.eml_path), ...(box ?? []).filter((b) => b.direction === "to_buyer").map((b) => b.eml_path)] };
   for (const [bucket, paths] of Object.entries(files)) { const p = paths.filter(Boolean) as string[]; if (p.length) await db().storage.from(bucket).remove(p); }
+  return other.filter((r) => !ids.includes(r.id))
+    .sort((a, b) => Number(a.is_clarification) - Number(b.is_clarification) || String(a.received_at).localeCompare(String(b.received_at))).map((r) => r.id);
 }
 
 export async function getResponse(id: string): Promise<ResponseRow> {

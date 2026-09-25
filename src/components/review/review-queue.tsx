@@ -33,17 +33,21 @@ const DONE: Record<Action, string> = {
 type Draft = { to: string; reply_to: string; clar_n: number; subject: string; body: string; items: { id: string; text: string }[] };
 type Pending = { total: number; by_vendor: { vendor: string; count: number; clarification: boolean }[] };
 // Cards one clarification email covers (src/lib/clarify.ts ASKABLE).
+const SLOW: Action[] = ["ask-vendor", "map", "reassign"];
 const ASKABLE = ["ambiguous_unit", "price_check", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing",
   "missing_line", "conflict", "freight_treatment", "fx_assumption", "discount_treatment", "tax_basis", "validity_short", "vendor_mismatch", "vendor_condition", "total_mismatch"];
 const andList = (xs: (string | number)[]) => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : String(xs[0] ?? "");
 
-export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendor: initialVendor = "", pending: initialPending }: { rfxId: string; items: QueueItem[]; canAct: boolean; locked?: boolean; focus: string | null; vendor?: string; pending: Pending | null }) {
+export function ReviewQueue({ rfxId, items: served, canAct, locked = false, focus, vendor: initialVendor = "", pending: initialPending }: { rfxId: string; items: QueueItem[]; canAct: boolean; locked?: boolean; focus: string | null; vendor?: string; pending: Pending | null }) {
   const router = useRouter();
   // The server's count, unless this page polled a newer one since (a refresh brings a new server count and wins again).
   const [polled, setPolled] = useState<{ base: Pending | null; v: Pending } | null>(null);
   const pending = polled && polled.base === initialPending ? polled.v : initialPending;
   const [vendor, setVendor] = useState(initialVendor); const [status, setStatus] = useState<"open" | "waiting" | "resolved">("open");
   const [busy, setBusy] = useState<string | null>(null);
+  // Decided here, before the refreshed page arrives (~1 s): the card moves to Decided at once; a failed request puts it back.
+  const [decided, setDecided] = useState<Record<string, string>>({});
+  const items = useMemo(() => served.map((i) => decided[i.id] && (i.status === "open" || i.status === "asked_vendor") ? { ...i, status: decided[i.id] } : i), [served, decided]);
   const [group, setGroup] = useState<"type" | "vendor">("vendor"); // vendor-wise by default (the buyer works one supplier at a time)
   // Three views: Open · Waiting on vendor (asked, no reply yet — still decidable) · Decided.
   const viewOf = (s: string) => (s === "open" ? "open" : s === "asked_vendor" ? "waiting" : "resolved");
@@ -57,14 +61,17 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
   const waiting = items.filter((i) => i.status === "asked_vendor");
 
   const run = useCallback(async (it: QueueItem, action: Action, body: Record<string, unknown> = {}) => {
-    setBusy(it.id);
+    // Actions that re-run pipeline stages take seconds, so they keep the busy state instead.
+    const quick = !SLOW.includes(action) && it.type !== "vendor_mismatch";
+    const undo = () => setDecided((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== it.id)));
+    if (quick) setDecided((d) => ({ ...d, [it.id]: "confirmed" })); else setBusy(it.id);
     try {
       const r = await fetch(`/api/review/${it.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
-      if (!r.ok) { toast.error(`${j.error ?? "That didn't work."} (${j.code ?? r.status})`); return null; }
+      if (!r.ok) { if (quick) undo(); toast.error(`${j.error ?? "That didn't work."} (${j.code ?? r.status})`); return null; }
       if (action !== "ask-vendor") { toast.success(action === "confirm" && INFO.includes(it.type) ? "Accepted — noted in the ledger" : DONE[action]); router.refresh(); }
       return j as { status: string; draft?: Draft };
-    } catch { toast.error("Couldn't reach the server — check the connection and try again (NETWORK)"); return null; }
+    } catch { if (quick) undo(); toast.error("Couldn't reach the server — check the connection and try again (NETWORK)"); return null; }
     finally { setBusy(null); }
   }, [router]);
 

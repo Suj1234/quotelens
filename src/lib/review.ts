@@ -341,20 +341,20 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
   // P10 B2: a per-vendor correction (rate, GST, discount) rescales that vendor's prices; landed keeps its freight gap.
   const rescale = async (factorOf: (c: { conversion_chain: Step[] }) => number | null, step: Step) => {
     const { data: cells } = await db().from("line_quotes").select("id, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value, conversion_chain").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!);
-    let n = 0;
-    for (const c of cells ?? []) {
+    // One request per cell, all at once (each cell's values differ, so no single update).
+    const done = await Promise.all((cells ?? []).map(async (c) => {
       const chain = (c.conversion_chain as Step[] | null) ?? [];
       const f = factorOf({ conversion_chain: chain });
-      if (f === null || (c.unit_price_inr_per_1000 === null && c.best_guess_value === null)) continue;
+      if (f === null || (c.unit_price_inr_per_1000 === null && c.best_guess_value === null)) return 0;
       const u0 = c.unit_price_inr_per_1000 === null ? null : Number(c.unit_price_inr_per_1000);
       const gap = u0 !== null && c.landed_price_inr_per_1000 !== null ? Number(c.landed_price_inr_per_1000) - u0 : 0;
       const u = u0 === null ? null : round2(u0 * f);
       const { error: e } = await db().from("line_quotes").update({ unit_price_inr_per_1000: u, landed_price_inr_per_1000: u === null ? null : round2(u + gap),
         best_guess_value: c.best_guess_value === null ? null : round2(Number(c.best_guess_value) * f), conversion_chain: [...chain, step], updated_at: at }).eq("id", c.id);
       if (e) throw e;
-      n++;
-    }
-    return n;
+      return 1;
+    }));
+    return done.reduce<number>((a, b) => a + b, 0);
   };
   /** Replace this vendor's active ledger row of a kind with the buyer's (normalise re-runs keep buyer rows). */
   const supersede = async (kind: string, description: string, value: Record<string, unknown>) => {
@@ -452,7 +452,10 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
     }
     case "mark-not-quoted": {
       const { data: cells } = await db().from("line_quotes").select("id").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!).eq("state", "references_prior");
-      for (const c of cells ?? []) await patchCell(c.id, { state: "not_quoted", review_note: "Prior pricing treated as not quoted" });
+      if (cells?.length) {
+        const { error: e } = await db().from("line_quotes").update({ state: "not_quoted", review_note: "Prior pricing treated as not quoted", ...by, updated_at: at }).in("id", cells.map((c) => c.id));
+        if (e) throw e;
+      }
       await ledger("prior_pricing", `${cells?.length ?? 0} lines referring to earlier pricing treated as not quoted.`, { lines: cells?.length ?? 0 });
       status = "overridden"; resolution = { ...resolution, note: "Treated as not quoted" };
       break;
@@ -518,10 +521,10 @@ export async function act(itemId: string, action: Action, body: ActBody, user: S
       if (e2) throw e2;
       if (old?.length) await db().from("assumptions").update({ superseded_by: row.id }).in("id", old.map((a) => a.id));
       const { data: cells } = await db().from("line_quotes").select("id, unit_price_inr_per_1000").eq("rfx_id", r.rfx_id).eq("vendor_id", r.vendor_id!).not("unit_price_inr_per_1000", "is", null);
-      for (const c of cells ?? []) {
+      await Promise.all((cells ?? []).map(async (c) => {
         const { error: e3 } = await db().from("line_quotes").update({ landed_price_inr_per_1000: round2(Number(c.unit_price_inr_per_1000) + value), updated_at: at }).eq("id", c.id);
         if (e3) throw e3;
-      }
+      }));
       status = "overridden"; resolution = { ...resolution, value, note: `Freight ₹${value} per 1000 — ${body.reason.trim()}` };
       break;
     }

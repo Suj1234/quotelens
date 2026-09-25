@@ -25,7 +25,8 @@ export default async function RfxLayout({ children, params }: LayoutProps<"/rfx/
   // Prototype: the Award tab counts saved scenarios until a memo exists.
   const awardTab = { slug: "award", label: "Award", count: award ? 0 : scenarios ?? 0 };
   const invited = inv?.length ?? 0;
-  const responded = new Set((resp ?? []).map((r) => r.vendor_id)).size;
+  // Only invited vendors count: a stray reply from another vendor must never read "5 of 4".
+  const responded = new Set((resp ?? []).map((r) => r.vendor_id).filter((v) => inv?.some((i) => i.vendor_id === v))).size;
   // DESIGN §2.3 meta: "Reviewing · 5 of 5 responded", "Issued — awaiting 5 responses"
   const statusText = rfx.status === "draft" || rfx.status === "awarded" || rfx.status === "closed" ? LABEL[rfx.status]
     : responded === 0 ? `${LABEL[rfx.status]} — awaiting ${invited} responses` : `${LABEL[rfx.status]} · ${responded} of ${invited} responded`;

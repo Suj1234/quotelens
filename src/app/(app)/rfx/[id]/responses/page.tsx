@@ -5,6 +5,7 @@ import { countWord, shortDate } from "@/lib/format";
 import { ext, formatLabel } from "@/lib/file-labels";
 import { Button } from "@/components/ui/button";
 import { LoadSeed } from "@/components/rfx/load-seed";
+import { seedPickVendors } from "@/lib/responses";
 import { AssignVendor } from "@/components/rfx/assign-vendor";
 import { AddResponse } from "@/components/rfx/add-response";
 import { isLocked } from "@/lib/lock";
@@ -23,6 +24,7 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
     outstandingClarifications(id),
     db().from("responses").select("id, vendor_id, received_at").eq("rfx_id", id).eq("is_clarification", true).order("received_at"),
   ]);
+  const seed = buyer ? await seedPickVendors(id) : [];
   const clarOf = (vid: string) => (clarReplies ?? []).filter((c) => c.vendor_id === vid);
   const st = (vid: string) => status?.find((x) => x.vendor_id === vid);
   const replied = rows.filter((r) => r.response).length;
@@ -38,14 +40,14 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
             : <><b>{countWord(replied)} {replied === 1 ? "response" : "responses"} in</b>{replied < rows.length ? ` of ${rows.length}` : ""}, {unprocessed === 0 ? "all processed" : running ? `${countWord(running).toLowerCase()} still processing` : `${countWord(unprocessed).toLowerCase()} not fully processed`}.</>}
           {" "}Open one to see what was read and where, or add a response by hand — it runs through the same six stages as a Gmail reply.
         </p>
-        {buyer && replied > 0 && <LoadSeed rfxId={id} />}
+        {buyer && replied > 0 && <LoadSeed rfxId={id} vendors={seed} />}
       </div>
 
       {replied === 0 && buyer && (
         <div className="empty" style={{ marginTop: 16 }}>
           <p><b>No responses yet.</b></p>
-          <p style={{ margin: "4px 0 14px" }}>Add a reply by hand on a vendor&apos;s row, or load the five sample replies from the dataset.</p>
-          <div style={{ display: "inline-flex" }}><LoadSeed rfxId={id} primary /></div>
+          <p style={{ margin: "4px 0 14px" }}>Add a reply by hand on a vendor&apos;s row, or load sample replies from the dataset for the vendors you pick.</p>
+          <div style={{ display: "inline-flex" }}><LoadSeed rfxId={id} vendors={seed} primary /></div>
         </div>
       )}
       {rows.length > 0 && (
