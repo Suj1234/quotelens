@@ -33,6 +33,8 @@ export function LedgerTab({ rows }: { rows: LedgerRow[] }) {
         {(Object.keys(SOURCE) as LedgerRow["grade"][]).map((g) => <span key={g} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span className={`chip ${g === "D" ? "amber" : "grey"}`} style={{ fontWeight: 600, background: g === "D" ? undefined : "var(--surface)" }}>{g}</span>{SOURCE[g]}</span>)}
         <span className="text-muted-foreground" style={{ flexBasis: "100%", fontSize: 12 }}>Rate, freight, discount and GST figures are changed on their Review cards. Changing a weight or pack size taken from our spec is on the roadmap.</span>
       </div>
+      {/* A wide row scrolls inside the card; the page never moves sideways. */}
+      <div style={{ overflowX: "auto" }}>
       <table className="t">
         <thead><tr><th>Type</th><th>Vendor</th><th>Lines</th><th>What we did</th><th>Source</th><th>Recorded</th></tr></thead>
         <tbody>
@@ -40,8 +42,8 @@ export function LedgerTab({ rows }: { rows: LedgerRow[] }) {
             <tr key={i}>
               <td style={{ whiteSpace: "nowrap" }}>{KIND[r.kind] ?? r.kind}</td>
               <td>{r.vendor}</td>
-              <td className="mono">{r.lines}</td>
-              <td>
+              <td className="mono" style={{ whiteSpace: "normal", minWidth: 60, maxWidth: 160 }}>{r.lines}</td>
+              <td style={{ minWidth: 280 }}>
                 {r.description}
                 {r.calcs.length > 0 && (
                   <details style={{ marginTop: 4 }}>
@@ -63,6 +65,7 @@ export function LedgerTab({ rows }: { rows: LedgerRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
       {!shown.length && <div className="bd"><div className="empty"><b>No assumptions yet.</b> Every conversion that isn&apos;t vendor-stated lands here.</div></div>}
     </div>
   );

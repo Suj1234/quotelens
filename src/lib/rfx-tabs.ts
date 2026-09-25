@@ -77,13 +77,27 @@ export const gradeOfBasis = (basis: string | null): LedgerRow["grade"] =>
 
 /** Active assumptions; per-line rows of one kind for one vendor are folded into one row ("1–22"). */
 export async function getLedger(rfxId: string): Promise<LedgerRow[]> {
-  const [aQ, uQ, cQ] = await Promise.all([
-    db().from("assumptions").select("id, kind, description, basis, made_by, created_at, vendors(name), rfx_lines(line_no)").eq("rfx_id", rfxId).is("superseded_by", null).order("created_at"),
+  const [aQ, uQ, cQ, rQ] = await Promise.all([
+    db().from("assumptions").select("id, kind, description, basis, made_by, created_at, vendor_id, rfx_line_id, value, vendors(name), rfx_lines(line_no)").eq("rfx_id", rfxId).is("superseded_by", null).order("created_at"),
     db().from("users").select("id, name"),
-    db().from("line_quotes").select("original_value, original_unit, original_currency, unit_price_inr_per_1000, best_guess_value, conversion_chain, rfx_lines(line_no)").eq("rfx_id", rfxId),
+    db().from("line_quotes").select("vendor_id, rfx_line_id, response_id, original_value, original_unit, original_currency, unit_price_inr_per_1000, best_guess_value, conversion_chain, rfx_lines(line_no)").eq("rfx_id", rfxId),
+    db().from("responses").select("id, is_clarification").eq("rfx_id", rfxId),
   ]);
   if (aQ.error) throw aQ.error;
   if (cQ.error) throw cQ.error;
+  // A vendor that replied twice has the pipeline's rows from both replies. Show a reply's rows only where its prices are
+  // the ones in the grid: a per-line row if that reply owns the line's cell, a vendor-wide row if it owns any of the
+  // vendor's cells. Clarification rows always show (they amend the reply they answer). Nothing is deleted.
+  const clarIds = new Set((rQ.data ?? []).filter((r) => r.is_clarification).map((r) => r.id));
+  const owner = new Map((cQ.data ?? []).map((c) => [`${c.vendor_id}|${c.rfx_line_id}`, c.response_id as string | null]));
+  const owns = new Set((cQ.data ?? []).map((c) => `${c.vendor_id}|${c.response_id}`));
+  const hasCells = new Set((cQ.data ?? []).filter((c) => c.response_id && !clarIds.has(c.response_id)).map((c) => c.vendor_id as string));
+  const inGrid = (a: { made_by: string; vendor_id: string | null; rfx_line_id: string | null; value: unknown }) => {
+    const from = (a.value as { response_id?: string } | null)?.response_id;
+    if (a.made_by !== "system" || !from || !a.vendor_id || clarIds.has(from)) return true;
+    if (a.rfx_line_id) { const o = owner.get(`${a.vendor_id}|${a.rfx_line_id}`); return !o || clarIds.has(o) || o === from; }
+    return !hasCells.has(a.vendor_id) || owns.has(`${a.vendor_id}|${from}`);
+  };
   // Every cell whose conversion chain used an assumption (per-line ones and vendor-wide ones like an FX rate or a gross-up).
   const calcsOf = new Map<string, LedgerCalc[]>();
   for (const c of cQ.data ?? []) {
@@ -102,7 +116,7 @@ export async function getLedger(rfxId: string): Promise<LedgerRow[]> {
   const who = (id: string) => (id === "system" ? "system" : (uQ.data ?? []).find((u) => u.id === id)?.name ?? "buyer");
   type Group = { rows: { description: string; line: number | null; at: string }[]; kind: string; vendor: string; basis: string; by: string; calcs: LedgerCalc[] };
   const groups = new Map<string, Group>();
-  for (const a of aQ.data ?? []) {
+  for (const a of (aQ.data ?? []).filter(inGrid)) {
     const vendor = (a.vendors as unknown as { name: string } | null)?.name ?? "—";
     const line = (a.rfx_lines as unknown as { line_no: number } | null)?.line_no ?? null;
     const key = line !== null && a.made_by === "system" ? `${a.kind}|${vendor}|${a.basis}` : `${a.kind}|${vendor}|${a.basis}|${a.description}`;
@@ -138,7 +152,9 @@ function clarified(rows: { description: string; line: number | null }[]): string
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
 
 /** [1,2,3,5,7,8] → "1–3, 5, 7–8"; [] → "—" */
-export function spans(ns: number[]): string {
+export function spans(input: number[]): string {
+  // Repeats (two replies' rows for the same line) must not become "1, 1–2, 2–3…".
+  const ns = [...new Set(input)].sort((a, b) => a - b);
   if (!ns.length) return "—";
   const out: string[] = [];
   for (let i = 0; i < ns.length; i++) {

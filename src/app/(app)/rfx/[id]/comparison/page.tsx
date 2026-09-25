@@ -13,13 +13,14 @@ import { isLocked } from "@/lib/lock";
 export default async function ComparisonPage({ params, searchParams }: PageProps<"/rfx/[id]/comparison">) {
   const user = await requireUser();
   const { id } = await params;
-  const q = (await searchParams).tab;
+  const sp = await searchParams;
+  const q = sp.tab;
   const tab: CmpTab = CMP_TABS.includes(q as CmpTab) ? (q as CmpTab) : "prices";
   return (
     <div className="cmpwrap">
       <CmpTabs rfxId={id} tab={tab} />
       {tab === "prices" && <Prices id={id} approver={user.role === "approver"} />}
-      {tab === "questionnaire" && <QuestionnaireTab qa={await getQuestionnaireGrid(id)} />}
+      {tab === "questionnaire" && <QuestionnaireTab qa={await getQuestionnaireGrid(id)} focus={typeof sp.vendor === "string" ? sp.vendor : null} />}
       {tab === "documents" && <DocumentsTab rfxId={id} docs={await getDocuments(id)} />}
       {tab === "ledger" && <LedgerTab rows={await getLedger(id)} />}
     </div>

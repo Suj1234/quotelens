@@ -6,4 +6,6 @@ test("line spans for the ledger", () => {
   expect(spans([23, 24, 25, 26, 27, 28, 29, 30])).toBe("23–30");
   expect(spans([9])).toBe("9");
   expect(spans([])).toBe("—");
+  // Two replies' rows for the same lines, unsorted: still one range.
+  expect(spans([1, 1, 2, 2, 3, 3, 22, 21, 22, 21])).toBe("1–3, 21–22");
 });

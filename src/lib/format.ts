@@ -42,6 +42,18 @@ export const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone:
 export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
 /** "clarification_sent" → "Clarification sent" — for status and kind values shown as labels. */
+/** A vendor's questionnaire note in few words: "Q1 not answered · Q3 not answered · Q6: No" → "Q1, Q3 not answered · Q6: No". */
+export function clearedReason(note: string): string {
+  const groups = new Map<string, string[]>(); // "not answered" → ["Q1", "Q3"]
+  const out: (string | { group: string })[] = [];
+  for (const p of note.split(" · ").filter(Boolean)) {
+    const m = p.match(/^(Q\d+) (not answered|unclear)$/);
+    if (!m) { out.push(p); continue; }
+    if (!groups.has(m[2])) { groups.set(m[2], []); out.push({ group: m[2] }); }
+    groups.get(m[2])!.push(m[1]);
+  }
+  return out.map((p) => (typeof p === "string" ? p : `${groups.get(p.group)!.join(", ")} ${p.group}`)).join(" · ");
+}
 export const cap = (s: string) => s.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 
 // "gap_pct" is a percentage; "annual_value_deprec_3pct" is rupees under a 3 % scenario (the digit names the scenario).

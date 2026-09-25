@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { inrShort, isMoneyColumn, longDate, money, shortDate } from "./format";
+import { clearedReason, inrShort, isMoneyColumn, longDate, money, shortDate } from "./format";
 
 test("money uses Indian grouping for INR", () => {
   expect(money(104280)).toBe("₹1,04,280");
@@ -23,4 +23,10 @@ test("inrShort: crore / lakh / plain", () => {
 test("isMoneyColumn: rupees by name, never counts", () => {
   for (const c of ["total_quote_value", "unit_price_inr_per_1000", "annual_value_inr", "line_total", "saving_inr", "annual_value_deprec_3pct"]) expect(isMoneyColumn(c), c).toBe(true);
   for (const c of ["priced_lines", "total_lines", "priced_line_count", "annual_qty", "gap_pct", "original_value", "price_rank", "vendors"]) expect(isMoneyColumn(c), c).toBe(false);
+});
+
+test("questionnaire reason in few words", () => {
+  expect(clearedReason("Q1 not answered · Q3 not answered · Q6 not answered")).toBe("Q1, Q3, Q6 not answered");
+  expect(clearedReason("Q6: No – BRC audit planned · Q1 not answered · Q3 unclear · Q9 not answered")).toBe("Q6: No – BRC audit planned · Q1, Q9 not answered · Q3 unclear");
+  expect(clearedReason("Questionnaire not read yet")).toBe("Questionnaire not read yet");
 });

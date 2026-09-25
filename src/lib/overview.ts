@@ -14,7 +14,7 @@ import { allocate, totals } from "@/lib/scenarios/allocate";
 
 export type NeedsRow = { vendor: string; text: string; count: number };
 export type OverviewVendor = {
-  id: string; name: string; city: string | null; sentAs: string | null; received: string | null; priced: number; lines: number;
+  id: string; code: string; name: string; city: string | null; sentAs: string | null; received: string | null; priced: number; lines: number;
   validUntil: string | null; validityDays: number | null; validityShort: boolean; cleared: boolean | null; clearedNote: string;
   needs: number; responseId: string | null; status: string;
   /** P10 D5: the vendor's conditions (chips + hover), from the comparison. */
@@ -84,7 +84,7 @@ export async function getOverview(rfxId: string) {
     const validityDays = g?.validity_days ?? null;
     const received = r.response?.received_at ?? null;
     return {
-      id: r.vendor_id, name: r.name, city: r.city, status: r.status,
+      id: r.vendor_id, code: g?.code ?? "", name: r.name, city: r.city, status: r.status,
       sentAs: r.response ? formatLabel(r.response.files, !!r.response.email_text) : null, received,
       priced: g?.priced ?? 0, lines: grid.lines.length,
       validUntil: validityDays && received ? new Date(new Date(received).getTime() + validityDays * 86_400_000).toISOString() : null,

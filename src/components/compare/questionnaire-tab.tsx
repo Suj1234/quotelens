@@ -4,8 +4,13 @@ import { useState } from "react";
 import type { QaGrid } from "@/lib/rfx-tabs";
 
 /** DESIGN §3.7 / TRD §17.9: 10 rows × vendors, ◆ disqualifying, red "No", amber unclear / "—"; click an answer → its evidence. */
-export function QuestionnaireTab({ qa }: { qa: QaGrid }) {
-  const [sel, setSel] = useState<{ q: number; v: string } | null>(null);
+export function QuestionnaireTab({ qa, focus = null }: { qa: QaGrid; focus?: string | null }) {
+  // Opened from a vendor's "Not cleared" reason: that vendor's column is marked and its first must-pass answer that
+  // doesn't pass (missing, No or unclear) is open below, so the reason and its evidence are on screen.
+  const [sel, setSel] = useState<{ q: number; v: string } | null>(() => {
+    const r = focus ? qa.rows.find((x) => x.disqualifying && x.answers[focus]?.passes !== true) ?? qa.rows.find((x) => x.answers[focus]?.state === "missing") : null;
+    return r && focus ? { q: r.q_no, v: focus } : null;
+  });
   const row = sel && qa.rows.find((r) => r.q_no === sel.q);
   const a = row?.answers[sel!.v];
   const vendor = sel && qa.vendors.find((v) => v.code === sel.v);
@@ -14,7 +19,7 @@ export function QuestionnaireTab({ qa }: { qa: QaGrid }) {
     <div className="card" style={{ marginBottom: 20 }}>
       <div style={{ overflow: "auto" }}>
         <table className="t">
-          <thead><tr><th>#</th><th>Question</th>{qa.vendors.map((v) => <th key={v.code}>{v.name}</th>)}</tr></thead>
+          <thead><tr><th>#</th><th>Question</th>{qa.vendors.map((v) => <th key={v.code} style={v.code === focus ? { background: "var(--tint)", color: "var(--ink)" } : undefined}>{v.name}</th>)}</tr></thead>
           <tbody>
             {qa.rows.map((r) => (
               <tr key={r.q_no}>
@@ -25,7 +30,7 @@ export function QuestionnaireTab({ qa }: { qa: QaGrid }) {
                   const on = sel?.q === r.q_no && sel.v === v.code;
                   return (
                     <td key={v.code} title={x?.tip} onClick={() => x && setSel(on ? null : { q: r.q_no, v: v.code })}
-                      style={{ cursor: x ? "pointer" : undefined, outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: -2 }}>
+                      style={{ cursor: x ? "pointer" : undefined, outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: -2, background: v.code === focus ? "var(--tint)" : undefined }}>
                       {!x ? <span className="hint">not read</span> : x.tone ? <span className={`chip ${x.tone}`}>{x.show}</span> : x.show}
                     </td>
                   );

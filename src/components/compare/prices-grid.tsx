@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { CellState, Grid, GridCell } from "@/lib/comparison";
 import { inrShort, money } from "@/lib/format";
 import { DownloadButton } from "@/components/download-button";
 import { Conditions } from "./conditions";
+import { clearedReason } from "@/lib/format";
 
 type View = "unit" | "landed" | "orig";
 const COUNTED: CellState[] = ["confirmed", "inferred", "reviewed"];
@@ -39,7 +41,7 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
           <button className={view === "orig" ? "on" : ""} onClick={() => setView("orig")}>As written</button>
         </div>
         <label className="text-muted-foreground" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-          <input type="checkbox" checked={inclDq} onChange={(e) => setInclDq(e.target.checked)} /> show disqualified vendors
+          <input type="checkbox" checked={inclDq} onChange={(e) => setInclDq(e.target.checked)} /> show vendors who didn&apos;t clear
         </label>
         <span style={{ flex: 1 }} />
         {/* DESIGN §2.8 Export (TRD: XLSX/CSV); the workbook uses the basis on screen */}
@@ -60,6 +62,8 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
                       <div className="m" title={v.held}>May be another vendor&apos;s file. Out of every total until {approver ? "Sujit confirms" : "you confirm"} who sent it.</div>
                     </> : <>
                       <div className="nm">{v.name}<span className={`chip ${v.cleared === true ? "green" : v.cleared === false ? "red" : "amber"}`} title={v.cleared_note}>{v.cleared === true ? "✓" : v.cleared === false ? "✗" : "?"}</span></div>
+                      {/* Why it didn't clear, in words; opens that vendor's answers. */}
+                      {v.cleared !== true && <Link href={`/rfx/${rfxId}/comparison?tab=questionnaire&vendor=${v.code}`} className="qreason" style={{ color: v.cleared === false ? "var(--red)" : "var(--amber)" }}>{v.cleared === false ? "Not cleared" : "Not decided"}: {clearedReason(v.cleared_note)}</Link>}
                       <div className="m">
                         <span className="mono">{v.priced}/{grid.lines.length} priced</span>
                       </div>
