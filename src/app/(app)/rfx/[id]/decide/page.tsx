@@ -51,7 +51,7 @@ export default async function DecidePage({ params }: PageProps<"/rfx/[id]/decide
         <Button asChild variant={status.primary ? "default" : undefined}><Link href={`/rfx/${id}/${status.href}`}>{status.label}</Link></Button>
       </div></div>
 
-      {(held.length > 0 || unsure > 0) && (
+      {award?.status !== "approved" && (held.length > 0 || unsure > 0) && (
         <div className="card" style={{ marginTop: 16, borderColor: "var(--amber)" }}>
           <div className="hd"><b>Before you approve</b></div>
           <div className="bd" style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5 }}>
