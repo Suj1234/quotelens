@@ -13,6 +13,7 @@ export type Evidence = {
   mark?: string;       // phrase to highlight inside text
   caption: string;
   open_url?: string;   // original file
+  open_name?: string;  // its file name, for the in-app viewer (P10)
 };
 
 const PAD = 0.04; // TRD §12.2: pad 4%
@@ -43,11 +44,11 @@ export async function buildEvidence(loc: Loc | null | undefined, file: ResponseF
       await put("derived", path, await img.resize({ width: 900, withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer(), "image/jpeg");
       url = await signedUrl("derived", path);
     }
-    return { kind: "image", url, text: snippet, caption: `${name}${b ? " · crop around the read" : " · whole photo"}`, open_url };
+    return { kind: "image", url, text: snippet, caption: `${name}${b ? " · crop around the read" : " · whole photo"}`, open_url, open_name: file.original_name };
   }
 
   if (loc.type === "pdf" && file) {
-    return { kind: "pdf", url: `${open_url}#page=${loc.page ?? 1}&view=FitH`, text: snippet, mark: snippet, caption: `${name} · page ${loc.page ?? "?"}`, open_url };
+    return { kind: "pdf", url: `${open_url}#page=${loc.page ?? 1}&view=FitH`, text: snippet, mark: snippet, caption: `${name} · page ${loc.page ?? "?"}`, open_url, open_name: file.original_name };
   }
 
   // Spreadsheet rows, document paragraphs and email lines: find the snippet in the derived text and show it with its neighbours.
@@ -64,7 +65,7 @@ export async function buildEvidence(loc: Loc | null | undefined, file: ResponseF
   const cellMark = loc.type === "cell" && loc.ref && at >= 0 ? lines[at].match(new RegExp(`${loc.ref}=[^ ]+`))?.[0] : undefined;
   const where = loc.type === "cell" ? `${loc.sheet ? `${loc.sheet} · ` : ""}cell ${loc.ref ?? "?"}` : file ? `paragraph ${loc.line ?? "?"}` : `line ${loc.line ?? "?"}`;
   const hint = markHint && context?.toLowerCase().includes(markHint.toLowerCase()) ? context.slice(context.toLowerCase().indexOf(markHint.toLowerCase()), context.toLowerCase().indexOf(markHint.toLowerCase()) + markHint.length) : undefined;
-  return { kind: "text", text: context, mark: cellMark ?? hint ?? snippet, caption: `${name} · ${where}`, open_url };
+  return { kind: "text", text: context, mark: cellMark ?? hint ?? snippet, caption: `${name} · ${where}`, open_url, open_name: file?.original_name };
 }
 
 /** Long paragraphs: just the vendor's sentence (the snippet), marked as an excerpt (DESIGN §2.10). */

@@ -3,6 +3,7 @@ import path from "node:path";
 import { Document, Font, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { longDate, money } from "@/lib/format";
 import type { LedgerRow } from "@/lib/rfx-tabs";
+import { discountText } from "@/lib/scenarios/allocate";
 
 // TRD §14.3 award memo (react-pdf). Rendered only from memo_json (awards.memo_json), which holds every number shown;
 // all numbers come from the database (scenario lines, grid, ledger) — the model writes only the five narrative paragraphs.
@@ -12,14 +13,17 @@ export type MemoAlloc = {
   line_no: number; description: string; annual_qty: number; vendor: string | null; price: number | null; annual_value: number | null;
   runner_up: string | null; runner_up_price: number | null; gap_pct: number | null; reason: string; is_override: boolean;
 };
+export type MemoDiscount = { vendor: string; pct: number; condition: string | null; met: boolean | null; why: string; saving: number };
 export type MemoData = {
   rfx: { code: string; title: string; category: string; frozen_at: string | null; deadline: string | null; contract_months: number };
   prepared: { name: string; title: string; at: string };
   approved: { name: string; title: string; at: string } | null;
   scenario: { id: string; name: string; rule_text: string; price_basis: "unit" | "landed"; question: string | null; sql: string | null; fingerprint: string };
   allocation: MemoAlloc[];
-  totals: { total: number; allocated: number; lines: number; unallocated: number[]; single_source: number[]; vendors: { name: string; lines: number; value: number; pct: number }[] };
-  baseline: { vendor: string | null; total: number; note: string | null } | null;
+  totals: { total: number; allocated: number; lines: number; unallocated: number[]; single_source: number[]; vendors: { name: string; lines: number; value: number; pct: number }[];
+    /** P10 D4 (absent on memos made before): after the discounts this award earns, and each vendor's discount explained. */
+    total_after?: number; discounts?: MemoDiscount[] };
+  baseline: { vendor: string | null; total: number; total_quoted?: number; discount?: MemoDiscount | null; note: string | null } | null;
   savings: number | null; savings_pct: number | null;
   exclusions: { vendor: string; reason: string }[];
   validity: { vendor: string; days: number | null; until: string | null; short: boolean }[];
@@ -116,7 +120,9 @@ export function renderMemoPdf(m: MemoData): Promise<Buffer> {
         <Text style={s.h2} minPresenceAhead={80}>Totals and baseline</Text>
         <KV k="Annual total" v={`${rs(t.total)} for ${t.allocated} of ${t.lines} lines`} />
         {t.vendors.map((v) => <KV key={v.name} k={v.name} v={`${v.lines} lines · ${rs(v.value)} · ${v.pct.toFixed(1)}%`} />)}
-        <KV k="Best single vendor" v={m.baseline ? `${m.baseline.vendor} at ${rs(m.baseline.total)}${m.baseline.note ? ` — ${m.baseline.note}` : ""}` : "none (no vendor priced these lines)"} />
+        {(t.discounts ?? []).map((d) => <KV key={`d-${d.vendor}`} k={`Discount · ${d.vendor}`} v={`${discountText(d)}${d.saving ? ` · −${rs(d.saving)}` : ""}`} />)}
+        {t.total_after !== undefined && t.total_after < t.total - 0.5 && <KV k="After discounts" v={rs(t.total_after)} />}
+        <KV k="Best single vendor" v={m.baseline ? `${m.baseline.vendor} at ${rs(m.baseline.total)}${m.baseline.discount?.met && m.baseline.total_quoted ? ` (${rs(m.baseline.total_quoted)} quoted; ${discountText(m.baseline.discount)})` : ""}${m.baseline.note ? ` — ${m.baseline.note}` : ""}` : "none (no vendor priced these lines)"} />
         <KV k="Saving against it" v={m.savings === null ? "—" : `${rs(m.savings)} a year (${pct(m.savings_pct)})`} />
         <KV k="Unallocated lines" v={t.unallocated.length ? t.unallocated.join(", ") : "none"} />
         <KV k="Single-source lines" v={t.single_source.length ? `${t.single_source.join(", ")} (only one eligible quote)` : "none"} />

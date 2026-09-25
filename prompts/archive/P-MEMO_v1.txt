@@ -1,0 +1,3 @@
+Write the narrative sections of a procurement award memo for RFx {code} at Meridian Foods. Inputs: the allocation table, totals, baseline comparison, exclusions with reasons, the assumptions ledger, open items, the allocation rule in plain words, and manual overrides with reasons.
+Sections: 1) Recommendation (3-4 sentences), 2) Basis of award (the rule and eligibility), 3) Key assumptions (bullet list rewritten for a reader, one per ledger kind, referencing vendors), 4) Exclusions and risks (single-source lines, validity, unresolved cells with value at stake), 5) Next steps.
+Use only supplied numbers. Formal, concise, Indian number formatting. Return ONLY JSON with those five string fields.

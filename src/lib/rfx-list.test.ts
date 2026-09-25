@@ -38,8 +38,8 @@ describe("rfx list", () => {
     expect(nextStep(rows[0])).toEqual({ text: "Approved 24 Sep", tone: "green" });
     expect(nextStep(row({ status: "issued", responded: 3 })).text).toBe("Waiting on 2 of 5");
     // Replies in but not read: never "Ready to award", whatever the review count says.
-    expect(nextStep(row({ status: "issued", responded: 5, unread: 5 }))).toEqual({ text: "5 replies not read", tone: "amber" });
-    expect(nextStep(row({ status: "reviewing", responded: 5, unread: 1, open_reviews: 3 })).text).toBe("1 reply not read");
+    expect(nextStep(row({ status: "issued", responded: 5, unread: 5 }))).toEqual({ text: "5 replies not processed yet", tone: "amber" });
+    expect(nextStep(row({ status: "reviewing", responded: 5, unread: 1, open_reviews: 3 })).text).toBe("1 reply not processed yet");
     expect(deadlineText({ status: "issued", deadline: "2026-09-27" }, now)).toEqual({ text: "Due in 2 days", tone: "amber" });
     expect(deadlineText({ status: "issued", deadline: "2026-09-25" }, now).text).toBe("Due today");
     expect(deadlineText({ status: "awarded", deadline: "2026-09-01" }, now).text).toBe("Closed");

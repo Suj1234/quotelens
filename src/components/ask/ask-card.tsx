@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { DownloadButton } from "@/components/download-button";
 import type { AskAnswer } from "@/lib/query/ask";
 import { allocationColumn, type ChartSpec, type Row } from "@/lib/query/result";
 import { inrShort, money } from "@/lib/format";
@@ -82,6 +83,7 @@ const exclText = (a: AskAnswer) => a.exclusions.map((e) => e.vendor ? `${e.vendo
 /** DESIGN §2.13 answer card. "Include best guesses" re-runs this answer's SQL on the best-guess view (TRD §13.2). */
 export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
   const [sqlOpen, setSqlOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [bg, setBg] = useState<AskAnswer | null>(null);
   const [showBg, setShowBg] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -120,8 +122,12 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
   const unsureInScope = a.exclusions.some((e) => e.cells) || a.columns.includes("state");
   return (
     <div className="qa">
-      <div className="q">{a.question}</div>
+      <div className="q qhead">
+        <span>{a.question}</span>
+        <button className="qa-toggle" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed}>{collapsed ? "Expand" : "Collapse"}</button>
+      </div>
       <div className="a">{cur.answer_text}</div>
+      {!collapsed && <>
       {cur.exclusions.length > 0 && <div className="excl">Excluded: {exclText(cur)}</div>}
       {a.ok && (
         <div className="how">
@@ -161,11 +167,12 @@ export function AskCard({ a, rfxId }: { a: AskAnswer; rfxId: string }) {
           : <Button size="sm" onClick={() => setNaming(true)}>Save as scenario</Button>)}
         {a.ok && !bg && unsureInScope && a.unresolved_cells > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={bestGuesses}>{busy ? "Computing…" : "Include best guesses"}</Button>}
         {cur.ok && cur.rows.length > 0 && <>
-          <Button asChild size="sm"><a href={`/api/export/query/${cur.query_id}?format=xlsx`} download>Export</a></Button>
-          <Button asChild size="sm" variant="ghost"><a href={`/api/export/query/${cur.query_id}?format=csv`} download>CSV</a></Button>
+          <DownloadButton href={`/api/export/query/${cur.query_id}?format=xlsx`} size="sm">Export</DownloadButton>
+          <DownloadButton href={`/api/export/query/${cur.query_id}?format=csv`} size="sm" variant="ghost">CSV</DownloadButton>
         </>}
         <span className="hint" style={{ marginLeft: "auto" }}>{a.asked_by ? `${a.asked_by} · ` : ""}{(cur.duration_ms / 1000).toFixed(1)} s</span>
       </div>
+      </>}
     </div>
   );
 }

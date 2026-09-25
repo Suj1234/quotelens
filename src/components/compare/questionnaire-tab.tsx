@@ -48,7 +48,7 @@ export function QuestionnaireTab({ qa }: { qa: QaGrid }) {
               <dt>Vendor&apos;s answer</dt><dd>{a.raw ?? "—"}</dd>
               <dt>Read as</dt><dd>{a.show} · {a.state}</dd>
               {a.p && <><dt>Probability</dt><dd className="mono">{a.p}</dd></>}
-              {row.disqualifying && <><dt>Disqualifying rule</dt><dd>{a.passes === true ? "passes" : a.passes === false ? <span className="chip red">fails</span> : <span className="chip amber">not decided yet</span>}</dd></>}
+              {row.disqualifying && <><dt>Disqualifying rule</dt><dd>{a.passes === true ? "passes" : a.passes === false ? <span className="chip red">Fails</span> : <span className="chip amber">Not decided yet</span>}</dd></>}
             </dl>
           </div>
         </div>

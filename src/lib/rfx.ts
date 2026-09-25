@@ -11,7 +11,7 @@ export async function listRfx(): Promise<RfxListRow[]> {
   const { data, error } = await db()
     .from("rfx")
     .select("id, code, title, status, response_deadline, created_at, updated_at, rfx_lines(count), rfx_vendors(count), review_items(count), responses(vendor_id, is_clarification, pipeline_status, stage_errors, updated_at), awards(status, approved_at, scenarios(total_inr))")
-    .eq("review_items.status", "open")
+    .in("review_items.status", ["open", "asked_vendor"]) // waiting on a vendor still needs a decision
     .order("code", { ascending: false });
   if (error) throw error;
   return data.map((r) => {

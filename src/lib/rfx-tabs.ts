@@ -1,6 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { signedUrl } from "@/lib/storage";
+import { stepText, type Step } from "@/lib/comparison";
+import { money } from "@/lib/format";
 
 // TRD §17.9 / DESIGN §3.7 — Questionnaire, Documents, Ledger, Timeline tabs of the Comparison screen.
 
@@ -39,49 +41,80 @@ export async function getQuestionnaireGrid(rfxId: string): Promise<QaGrid> {
   };
 }
 
-export type DocRow = { vendor: string; file: string; kind: string; p: number | null; pages: string; used: string; url: string | null };
+export type DocRow = { vendor: string; file: string; kind: string; p: number | null; pages: string; used: string; url: string | null; text: string | null; response_id: string; at: string; reply: string };
 
 export async function getDocuments(rfxId: string): Promise<DocRow[]> {
-  const { data, error } = await db().from("responses").select("id, email_text, summary, vendors(name), response_files(*), extracted_items(id)").eq("rfx_id", rfxId).order("received_at");
+  const { data, error } = await db().from("responses").select("id, email_text, summary, received_at, is_clarification, vendors(name), response_files(*), extracted_items(id)").eq("rfx_id", rfxId).order("received_at");
   if (error) throw error;
   const rows: DocRow[] = [];
+  const seen = new Map<string, number>(); // replies so far per vendor (rows come oldest first)
   for (const r of data ?? []) {
     const vendor = (r.vendors as unknown as { name: string } | null)?.name ?? "Unmatched sender";
     const n = (r.extracted_items as unknown[]).length;
     const qs = (r.summary as { questionnaire?: { answered: number } }).questionnaire?.answered;
+    const nth = (seen.get(vendor) ?? 0) + (r.is_clarification ? 0 : 1);
+    seen.set(vendor, nth);
+    const at = r.received_at as string, reply = r.is_clarification ? "clarification reply" : `reply ${nth}`;
+    // the email is the message; its attachments came with it
+    if (r.email_text) rows.push({ vendor, file: "(email body)", kind: (r.summary as { classify?: { email?: { kind: string } } }).classify?.email?.kind ?? "email", p: null, pages: "—", used: n && !(r.response_files as unknown[]).length ? `${n} items, terms` : "cover note", url: null, text: r.email_text, response_id: r.id, at, reply });
     for (const f of r.response_files as { original_name: string; file_kind: string | null; file_kind_probability: number | null; page_count: number | null; derived_image_paths: string[] | null; storage_path: string; mime: string }[]) {
       const used = f.file_kind === "quotation" ? `${n} items, terms${qs ? ", questionnaire" : ""}` : f.file_kind === "questionnaire" ? `${qs ?? 0} answers` : f.file_kind === "supporting" ? "on file" : "—";
-      rows.push({ vendor, file: f.original_name, kind: f.file_kind ?? "unknown", p: f.file_kind_probability, pages: f.page_count ? String(f.page_count) : f.derived_image_paths?.length ? "photo" : f.mime.includes("sheet") ? "sheet" : "—", used, url: await signedUrl("raw", f.storage_path) });
+      rows.push({ vendor, file: f.original_name, kind: f.file_kind ?? "unknown", p: f.file_kind_probability, pages: f.page_count ? String(f.page_count) : f.derived_image_paths?.length ? "photo" : f.mime.includes("sheet") ? "sheet" : "—", used, url: await signedUrl("raw", f.storage_path), text: null, response_id: r.id, at, reply });
     }
-    if (r.email_text) rows.push({ vendor, file: "(email body)", kind: (r.summary as { classify?: { email?: { kind: string } } }).classify?.email?.kind ?? "email", p: null, pages: "—", used: n && !(r.response_files as unknown[]).length ? `${n} items, terms` : "cover note", url: null });
   }
-  return rows;
+  // One block per vendor, in the order the conversation happened; unmatched senders last. (Stable sort keeps time order.)
+  const U = "Unmatched sender";
+  return rows.sort((a, b) => (a.vendor === U ? 1 : 0) - (b.vendor === U ? 1 : 0) || a.vendor.localeCompare(b.vendor));
 }
 
-export type LedgerRow = { kind: string; vendor: string; lines: string; description: string; basis: string; by: string; at: string };
+/** One line an assumption touched: the vendor's figure, what was done to it, and the price that came out. */
+export type LedgerCalc = { line: number; written: string; did: string; result: string };
+export type LedgerRow = { kind: string; vendor: string; lines: string; description: string; basis: string; by: string; at: string; grade: "A" | "B" | "C" | "D"; calcs: LedgerCalc[] };
+/** P10 B5: how reliable the source of an entry is — A vendor-stated · B our spec or an official rate · C buyer-entered · D a default or the AI's inference. */
+export const gradeOfBasis = (basis: string | null): LedgerRow["grade"] =>
+  basis === "vendor_stated" ? "A" : basis === "rfx_spec" || basis === "settings_default" ? "B" : basis === "buyer_entered" ? "C" : "D";
 
 /** Active assumptions; per-line rows of one kind for one vendor are folded into one row ("1–22"). */
 export async function getLedger(rfxId: string): Promise<LedgerRow[]> {
-  const [aQ, uQ] = await Promise.all([
-    db().from("assumptions").select("kind, description, basis, made_by, created_at, vendors(name), rfx_lines(line_no)").eq("rfx_id", rfxId).is("superseded_by", null).order("created_at"),
+  const [aQ, uQ, cQ] = await Promise.all([
+    db().from("assumptions").select("id, kind, description, basis, made_by, created_at, vendors(name), rfx_lines(line_no)").eq("rfx_id", rfxId).is("superseded_by", null).order("created_at"),
     db().from("users").select("id, name"),
+    db().from("line_quotes").select("original_value, original_unit, original_currency, unit_price_inr_per_1000, best_guess_value, conversion_chain, rfx_lines(line_no)").eq("rfx_id", rfxId),
   ]);
   if (aQ.error) throw aQ.error;
+  if (cQ.error) throw cQ.error;
+  // Every cell whose conversion chain used an assumption (per-line ones and vendor-wide ones like an FX rate or a gross-up).
+  const calcsOf = new Map<string, LedgerCalc[]>();
+  for (const c of cQ.data ?? []) {
+    const line = (c.rfx_lines as unknown as { line_no: number } | null)?.line_no;
+    if (line == null) continue;
+    const out = c.unit_price_inr_per_1000 ?? c.best_guess_value;
+    for (const s of (c.conversion_chain ?? []) as (Step & { assumption_id?: string })[]) {
+      if (!s.assumption_id) continue;
+      const list = calcsOf.get(s.assumption_id) ?? [];
+      list.push({ line, did: stepText(s),
+        written: c.original_value != null ? `${money(Number(c.original_value), c.original_currency?.match(/\$|usd/i) ? "USD" : "INR")} ${c.original_unit ?? ""}`.trimEnd() : "—",
+        result: out == null ? "—" : `${money(Number(out))} per 1000${c.unit_price_inr_per_1000 == null ? " (best guess, not counted)" : ""}` });
+      calcsOf.set(s.assumption_id, list);
+    }
+  }
   const who = (id: string) => (id === "system" ? "system" : (uQ.data ?? []).find((u) => u.id === id)?.name ?? "buyer");
-  type Group = { rows: { description: string; line: number | null; at: string }[]; kind: string; vendor: string; basis: string; by: string };
+  type Group = { rows: { description: string; line: number | null; at: string }[]; kind: string; vendor: string; basis: string; by: string; calcs: LedgerCalc[] };
   const groups = new Map<string, Group>();
   for (const a of aQ.data ?? []) {
     const vendor = (a.vendors as unknown as { name: string } | null)?.name ?? "—";
     const line = (a.rfx_lines as unknown as { line_no: number } | null)?.line_no ?? null;
     const key = line !== null && a.made_by === "system" ? `${a.kind}|${vendor}|${a.basis}` : `${a.kind}|${vendor}|${a.basis}|${a.description}`;
-    const g: Group = groups.get(key) ?? { rows: [], kind: a.kind, vendor, basis: a.basis ?? "", by: who(a.made_by) };
+    const g: Group = groups.get(key) ?? { rows: [], kind: a.kind, vendor, basis: a.basis ?? "", by: who(a.made_by), calcs: [] };
     g.rows.push({ description: a.description, line, at: a.created_at });
+    g.calcs.push(...(calcsOf.get(a.id) ?? []));
     groups.set(key, g);
   }
   return [...groups.values()].map((g) => {
     const lines = g.rows.map((r) => r.line).filter((l): l is number => l !== null).sort((a, b) => a - b);
     return {
-      kind: g.kind, vendor: g.vendor, lines: spans(lines), basis: g.basis.replaceAll("_", " "), by: g.by, at: g.rows[g.rows.length - 1].at,
+      kind: g.kind, vendor: g.vendor, lines: spans(lines.length ? lines : [...new Set(g.calcs.map((c) => c.line))].sort((a, b) => a - b)), basis: g.basis.replaceAll("_", " "), grade: gradeOfBasis(g.basis), by: g.by, at: g.rows[g.rows.length - 1].at,
+      calcs: g.calcs.sort((a, b) => a.line - b.line),
       description: g.rows.length <= 1 ? g.rows[0].description : g.rows.every((r) => r.description.includes("clarification reply"))
         ? clarified(g.rows) : `${FOLDED[g.kind] ?? g.rows[0].description.replace(/^Line \d+: /, "")} (${g.rows.length} lines)`,
     };
@@ -133,7 +166,7 @@ export async function getTimeline(rfxId: string): Promise<TimelineRow[]> {
   const clar = (id: string | null) => (rQ.data ?? []).find((r) => r.id === id);
   const who = (id: string) => (id === "system" ? "QuoteLens" : (uQ.data ?? []).find((u) => u.id === id)?.name ?? "Someone");
   const title = (id: string | null) => (iQ.data ?? []).find((i) => i.id === id)?.title ?? "an item";
-  const VERB: Record<string, string> = { confirm: "confirmed", override: "overrode", exclude: "excluded", map: "mapped", ignore: "ignored", "ask-vendor": "asked the vendor about", "mark-not-quoted": "treated as not quoted", dismiss: "dismissed", "accept-yes": "accepted as Yes", "treat-no": "treated as No" };
+  const VERB: Record<string, string> = { confirm: "confirmed", override: "overrode", exclude: "excluded", map: "mapped", ignore: "ignored", "ask-vendor": "asked the vendor about", "mark-not-quoted": "treated as not quoted", dismiss: "dismissed", "accept-yes": "accepted as Yes", "treat-no": "treated as No", "enter-prices": "entered prices for", "set-freight": "changed the freight on" };
   const rows: TimelineRow[] = [];
   for (const e of eQ.data ?? []) {
     const p = e.payload as Record<string, unknown>;

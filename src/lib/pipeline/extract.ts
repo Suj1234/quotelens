@@ -1,4 +1,5 @@
 import "server-only";
+import { VENDOR_DATA_RULE, vendorData } from "@/lib/ai/vendor-data";
 import { z } from "zod";
 import { generateJSON, inlineFile, type Part } from "@/lib/ai/gemini";
 import { db } from "@/lib/db";
@@ -27,6 +28,9 @@ Rules:
 - If a number is unreadable, still create the item with unit_price null, notes explaining, raw_confidence ≤ 0.3.
 - If the document contains no prices at all, return items: [] and explain in terms.other_notes.
 - Also report rows_with_prices: how many priced rows or price mentions the document shows in total (count them before listing items).
+- Also report who the document is from and to, exactly as written, without judging it: issuer_name (the supplier company named on the letterhead, header, stamp, signature or sender line; null if none is shown), issuer_ref (the supplier's own quotation or reference number, e.g. "SBP-0912"; null if none), addressed_to (the buyer COMPANY the document is addressed to; null if it names no company, e.g. only a person as in "Dear Sujit sir").
+- Also list in "conditions" anything else the supplier attaches to its prices or offer that a buyer comparing quotes must know and that none of the fields above captures — minimum order quantities, tooling / cylinder / die / plate charges, sizes measured inside vs outside, delivery lead time or schedule limits, price-escalation or raw-material clauses — each verbatim with a kind (moq, tooling, spec, delivery, price_basis, other). Don't repeat validity, freight, taxes, payment or discounts there; [] when there is nothing else.
+- Also report "stated_total": the grand total the document itself states for the whole quotation (amount as a number, and its currency), or null if it states none.
 - Return ONLY JSON matching the schema.
 {input_format}`;
 
@@ -48,6 +52,11 @@ const Location = z.object({
 });
 export const ExtractionResult = z.object({
   rows_with_prices: z.number().int().min(0),
+  // Who the document says it is from / to, as written (0016 vendor check; the flags stage decides whether it fits the vendor).
+  issuer_name: s.optional().default(null), issuer_ref: s.optional().default(null), addressed_to: s.optional().default(null),
+  // P10 C12 / C13: anything else attached to the prices, and the vendor's own grand total (checked against its lines).
+  conditions: z.array(z.object({ text: z.string(), kind: z.enum(["moq", "tooling", "spec", "delivery", "price_basis", "other"]) })).optional().default([]),
+  stated_total: z.object({ amount: z.number(), currency: s }).nullable().optional().default(null),
   items: z.array(z.object({
     vendor_sku: s, vendor_description: z.string(), quantity: n, quantity_unit: s,
     unit_price: n, price_unit_raw: s, currency_raw: s, pack_size: n, pack_size_unit: s,
@@ -66,7 +75,8 @@ type Terms = Extraction["terms"];
 
 const TEXT_CHUNK = 60_000; // TRD §8.2
 
-export type ExtractSummary = { items: number; items_with_price: number; currencies: string[]; has_footnotes: boolean; sources: string[] };
+export type Issuer = { source: string; issuer_name: string | null; issuer_ref: string | null; addressed_to: string | null };
+export type ExtractSummary = { items: number; items_with_price: number; currencies: string[]; has_footnotes: boolean; sources: string[]; issuers: Issuer[] };
 
 /** TRD §8.2 — quotation files (and the email body when it carries prices) → extracted_items + response_terms. */
 export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
@@ -108,7 +118,7 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
     for (const c of src.chunks) {
       const ask = (extra = "") => generateJSON({
         tier: "strong", purpose: "extract", rfx_id: resp.rfx_id, response_id: resp.id, schema: ExtractionResult, temperature: 0.1,
-        parts: [...c.parts, { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) + clarNote + extra }],
+        parts: [...vendorData(src.name, c.parts), { text: P_EXTRACT.replace("{rfx_lines_compact}", compact).replace("{input_format}", c.format) + clarNote + extra + `\n${VENDOR_DATA_RULE}` }],
       });
       let r = await ask();
       // Self-check: the model occasionally collapses a table (esp. photos) into one item. If it returned clearly fewer items
@@ -151,6 +161,13 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
     payment_days: terms.payment_days === null ? null : Math.round(terms.payment_days),
   });
   if (te) throw te;
+  // P10 C12 / C13: kept on the terms row (the vendor's conditions across its sources; the first stated total).
+  const conditions = [...new Map(results.flatMap((r) => r.out.flatMap((o) => o.conditions)).map((c) => [c.text.trim().toLowerCase(), c])).values()];
+  const total = results.flatMap((r) => r.out.map((o) => o.stated_total)).find((t) => t && t.amount > 0) ?? null;
+  if (conditions.length || total) {
+    const { error: ce } = await db().from("response_terms").update({ conditions, stated_total: total?.amount ?? null, stated_total_currency: total?.currency ?? null }).eq("response_id", resp.id);
+    if (ce) throw ce;
+  }
 
   const currencies = [...new Set(rows.map((r) => currencyCode(r.currency_raw) ?? r.currency_raw).filter((c): c is string => !!c))];
   return {
@@ -159,6 +176,9 @@ export async function extract(resp: ResponseRow): Promise<ExtractSummary> {
     currencies,
     has_footnotes: !!(terms.total_discount_condition || rows.some((r) => r.notes)),
     sources: sources.map((s) => s.name),
+    // First chunk that names them, per source (a long sheet's later chunks repeat only the header rows).
+    issuers: results.map(({ src, out }) => ({ source: src.name, issuer_name: out.find((o) => o.issuer_name)?.issuer_name ?? null,
+      issuer_ref: out.find((o) => o.issuer_ref)?.issuer_ref ?? null, addressed_to: out.find((o) => o.addressed_to)?.addressed_to ?? null })),
   };
 }
 

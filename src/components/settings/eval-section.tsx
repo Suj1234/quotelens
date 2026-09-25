@@ -91,10 +91,10 @@ export function EvalSection({ eligible, selected, last, vendors }: { eligible: E
                   </table>
                 </div>
                 <div className="legend" style={{ padding: "8px 14px", borderTop: "1px solid var(--hair2)" }}>
-                  <span className="chip green">correct</span> state and price match (±1%)
-                  <span className="chip amber">flagged OK</span> marked unsure, best guess right
-                  <span className="chip red">wrong</span> state or price off
-                  <span className="chip red">missing</span> no cell
+                  <span className="chip green">Correct</span> state and price match (±1%)
+                  <span className="chip amber">Flagged OK</span> marked unsure, best guess right
+                  <span className="chip red">Wrong</span> state or price off
+                  <span className="chip red">Missing</span> no cell
                 </div>
               </div>
               <div className="card" style={{ marginTop: 12 }}>
@@ -118,7 +118,7 @@ export function EvalSection({ eligible, selected, last, vendors }: { eligible: E
 }
 
 function Row({ c, name, onOpen }: { c: CellResult; name: string; onOpen: () => void }) {
-  const [label, tone] = c.state ? STATE_LABEL[c.state] ?? [c.state, "grey"] : ["no cell", "red"];
+  const [label, tone] = c.state ? STATE_LABEL[c.state] ?? [c.state, "grey"] : ["No cell", "red"];
   const exp = c.expected == null ? "—" : `${n(c.expected)}${c.expected_state === "ambiguous" || c.expected_state === "low_confidence" ? " (best guess)" : ""}`;
   const got = c.got != null ? n(c.got) : c.best_guess != null ? `${n(c.best_guess)}?` : "—";
   return (

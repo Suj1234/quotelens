@@ -23,7 +23,7 @@ export const STATUS_TABS: { key: string; label: string; statuses: RfxStatus[] | 
 
 export type Tone = "amber" | "green" | "muted" | "";
 
-const unreadStep = (n: number): { text: string; tone: Tone } => ({ text: `${n} ${n === 1 ? "reply" : "replies"} not read`, tone: "amber" });
+const unreadStep = (n: number): { text: string; tone: Tone } => ({ text: `${n} ${n === 1 ? "reply" : "replies"} not processed yet`, tone: "amber" });
 
 /** What the buyer does next with this event. */
 export function nextStep(r: ListRow): { text: string; tone: Tone } {

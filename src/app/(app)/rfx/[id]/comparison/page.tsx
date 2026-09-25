@@ -1,8 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { getComparison } from "@/lib/comparison";
-import { getDocuments, getLedger, getQuestionnaireGrid, getTimeline } from "@/lib/rfx-tabs";
+import { getDocuments, getLedger, getQuestionnaireGrid } from "@/lib/rfx-tabs";
 import { ComparisonView } from "@/components/compare/comparison-view";
-import { CMP_TABS, CmpTabs, DocumentsTab, TimelineTab, type CmpTab } from "@/components/compare/tabs";
+import { CMP_TABS, CmpTabs, DocumentsTab, type CmpTab } from "@/components/compare/tabs";
 import { QuestionnaireTab } from "@/components/compare/questionnaire-tab";
 import { LedgerTab } from "@/components/compare/ledger-tab";
 import { UnmatchedPanel } from "@/components/compare/unmatched-panel";
@@ -20,9 +20,8 @@ export default async function ComparisonPage({ params, searchParams }: PageProps
       <CmpTabs rfxId={id} tab={tab} />
       {tab === "prices" && <Prices id={id} approver={user.role === "approver"} />}
       {tab === "questionnaire" && <QuestionnaireTab qa={await getQuestionnaireGrid(id)} />}
-      {tab === "documents" && <DocumentsTab docs={await getDocuments(id)} />}
+      {tab === "documents" && <DocumentsTab rfxId={id} docs={await getDocuments(id)} />}
       {tab === "ledger" && <LedgerTab rows={await getLedger(id)} />}
-      {tab === "timeline" && <TimelineTab rows={await getTimeline(id)} />}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { money } from "@/lib/format";
 import type { SessionUser } from "@/lib/auth";
 import { unverifiedNumbers } from "@/lib/query/result";
 import { listScenarios } from "@/lib/scenarios";
+import { discountText } from "@/lib/scenarios/allocate";
 import { renderMemoPdf, type MemoData, type Narrative } from "./memo";
 
 // TRD §14.3 / §16: generate (buyer) → draft; send back (approver, with a note) → sent_back; approve (approver) → approved + RFx awarded (locked).
@@ -23,6 +24,7 @@ const UNSURE = ["low_confidence", "ambiguous", "references_prior", "conflict"];
 // TRD §9.10 P-MEMO, verbatim.
 const P_MEMO = `Write the narrative sections of a procurement award memo for RFx {code} at Meridian Foods. Inputs: the allocation table, totals, baseline comparison, exclusions with reasons, the assumptions ledger, open items, the allocation rule in plain words, and manual overrides with reasons.
 Sections: 1) Recommendation (3-4 sentences), 2) Basis of award (the rule and eligibility), 3) Key assumptions (bullet list rewritten for a reader, one per ledger kind, referencing vendors), 4) Exclusions and risks (single-source lines, validity, unresolved cells with value at stake), 5) Next steps.
+Vendor discounts (totals.discounts) apply only where their condition is met by this award: say which are met, use annual_total_after_discounts as the award's cost when it differs, and name any discount this award does not earn.
 Use only supplied numbers. Formal, concise, Indian number formatting. Return ONLY JSON with those five string fields.`;
 const NarrativeSchema = z.object({ recommendation: z.string().min(1), basis_of_award: z.string().min(1), key_assumptions: z.string().min(1), exclusions_and_risks: z.string().min(1), next_steps: z.string().min(1) });
 
@@ -63,8 +65,9 @@ async function buildMemo(rfxId: string, scenarioId: string, preparedBy: SessionU
     allocation: sc.lines.map((l) => ({ line_no: l.line_no, description: l.description, annual_qty: l.annual_qty, vendor: l.vendor, price: l.price, annual_value: l.annual_value,
       runner_up: l.runner_up, runner_up_price: l.runner_up_price, gap_pct: l.gap_pct, reason: l.reason, is_override: l.is_override })),
     totals: { total: sc.total, allocated: sc.allocated, lines: sc.lines.length, unallocated: sc.unallocated,
-      single_source: sc.lines.filter((l) => l.vendor && !l.runner_up).map((l) => l.line_no), vendors: sc.share.map(({ vendor, ...x }) => ({ name: vendor, ...x })) },
-    baseline: base, savings: base ? base.total - sc.total : null, savings_pct: base && base.total ? (base.total - sc.total) / base.total * 100 : null,
+      single_source: sc.lines.filter((l) => l.vendor && !l.runner_up).map((l) => l.line_no), vendors: sc.share.map(({ vendor, ...x }) => ({ name: vendor, ...x })),
+      total_after: sc.total_after, discounts: sc.discounts },
+    baseline: base, savings: base ? base.total - sc.total_after : null, savings_pct: base && base.total ? (base.total - sc.total_after) / base.total * 100 : null,
     exclusions,
     validity: grid.vendors.filter((v) => winners.has(v.name)).map((v) => ({ vendor: v.name, days: v.validity_days,
       until: (vs.data ?? []).find((x) => x.vendor === v.name)?.validity_until ?? null, short: v.validity_short })),
@@ -83,9 +86,11 @@ async function narrate(rfxId: string, m: Omit<MemoData, "narrative" | "narrative
     rfx: { code: m.rfx.code, title: m.rfx.title, contract_months: m.rfx.contract_months },
     allocation_rule: m.scenario.rule_text, scenario: m.scenario.name, price_basis: m.scenario.price_basis === "landed" ? "landed cost" : "unit price",
     allocation_table: m.allocation.map((a) => ({ line: a.line_no, description: a.description, vendor: a.vendor ?? "unallocated", price_per_1000: r(a.price), annual_value: r(a.annual_value), runner_up: a.runner_up, runner_up_price: r(a.runner_up_price), gap_pct: a.gap_pct === null ? null : `${a.gap_pct.toFixed(2)}%`, reason: a.reason })),
-    totals: { annual_total: r(m.totals.total), lines_allocated: m.totals.allocated, lines_total: m.totals.lines, unallocated_lines: m.totals.unallocated, single_source_lines: m.totals.single_source,
+    totals: { annual_total: r(m.totals.total), annual_total_after_discounts: r(m.totals.total_after ?? m.totals.total),
+      discounts: (m.totals.discounts ?? []).map((d) => `${discountText(d)}${d.saving ? `; saves ${r(d.saving)}` : ""}`), lines_allocated: m.totals.allocated, lines_total: m.totals.lines, unallocated_lines: m.totals.unallocated, single_source_lines: m.totals.single_source,
       by_vendor: m.totals.vendors.map((v) => ({ vendor: v.name, lines: v.lines, annual_value: r(v.value), share: `${v.pct.toFixed(1)}%` })) },
-    baseline: m.baseline ? { best_single_vendor: m.baseline.vendor, its_total: r(m.baseline.total), note: m.baseline.note, saving: r(m.savings), saving_pct: m.savings_pct === null ? null : `${m.savings_pct.toFixed(2)}%` } : null,
+    baseline: m.baseline ? { best_single_vendor: m.baseline.vendor, its_total: r(m.baseline.total), its_total_as_quoted: r(m.baseline.total_quoted ?? m.baseline.total),
+      its_discount: m.baseline.discount ? discountText(m.baseline.discount) : null, note: m.baseline.note, saving: r(m.savings), saving_pct: m.savings_pct === null ? null : `${m.savings_pct.toFixed(2)}%` } : null,
     exclusions: m.exclusions.map((e) => `${e.vendor}: ${e.reason}`),
     validity: m.validity.map((v) => `${v.vendor}: ${v.days ?? "?"} days${v.short ? " (shorter than the RFx asked)" : ""}`),
     assumptions_ledger: m.ledger.map((l) => ({ kind: l.kind, vendor: l.vendor, lines: l.lines, assumption: l.description, basis: l.basis, by: l.by })),

@@ -28,7 +28,7 @@ export async function submitReply(o: { rfxId: string; vendorId: string; files: F
 }
 
 /** Drop zone + pasted text, shared by the Add response sheet and the vendor portal. */
-export function ReplyForm({ files, setFiles, text, setText, placeholder }: { files: File[]; setFiles: (f: File[]) => void; text: string; setText: (t: string) => void; placeholder: string }) {
+export function ReplyForm({ files, setFiles, text, setText, placeholder, minHeight = 120 }: { files: File[]; setFiles: (f: File[]) => void; text: string; setText: (t: string) => void; placeholder: string; minHeight?: number }) {
   const [over, setOver] = useState(false);
   return (
     <>
@@ -51,7 +51,7 @@ export function ReplyForm({ files, setFiles, text, setText, placeholder }: { fil
         </div>
       )}
       <div className="eyebrow">or paste the email body</div>
-      <textarea className="ta" style={{ minHeight: 120 }} placeholder={placeholder} value={text} onChange={(e) => setText(e.target.value)} />
+      <textarea className="ta" style={{ minHeight, resize: "vertical" }} placeholder={placeholder} value={text} onChange={(e) => setText(e.target.value)} />
     </>
   );
 }

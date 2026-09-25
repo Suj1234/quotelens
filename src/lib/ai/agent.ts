@@ -15,7 +15,7 @@ setLogLevel(LogLevel.WARN); // ADK logs every request at INFO
 
 type Ctx = { purpose: string; rfx_id?: string | null };
 export type AgentEvent = { type: "step"; text: string } | { type: "action"; tool: string; text: string };
-export type Action = { tool: string; text: string; data?: unknown };
+export type Action = { tool: string; text: string; data?: unknown; result?: unknown };
 
 export type AgentTool<S extends z.ZodObject = z.ZodObject> = {
   name: string; description: string; parameters: S;
@@ -85,7 +85,7 @@ export async function runAgent(o: RunOpts): Promise<{ reply: string; actions: Ac
         const args = input as z.infer<typeof t.parameters>;
         if (t.step) o.onEvent?.({ type: "step", text: t.step(args) });
         const out = await t.run(args);
-        if (out.action) { actions.push({ tool: t.name, text: out.action, data: out.data }); o.onEvent?.({ type: "action", tool: t.name, text: out.action }); }
+        if (out.action) { actions.push({ tool: t.name, text: out.action, data: out.data, result: out.result }); o.onEvent?.({ type: "action", tool: t.name, text: out.action }); }
         return out.result ?? { ok: true };
       } catch (e) {
         if (!(e instanceof AppError)) console.error(`[agent:${o.name}] tool ${t.name} failed:`, e);

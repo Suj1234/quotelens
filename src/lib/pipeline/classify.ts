@@ -1,4 +1,5 @@
 import "server-only";
+import { VENDOR_DATA_RULE, vendorData, vendorText } from "@/lib/ai/vendor-data";
 import { bool, choice, decide, type Question } from "@/lib/ai/decision";
 import { generateText, inlineFile } from "@/lib/ai/gemini";
 import { db } from "@/lib/db";
@@ -38,7 +39,7 @@ export async function classify(resp: ResponseRow): Promise<ClassifySummary> {
       const part = f.derived_image_paths?.length
         ? inlineFile(await get("derived", f.derived_image_paths[0]), "image/png")
         : inlineFile(await get("raw", f.storage_path), "application/pdf");
-      caption = await generateText({ tier: "fast", purpose: "classify", rfx_id: resp.rfx_id, response_id: resp.id, parts: [part, { text: P_CAPTION }] });
+      caption = await generateText({ tier: "fast", purpose: "classify", rfx_id: resp.rfx_id, response_id: resp.id, parts: [...vendorData(f.original_name, [part]), { text: `${P_CAPTION}\n${VENDOR_DATA_RULE}` }] });
       content = `Caption of the ${f.page_count ? `${f.page_count}-page PDF` : "image"}: ${caption}`;
     }
     docs[i] = { key: `f${i + 1}`, label: `${f.original_name} (${f.mime})`, content, caption, file: f };
@@ -48,7 +49,7 @@ export async function classify(resp: ResponseRow): Promise<ClassifySummary> {
   const summary: ClassifySummary = { files: {}, email: null, no_quote_found: false };
   if (docs.length) {
     const per = Math.min(3000, Math.floor(STATE_BUDGET / docs.length) - 120);
-    const state = docs.map((d) => `### DOCUMENT ${d.key}: ${d.label}\n${d.content.slice(0, per)}`).join("\n\n");
+    const state = docs.map((d) => `### DOCUMENT ${d.key}: ${d.label}\n${vendorText(d.label, d.content.slice(0, per))}`).join("\n\n");
     const questions: Record<string, Question> = {};
     for (const d of docs) {
       questions[`${d.key}_kind`] = {

@@ -60,5 +60,6 @@ export interface ResponseFile {
   id: string; response_id: string; original_name: string; mime: string; size_bytes: number; storage_path: string;
   derived_text_path: string | null; derived_image_paths: string[] | null; file_kind: FileKind | null;
   file_kind_probability: number | null; file_kind_provider: string | null; classify_reason: string | null;
+  sha256?: string | null; // 0016: content fingerprint for the "same file from two vendors" check
   page_count: number | null; created_at: string;
 }

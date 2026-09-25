@@ -68,6 +68,7 @@ export function CategoryTemplateCard({ category, templates, vendors, busy, save 
             <dt>Payment</dt><dd className="unit"><Int v={s.payment_terms_days} on={(v) => setS({ payment_terms_days: v })} /> days</dd>
             <dt>Quote validity</dt><dd className="unit"><Int v={s.validity_days} on={(v) => setS({ validity_days: v })} /> days</dd>
             <dt>Contract</dt><dd className="unit"><Int v={s.contract_months} on={(v) => setS({ contract_months: v })} /> months</dd>
+            <dt>Usual price</dt><dd className="unit">₹<Int v={t.price_band?.rs_per_kg_min ?? 0} on={(v) => set({ price_band: { rs_per_kg_min: v, rs_per_kg_max: t.price_band?.rs_per_kg_max ?? v + 1 } })} /> to ₹<Int v={t.price_band?.rs_per_kg_max ?? 0} on={(v) => set({ price_band: { rs_per_kg_min: t.price_band?.rs_per_kg_min ?? 0, rs_per_kg_max: v } })} /> per kg <span className="hint">— a price outside this gets a &ldquo;Check unit&rdquo; card</span></dd>
           </dl>
         </section>
 

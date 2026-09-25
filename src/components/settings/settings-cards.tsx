@@ -31,15 +31,15 @@ export function SettingsCards({ settings, jevKey, changes, category, vendors }: 
           <div className="hd"><b>Email transport</b></div>
           <div className="bd radios">
             <label><input type="radio" name="em" checked readOnly /> <b>Mock</b> — outbox page, add-response sheet, vendor portal</label>
-            <label className="off"><input type="radio" name="em" disabled /> <b>Gmail</b> — SMTP with App Password; IMAP sync <span className="chip grey">not in this build</span></label>
-            <label className="off"><input type="radio" name="em" disabled /> <b>Resend</b> — needs a verified domain <span className="chip grey">not configured</span></label>
+            <label className="off"><input type="radio" name="em" disabled /> <b>Gmail</b> — SMTP with App Password; IMAP sync <span className="chip grey">Not in this build</span></label>
+            <label className="off"><input type="radio" name="em" disabled /> <b>Resend</b> — needs a verified domain <span className="chip grey">Not configured</span></label>
             <div className="hint">All three raise the same “response received” event.</div>
           </div>
         </div>
 
         <DecisionCard settings={settings} jevKey={jevKey} busy={busy} save={save} />
         <FxCard rates={settings.fx_rates} busy={busy === "fx_rates"} save={save} />
-        <LandedCard settings={settings} busy={busy} save={save} />
+        <PriceCheckCard p={settings.price_check} busy={busy === "price_check"} save={save} />
       </div>
 
       <CategoryTemplateCard category={category} templates={settings.category_templates} vendors={vendors} busy={busy === "category_templates"} save={save} />
@@ -71,9 +71,9 @@ function DecisionCard({ settings, jevKey, busy, save }: { settings: Settings; je
       <div className="hd"><b>Decision layer</b></div>
       <div className="bd radios">
         <div className="small">Classification, line mapping and questionnaire judgments go through a typed-decision interface — choice, score, yes/no, each with a probability.</div>
-        <label><input type="radio" name="dp" checked={p === "auto"} disabled={busy === "decision_provider"} onChange={() => pick("auto", "Auto")} /> <b>Auto</b> — Jev via OpenRouter when a key is present, else Gemini {jevKey ? <span className="chip green">key found · Jev</span> : <span className="chip amber">no key · Gemini</span>}</label>
+        <label><input type="radio" name="dp" checked={p === "auto"} disabled={busy === "decision_provider"} onChange={() => pick("auto", "Auto")} /> <b>Auto</b> — Jev via OpenRouter when a key is present, else Gemini {jevKey ? <span className="chip green">Key found · Jev</span> : <span className="chip amber">No key · Gemini</span>}</label>
         <label><input type="radio" name="dp" checked={p === "gemini"} disabled={busy === "decision_provider"} onChange={() => pick("gemini", "Gemini only")} /> Gemini only <span className="muted xs">“LLM-estimated”</span></label>
-        <label className={jevKey ? undefined : "off"}><input type="radio" name="dp" checked={p === "jev"} disabled={!jevKey || busy === "decision_provider"} onChange={() => pick("jev", "Jev only")} /> Jev only <span className="muted xs">“measured”</span>{!jevKey && <span className="chip grey">needs an OpenRouter key</span>}</label>
+        <label className={jevKey ? undefined : "off"}><input type="radio" name="dp" checked={p === "jev"} disabled={!jevKey || busy === "decision_provider"} onChange={() => pick("jev", "Jev only")} /> Jev only <span className="muted xs">“measured”</span>{!jevKey && <span className="chip grey">Needs an OpenRouter key</span>}</label>
         <dl className="kv" style={{ marginTop: 6, alignItems: "center" }}>
           <dt>Act threshold</dt><dd><input className="ta mono num-in" type="number" step="0.01" min="0.01" max="1" value={act} onChange={(e) => setAct(e.target.value)} aria-label="Act threshold" /></dd>
           <dt>Review threshold</dt><dd><input className="ta mono num-in" type="number" step="0.01" min="0.01" max="1" value={review} onChange={(e) => setReview(e.target.value)} aria-label="Review threshold" /></dd>
@@ -81,6 +81,27 @@ function DecisionCard({ settings, jevKey, busy, save }: { settings: Settings; je
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Button size="sm" disabled={!dirty || busy === "thresholds"} onClick={() => save("thresholds", { act: Number(act), review: Number(review) }, `thresholds ${act} / ${review}. ${NEXT_RUN}`)}>{busy === "thresholds" ? "Saving…" : "Save thresholds"}</Button>
           <span className="hint">At or above act: used as is. Between: marked for a look. Below review: not used. {NEXT_RUN}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** P9 D2: when a price gets a "Check unit" card. */
+function PriceCheckCard({ p, busy, save }: { p: Settings["price_check"]; busy: boolean; save: Save }) {
+  const [ratio, setRatio] = useState(String(p.median_ratio));
+  const dirty = Number(ratio) !== p.median_ratio;
+  return (
+    <div className="card">
+      <div className="hd"><b>Price check</b></div>
+      <div className="bd radios">
+        <div className="small">A price far from the other vendors&apos; prices for the same line, or one that works out to an unusual rupees-per-kg, is usually a unit slip. It gets a &ldquo;Check unit&rdquo; card; the cell keeps its state until you decide. The median needs at least 2 other vendors on the line. The usual ₹ per kg depends on the category, so it is set in the category template below.</div>
+        <dl className="kv" style={{ marginTop: 6, alignItems: "center" }}>
+          <dt>Median ratio</dt><dd className="unit"><input className="ta mono num-in" type="number" step="0.1" min="1.2" max="10" value={ratio} onChange={(e) => setRatio(e.target.value)} aria-label="Median ratio" /> × the others&apos; median, up or down</dd>
+        </dl>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Button size="sm" disabled={!dirty || busy} onClick={() => save("price_check", { median_ratio: Number(ratio) }, `price check ${ratio}×. ${NEXT_RUN}`)}>{busy ? "Saving…" : "Save price check"}</Button>
+          <span className="hint">{NEXT_RUN}</span>
         </div>
       </div>
     </div>
@@ -136,31 +157,3 @@ function FxCard({ rates, busy, save }: { rates: Settings["fx_rates"]; busy: bool
   );
 }
 
-function LandedCard({ settings, busy, save }: { settings: Settings; busy: string | null; save: Save }) {
-  const [freight, setFreight] = useState(String(settings.freight_default_inr_per_1000));
-  const d = settings.discount_default;
-  return (
-    <div className="card">
-      <div className="hd"><b>Landed cost &amp; discounts</b></div>
-      <div className="bd radios">
-        <dl className="kv" style={{ alignItems: "center" }}>
-          <dt>Freight default</dt>
-          <dd style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            ₹<input className="ta mono num-in" type="number" min="0" step="1" value={freight} onChange={(e) => setFreight(e.target.value)} aria-label="Freight default per 1000 pcs" /> / 1000 pcs
-            <Button size="sm" disabled={Number(freight) === settings.freight_default_inr_per_1000 || freight === "" || busy === "freight_default_inr_per_1000"}
-              onClick={() => save("freight_default_inr_per_1000", Number(freight), `freight default ₹${freight} per 1000. ${NEXT_RUN}`)}>Save</Button>
-          </dd>
-          <dt>Total-level discounts</dt>
-          <dd>
-            <div className="seg" role="radiogroup" aria-label="Total-level discounts">
-              <button className={d === "gross" ? "on" : undefined} disabled={busy === "discount_default"} onClick={() => d !== "gross" && save("discount_default", "gross", `total-level discounts shown gross. ${NEXT_RUN}`)}>Show gross</button>
-              <button className={d === "net" ? "on" : undefined} disabled={busy === "discount_default"} onClick={() => d !== "net" && save("discount_default", "net", `total-level discounts applied to every line. ${NEXT_RUN}`)}>Apply to every line</button>
-            </div>
-          </dd>
-          <dt>Cost of money</dt><dd className="muted">not in this build</dd>
-        </dl>
-        <div className="hint">Freight is added to the landed price of vendors whose quote excludes it, unless a per-vendor figure was entered. A vendor&apos;s total discount (e.g. 3% on orders above a value) is shown in the ledger; &ldquo;Apply to every line&rdquo; takes it off each of that vendor&apos;s prices. {NEXT_RUN}</div>
-      </div>
-    </div>
-  );
-}

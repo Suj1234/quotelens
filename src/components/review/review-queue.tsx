@@ -1,33 +1,40 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Action, QueueItem } from "@/lib/review";
-import { countWord, money } from "@/lib/format";
+import type { Evidence } from "@/lib/evidence";
+import { countWord, money, shortDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { EvidenceBlock } from "@/components/compare/evidence";
+import { Marked } from "@/components/compare/evidence";
 import { SyncRepliedButton } from "@/components/comms/sync-inbox";
+import { OpenFile } from "@/components/compare/open-file";
+import { plain, short, sourceLabel } from "@/lib/review-text";
 
-const TYPE_ORDER = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "discount_treatment", "fx_assumption", "freight_treatment", "tax_basis", "questionnaire_ambiguous", "questionnaire_missing", "validity_short", "missing_line", "unmapped_item", "conflict", "unknown_vendor", "not_a_quote"];
+// DECISIONS 2026-09-25 "Review tab": six plain-language groups, one column per card, no bulk select, no J/K/C.
+// "Replies to sort" first: whose reply it is comes before judging its prices.
+// P10 B4: bid-leveling's terms — numbers we filled in (plugs) · vendor conditions (qualifications) · not quoted (exclusions).
+const GROUPS = ["Replies to sort", "Prices to check", "Not quoted", "Line matching", "Numbers we filled in", "Vendor conditions", "Questionnaire"];
+const TYPE_ORDER = ["vendor_mismatch", "unknown_vendor", "not_a_quote", "total_mismatch", "ambiguous_unit", "price_check", "low_confidence_read", "conflict", "prior_pricing", "missing_line", "unmapped_item", "freight_treatment", "discount_treatment", "fx_assumption", "tax_basis", "validity_short", "questionnaire_ambiguous", "questionnaire_missing", "unknown_vendor", "not_a_quote"];
 const PRICE_TYPES = ["ambiguous_unit", "low_confidence_read", "conflict"];
-// DESIGN §3.6: assumptions driven by a global setting offer "Change in settings" (FX rate, freight default, discount default).
-const SETTINGS_TYPES = ["fx_assumption", "discount_treatment", "freight_treatment"];
 const INFO = ["fx_assumption", "discount_treatment", "freight_treatment", "tax_basis", "validity_short", "missing_line"];
-const LABEL: Record<Action, string> = {
-  confirm: "Confirm", override: "Override…", exclude: "Exclude", map: "Map to line…", ignore: "Ignore", "ask-vendor": "Ask vendor",
-  "mark-not-quoted": "Treat as not quoted", dismiss: "Dismiss", "accept-yes": "Accept as Yes", "treat-no": "Treat as No",
-};
+// Confidence is shown only where the system can be unsure of a reading (brief: "what does it show the buyer when it isn't sure?").
+const SURE_TYPES = ["ambiguous_unit", "low_confidence_read", "conflict", "price_check", "questionnaire_ambiguous"];
+const word = (t: string) => t.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 // DESIGN §5: toasts confirm the verb
 const DONE: Record<Action, string> = {
-  confirm: "Confirmed — cell now counts", override: "Overridden — cell now counts", exclude: "Excluded — logged in the ledger", map: "Mapped — grid updated",
-  ignore: "Ignored", "ask-vendor": "Sent — logged under vendor communications", "mark-not-quoted": "Treated as not quoted", dismiss: "Dismissed",
-  "accept-yes": "Accepted as Yes", "treat-no": "Treated as No",
+  confirm: "Confirmed — cell now counts", override: "Price entered — cell now counts", exclude: "Excluded — logged in the ledger", map: "Moved — grid updated",
+  ignore: "Ignored", "ask-vendor": "Sent — logged under vendor communications", "mark-not-quoted": "Treated as not quoted", dismiss: "Closed",
+  "accept-yes": "Answer set to Yes", "treat-no": "Answer set to No", "enter-prices": "Prices entered — cells now count", "set-freight": "Freight changed — landed prices updated",
+  "set-fx": "Rate changed — this vendor's prices converted again", "set-gst": "GST changed — this vendor's prices restated", "set-discount": "Discount changed — award totals follow it",
+  answer: "Answers entered — the questionnaire is scored again", reassign: "Reply moved — processed again for its vendor",
 };
 type Draft = { to: string; reply_to: string; clar_n: number; subject: string; body: string; items: { id: string; text: string }[] };
 type Pending = { total: number; by_vendor: { vendor: string; count: number; clarification: boolean }[] };
-const ASKABLE = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing"];
+// Cards one clarification email covers (src/lib/clarify.ts ASKABLE).
+const ASKABLE = ["ambiguous_unit", "price_check", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing",
+  "missing_line", "conflict", "freight_treatment", "fx_assumption", "discount_treatment", "tax_basis", "validity_short", "vendor_mismatch", "vendor_condition", "total_mismatch"];
 const andList = (xs: (string | number)[]) => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : String(xs[0] ?? "");
 
 export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendor: initialVendor = "", pending: initialPending }: { rfxId: string; items: QueueItem[]; canAct: boolean; locked?: boolean; focus: string | null; vendor?: string; pending: Pending | null }) {
@@ -35,21 +42,19 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
   // The server's count, unless this page polled a newer one since (a refresh brings a new server count and wins again).
   const [polled, setPolled] = useState<{ base: Pending | null; v: Pending } | null>(null);
   const pending = polled && polled.base === initialPending ? polled.v : initialPending;
-  const [vendor, setVendor] = useState(initialVendor); const [type, setType] = useState(""); const [status, setStatus] = useState("open");
-  const [cur, setCur] = useState<string | null>(focus);
+  const [vendor, setVendor] = useState(initialVendor); const [status, setStatus] = useState<"open" | "waiting" | "resolved">("open");
   const [busy, setBusy] = useState<string | null>(null);
-  const [group, setGroup] = useState<"type" | "vendor">("type");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const shown = useMemo(() => items.filter((i) => (!vendor || i.vendor?.code === vendor) && (!type || i.type === type)
-    && (status === "all" || (status === "open" ? i.status === "open" : i.status !== "open"))), [items, vendor, type, status]);
-  // PRD #17: grouped by type (DESIGN §3.6 order) or by vendor; J/K follow the same order.
-  const keyOf = useCallback((i: QueueItem) => (group === "type" ? i.type : i.vendor?.name ?? "Unknown sender"), [group]);
+  const [group, setGroup] = useState<"type" | "vendor">("vendor"); // vendor-wise by default (the buyer works one supplier at a time)
+  // Three views: Open · Waiting on vendor (asked, no reply yet — still decidable) · Decided.
+  const viewOf = (s: string) => (s === "open" ? "open" : s === "asked_vendor" ? "waiting" : "resolved");
+  const shown = useMemo(() => items.filter((i) => (!vendor || i.vendor?.code === vendor) && viewOf(i.status) === status), [items, vendor, status]);
+  const keyOf = useCallback((i: QueueItem) => (group === "type" ? i.group : i.vendor?.name ?? "Unknown sender"), [group]);
+  const inGroup = (a: QueueItem, b: QueueItem) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || (a.vendor?.name ?? "").localeCompare(b.vendor?.name ?? "") || (a.line_no ?? 0) - (b.line_no ?? 0);
   const ordered = useMemo(() => [...shown].sort((a, b) => group === "type"
-    ? (TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)) || (a.vendor?.name ?? "").localeCompare(b.vendor?.name ?? "")
-    : keyOf(a).localeCompare(keyOf(b)) || TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)), [shown, group, keyOf]);
+    ? GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || inGroup(a, b)
+    : keyOf(a).localeCompare(keyOf(b)) || GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || inGroup(a, b)), [shown, group, keyOf]);
   const open = items.filter((i) => i.status === "open");
-  const vendors = [...new Map(items.filter((i) => i.vendor).map((i) => [i.vendor!.code, i.vendor!.name])).entries()];
-  const types = [...new Set(items.map((i) => i.type))];
+  const waiting = items.filter((i) => i.status === "asked_vendor");
 
   const run = useCallback(async (it: QueueItem, action: Action, body: Record<string, unknown> = {}) => {
     setBusy(it.id);
@@ -57,26 +62,11 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
       const r = await fetch(`/api/review/${it.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!r.ok) { toast.error(`${j.error ?? "That didn't work."} (${j.code ?? r.status})`); return null; }
-      if (action !== "ask-vendor") { toast.success(action === "confirm" && INFO.includes(it.type) ? "Acknowledged — noted in the ledger" : DONE[action]); router.refresh(); }
+      if (action !== "ask-vendor") { toast.success(action === "confirm" && INFO.includes(it.type) ? "Accepted — noted in the ledger" : DONE[action]); router.refresh(); }
       return j as { status: string; draft?: Draft };
     } catch { toast.error("Couldn't reach the server — check the connection and try again (NETWORK)"); return null; }
     finally { setBusy(null); }
   }, [router]);
-
-  const bulk = async (ids: string[], action: Action, done: string) => {
-    if (!ids.length) return;
-    setBusy("bulk");
-    const r = await fetch("/api/review/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids, action }) }).catch(() => null);
-    setBusy(null);
-    const j = await r?.json().catch(() => null) as { results?: { error?: string }[] } | null;
-    if (!r?.ok || !j?.results) return toast.error(r ? `Couldn't apply that — try again (${r.status})` : "Couldn't reach the server — check the connection and try again (NETWORK)");
-    const failed = j.results.filter((x) => x.error).length;
-    if (failed) toast.error(`${ids.length - failed} done, ${failed} skipped (that action doesn't apply to them)`); else toast.success(`${done} ${ids.length}`);
-    setPicked(new Set());
-    router.refresh();
-  };
-  const ackAll = () => bulk(open.filter((i) => INFO.includes(i.type)).map((i) => i.id), "confirm", "Acknowledged");
-  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const groups = [...new Set(ordered.map(keyOf))];
   // DESIGN §3.6 note while a clarification is out: "Clarification sent to Westline Packaging for items 5, 9, 15 and 19. Waiting for their reply."
@@ -94,132 +84,229 @@ export function ReviewQueue({ rfxId, items, canAct, locked = false, focus, vendo
     return () => clearInterval(t);
   }, [canAct, askedVendors.length, rfxId, initialPending]);
   const replied = (pending?.by_vendor ?? []).filter((p) => p.clarification || askedVendors.includes(p.vendor));
-
-  // J / K move, C confirms the current card (TRD §17.8).
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("input, textarea, select")) return;
-      const k = e.key.toLowerCase();
-      if (k !== "j" && k !== "k" && k !== "c") return;
-      const i = ordered.findIndex((x) => x.id === cur);
-      if (k === "c") { const it = ordered[i]; if (canAct && it?.status === "open" && it.actions.includes("confirm")) run(it, "confirm"); return; }
-      const next = ordered[Math.min(ordered.length - 1, Math.max(0, i + (k === "j" ? 1 : -1)))];
-      if (next) { setCur(next.id); document.getElementById(`rq-${next.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [ordered, cur, canAct, run]);
   useEffect(() => { if (focus) document.getElementById(`rq-${focus}`)?.scrollIntoView({ block: "center" }); }, [focus]);
+  const vendorName = items.find((i) => i.vendor?.code === vendor)?.vendor?.name;
 
   return (
     <>
       <p className="lead">
         {open.length
-          ? <><b>{countWord(open.length)} {open.length === 1 ? "item needs" : "items need"}</b> a decision. Nothing here counts in totals until you decide. Evidence on the left, your call on the right.</>
+          ? <><b>{countWord(open.length)} {open.length === 1 ? "item needs" : "items need"}</b> a decision{waiting.length ? <>, and <b>{waiting.length}</b> {waiting.length === 1 ? "is" : "are"} waiting on a vendor&apos;s reply</> : null}. Each card says what happens if you leave it; nothing it holds back counts in totals until you decide.</>
+          : waiting.length ? <><b>{countWord(waiting.length)} {waiting.length === 1 ? "item is" : "items are"} waiting on a vendor&apos;s reply.</b> You can still decide them without waiting; a reply updates them itself.</>
           : <><b>Nothing waits for you.</b> Every item has a decision; the grid counts all reviewed cells.</>}
       </p>
       <div style={{ display: "flex", gap: 8, margin: "14px 0 18px", alignItems: "center", flexWrap: "wrap" }}>
-        {canAct && open.some((i) => INFO.includes(i.type)) && <Button onClick={ackAll} disabled={busy === "bulk"}>Acknowledge all assumptions</Button>}
+        
         {canAct && replied.map((p) => <SyncRepliedButton key={p.vendor} rfxId={rfxId} vendor={p.vendor} />)}
-        <select value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Vendor" className="sel"><option value="">All vendors</option>{vendors.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
-        <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type" className="sel"><option value="">All types</option>{types.map((t) => <option key={t} value={t}>{t.replaceAll("_", " ")}</option>)}</select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status" className="sel"><option value="open">Open</option><option value="resolved">Decided</option><option value="all">All</option></select>
-        <div className="seg" role="group" aria-label="Group by">
-          <button className={group === "type" ? "on" : ""} onClick={() => setGroup("type")}>By type</button>
-          <button className={group === "vendor" ? "on" : ""} onClick={() => setGroup("vendor")}>By vendor</button>
+        <div className="seg" role="group" aria-label="Show">
+          <button className={status === "open" ? "on" : ""} onClick={() => setStatus("open")}>Open{open.length ? ` · ${open.length}` : ""}</button>
+          <button className={status === "waiting" ? "on" : ""} onClick={() => setStatus("waiting")}>Waiting on vendor{waiting.length ? ` · ${waiting.length}` : ""}</button>
+          <button className={status === "resolved" ? "on" : ""} onClick={() => setStatus("resolved")}>Decided</button>
         </div>
-        <span className="hint"><span className="kbd">J</span> <span className="kbd">K</span> move · <span className="kbd">C</span> confirm</span>
+        <div className="seg" role="group" aria-label="Group by">
+          <button className={group === "vendor" ? "on" : ""} onClick={() => setGroup("vendor")}>By vendor</button>
+          <button className={group === "type" ? "on" : ""} onClick={() => setGroup("type")}>By type</button>
+        </div>
+        {vendor && <span className="chip">Only {vendorName ?? vendor} <button onClick={() => setVendor("")} aria-label="Show all vendors" style={{ marginLeft: 4 }}>×</button></span>}
       </div>
       {asked.map((a) => <div key={a} className="note" style={{ marginBottom: 12 }}>{a}</div>)}
-      {canAct && picked.size > 0 && (
-        <div className="lock" style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, position: "sticky", top: 0, zIndex: 5, color: "var(--ink)" }}>
-          <b>{picked.size} selected</b>
-          <Button size="sm" variant="default" disabled={busy === "bulk"} onClick={() => bulk([...picked], "confirm", "Confirmed")}>Confirm</Button>
-          <Button size="sm" disabled={busy === "bulk"} onClick={() => bulk([...picked], "dismiss", "Dismissed")}>Dismiss</Button>
-          <Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>Clear</Button>
-          <span className="hint">Confirm uses each card&apos;s proposed value; cards it doesn&apos;t apply to are skipped.</span>
-        </div>
-      )}
       <div className="rq">
         {groups.map((g) => (
           <section key={g} className="rq">
-            <div className="eyebrow" style={{ marginTop: 6 }}>{group === "type" ? g.replaceAll("_", " ") : g} · {ordered.filter((i) => keyOf(i) === g).length}</div>
-            {ordered.filter((i) => keyOf(i) === g).map((it) => <Card key={it.id} it={it} rfxId={rfxId} askable={items.filter((x) => x.status === "open" && x.vendor?.id === it.vendor?.id && ASKABLE.includes(x.type)).map((x) => x.id)} canAct={canAct} locked={locked} busy={busy === it.id} current={cur === it.id} onPick={() => setCur(it.id)} run={run}
-              selected={picked.has(it.id)} onSelect={() => toggle(it.id)} />)}
+            <div className="eyebrow rqgroup">{g} · {ordered.filter((i) => keyOf(i) === g).length}</div>
+            {ordered.filter((i) => keyOf(i) === g).map((it) => <Card key={it.id} it={it} rfxId={rfxId} askable={items.filter((x) => x.status === "open" && x.vendor?.id === it.vendor?.id && ASKABLE.includes(x.type)).map((x) => x.id)} canAct={canAct} locked={locked} busy={busy === it.id} run={run} />)}
           </section>
         ))}
         {!shown.length && (items.length && !open.length && status === "open"
-          ? <div className="empty"><b>The queue is clear.</b> Every item has a decision — switch the status filter to Decided to read them.</div>
+          ? <div className="empty"><b>The queue is clear.</b> Every item has a decision — switch to Decided to read them.</div>
           : !items.length ? <div className="empty"><b>Nothing to review.</b> Items appear here when a response is processed and something needs your call.</div>
-          : <div className="empty"><b>No items match.</b> Change the filters to see decided items or other vendors.</div>)}
+          : <div className="empty"><b>Nothing here.</b> {status === "open" ? "No open items" : status === "waiting" ? "Nothing is waiting on a vendor" : "No decided items"}{vendor ? ` for ${vendorName ?? vendor}` : ""}.</div>)}
       </div>
     </>
   );
 }
 
-function Card({ it, rfxId, askable, canAct, locked, busy, current, onPick, run, selected, onSelect }: {
-  it: QueueItem; rfxId: string; askable: string[]; canAct: boolean; locked: boolean; busy: boolean; current: boolean; onPick: () => void; selected: boolean; onSelect: () => void;
+type Form = "change" | "exclude";
+const DISCOUNT_KINDS: [string, string][] = [["all_lines", "if all lines are awarded"], ["min_lines", "if at least N lines are awarded"], ["min_value", "if the award is at least ₹N"], ["payment_days", "if we pay within N days"], ["none", "no condition"]];
+
+/** P10 B1: one card = source on the left; on the right what it is, what happens if you leave it, and the four buttons — Accept · Change · Ask vendor · Exclude — in that order, shown by the four rules. */
+function Card({ it, rfxId, askable, canAct, locked, busy, run }: {
+  it: QueueItem; rfxId: string; askable: string[]; canAct: boolean; locked: boolean; busy: boolean;
   run: (it: QueueItem, a: Action, body?: Record<string, unknown>) => Promise<{ status: string; draft?: Draft } | null>;
 }) {
-  const [mode, setMode] = useState<"override" | "exclude" | "map" | null>(null);
-  const [value, setValue] = useState(it.proposed_value ? String(Math.round(it.proposed_value)) : "");
+  const b = it.buttons;
+  const pv = it.proposed_value;
+  const cur = it.current;
+  const [form, setForm] = useState<Form | null>(null);
+  const [value, setValue] = useState(it.type === "fx_assumption" ? String(cur?.rate ?? "") : it.type === "tax_basis" ? String(cur?.gst_pct ?? 18) : it.type === "discount_treatment" ? String(cur?.discount?.pct ?? pv ?? "") : pv ? String(Math.round(pv)) : "");
+  const [gstDir, setGstDir] = useState<"add" | "remove" | "none">("add");
+  const [kind, setKind] = useState(cur?.discount?.kind && cur.discount.kind !== "unclear" ? cur.discount.kind : "all_lines");
+  const [n, setN] = useState(String(cur?.discount?.min_lines ?? cur?.discount?.min_value_inr ?? cur?.discount?.payment_days ?? ""));
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
-  const [line, setLine] = useState("");
+  const [pick, setPick] = useState("");
   const [asking, setAsking] = useState(false);
-  const resolved = it.status !== "open";
-  const primary = it.actions[0];
+  // Waiting on the vendor is not decided: the card keeps its buttons and says when it was asked.
+  const waiting = it.status === "asked_vendor";
+  const resolved = it.status !== "open" && !waiting;
+  const mapped = it.type === "low_confidence_read" && it.group === "Line matching";
+  const vendor = short(it.vendor?.name);
 
-  const click = async (a: Action) => {
-    if (a === "override" || a === "exclude" || a === "map") return setMode(a);
-    if (a === "ask-vendor") return setAsking(true);
-    await run(it, a);
+  const acceptLabel = (): string => {
+    if (it.conflict) return `Accept — keep “${(it.conflict.earlier.answer ?? "").slice(0, 30)}”`;
+    if (b.accept === "mark-not-quoted") return "Accept as not quoted";
+    if (b.accept === "dismiss") return it.type === "questionnaire_missing" ? "Accept — leave unanswered" : "Accept — not a quote";
+    if (it.type === "price_check") return `Accept ${money(pv, "INR", 0)}`;
+    if (mapped) return `Accept line ${it.line_no ?? "?"}`;
+    if (PRICE_TYPES.includes(it.type) && pv !== null) return `Accept ${money(pv, "INR", 0)}`;
+    if (it.type === "freight_treatment") return `Accept ₹${pv} freight`;
+    if (it.type === "missing_line") return `Accept — ${pv ?? "those"} not quoted`;
+    if (it.type === "validity_short") return `Accept ${pv ?? ""}-day validity`;
+    if (it.type === "fx_assumption") return `Accept rate${cur?.rate ? ` ${cur.rate}` : ""}`;
+    if (it.type === "discount_treatment") return "Accept this reading";
+    if (it.type === "vendor_mismatch") return `Accept as ${vendor}'s`;
+    if (it.type === "total_mismatch") return "Accept the line prices";
+    return "Accept";
   };
-  const label = (a: Action) => a === "confirm" && it.proposed_value !== null && PRICE_TYPES.includes(it.type)
-    ? `Confirm ${money(it.proposed_value, "INR", 0)}` : a === "confirm" && INFO.includes(it.type) ? "Acknowledge" : LABEL[a];
+  const changeLabel: Record<string, string> = { price: "Change price…", prices: "Change — enter prices…", line: mapped ? "Change line…" : "Change — place on a line…", freight: "Change freight…",
+    rate: "Change rate…", gst: "Change GST…", discount: "Change discount…", yesno: "Change — answer Yes / No…",
+    answers: it.conflict ? "Change — use the other answer…" : it.type === "questionnaire_ambiguous" ? "Change — type the answer…" : "Change — type the answers…", vendor: "Change vendor…" };
+  const excludeLabel = b.exclude === "ignore" ? "Exclude item" : b.exclude === "dismiss" ? "Exclude reply" : it.type === "discount_treatment" ? "Exclude discount…" : it.type === "vendor_mismatch" ? "Exclude reply…" : mapped ? "Exclude item…" : "Exclude line…";
+
+  // The note under the title, unless the source panel already says the same thing; model scores stay out of the prose.
+  const note = it.type === "freight_treatment" || it.type === "prior_pricing" ? null : (it.proposed_note ?? it.detail)?.replace(/\s*\(p=[\d.]+\)/g, "") ?? null;
+  const detail = note && !it.evidence?.text?.includes(note.trim()) ? note : null;
+  const sure = SURE_TYPES.includes(it.type) && it.probability !== null && it.probability > 0 && it.probability < 0.95 ? it.probability : null;
+  const f = b.change?.form;
+  const needN = f === "discount" && kind !== "all_lines" && kind !== "none" && cur?.discount?.kind !== "gross_up";
+  const canSave = form === "exclude" ? !!reason.trim()
+    : f === "line" || f === "vendor" ? !!pick
+    : f === "yesno" ? false
+    : f === "prices" ? !!reason.trim() && Object.values(prices).some((v) => Number(v) > 0)
+    : f === "answers" ? !!reason.trim() && Object.values(answers).some((v) => v.trim())
+    : f === "gst" ? !!reason.trim() && (gstDir === "none" || Number(value) > 0)
+    : !!reason.trim() && value.trim() !== "" && Number(value) >= (f === "price" || f === "rate" ? 0.0001 : 0) && (!needN || Number(n) > 0);
+  const save = async () => {
+    if (form === "exclude") { if (await run(it, b.exclude!, { reason })) setForm(null); return; }
+    const a = b.change!.actions[0];
+    const body = f === "line" ? { line_id: pick } : f === "vendor" ? { vendor_id: pick }
+      : f === "prices" ? { reason, prices: Object.fromEntries(Object.entries(prices).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)])) }
+      : f === "answers" ? { reason, answers }
+      : f === "gst" ? { reason, value: gstDir === "none" ? 0 : gstDir === "add" ? Number(value) : -Number(value) }
+      : f === "discount" ? { reason, value: Number(value), kind, min_lines: kind === "min_lines" ? Number(n) : null, min_value_inr: kind === "min_value" ? Number(n) : null, payment_days: kind === "payment_days" ? Number(n) : null }
+      : { value: Number(value), reason };
+    if (await run(it, a, body)) setForm(null);
+  };
+  const direct = async (a: Action) => { await run(it, a); };
 
   return (
-    <div className={`rqcard${resolved ? " resolved" : ""}${current ? " cur" : ""}`} id={`rq-${it.id}`} onClick={onPick}>
-      <EvidenceBlock ev={it.evidence} />
-      <div>
-        <div className="ttl">
-          {canAct && !resolved && <input type="checkbox" checked={selected} onChange={onSelect} onClick={(e) => e.stopPropagation()} aria-label="Select for bulk action" />}
-          {it.title}
+    <div className={`rqcard${resolved ? " resolved" : ""}${it.evidence ? "" : " noev"}`} id={`rq-${it.id}`}>
+      {/* Left: where the system read it. Right: what it means and your call (the layout the buyer preferred). */}
+      <Source ev={it.evidence} />
+      <div className="rqmain">
+      <div className="rqmeta">{[it.vendor?.name ?? "Unknown sender", it.line_no && !it.title.match(/^(Line|Item)s?\s/i) ? `Line ${it.line_no}` : null].filter(Boolean).join(" · ")}
+        {it.grade && <span className={`chip ${it.grade === "D" ? "amber" : "grey"}`} style={{ marginLeft: 8 }} title="A vendor-stated · B our spec or an official rate · C entered by the buyer · D a default or the AI's inference">Reliability {it.grade}</span>}
+        {resolved && <span className="chip green" style={{ marginLeft: 8 }}>{word(it.status)}</span>}
+        {waiting && <span className="chip amber" style={{ marginLeft: 8 }}>Asked{it.resolution?.at ? ` ${shortDate(it.resolution.at)}` : ""} — waiting for reply</span>}</div>
+      <div className="ttl">{it.title}</div>
+      {detail && <div className="rqdetail">{detail}</div>}
+      {!resolved && it.if_nothing && <div className="rqnothing"><b>If you do nothing:</b> {it.if_nothing}</div>}
+      {(sure !== null || (pv !== null && PRICE_TYPES.includes(it.type) && !mapped)) && (
+        <div className="prop">
+          {pv !== null && PRICE_TYPES.includes(it.type) && !mapped && <span>Proposed <span className="v">{money(pv, "INR", 0)}</span> <span className="text-muted-foreground" style={{ fontSize: 11 }}>per 1000</span></span>}
+          {sure !== null && <span className="text-muted-foreground" style={{ fontSize: 12 }}><span className="pbar"><i style={{ width: `${Math.round(sure * 100)}%` }} /></span> System is {Math.round(sure * 100)}% sure of this reading</span>}
         </div>
-        <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-          {it.vendor && <span className="chip">{it.vendor.name}</span>}
-          <span className="chip grey">{it.type.replaceAll("_", " ")}</span>
-          {resolved && <span className="chip green">{it.status.replaceAll("_", " ")}</span>}
+      )}
+      {resolved && it.resolution && <div className="hint">{[it.resolution.value !== undefined && ["ambiguous_unit", "low_confidence_read", "conflict", "price_check"].includes(it.type) ? money(it.resolution.value, "INR", 0) : null, it.resolution.note, it.resolution.by && `by ${it.resolution.by}`].filter(Boolean).join(" · ")}</div>}
+
+      {!resolved && canAct && !form && !asking && (
+        <div className="acts four">
+          {b.accept && <Button size="sm" variant="default" disabled={busy} onClick={() => direct(b.accept!)}>{acceptLabel()}</Button>}
+          {b.change && <Button size="sm" variant={b.accept ? "outline" : "default"} disabled={busy} onClick={() => setForm("change")}>{changeLabel[b.change.form]}</Button>}
+          {b.ask && it.vendor && <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(true)}>Ask {vendor}…</Button>}
+          {b.exclude && <Button size="sm" variant="outline" disabled={busy} onClick={() => (b.exclude === "exclude" ? setForm("exclude") : direct(b.exclude!))}>{excludeLabel}</Button>}
         </div>
-        {(it.proposed_note || it.detail) && <div className="text-muted-foreground" style={{ marginTop: 8, maxWidth: "60ch", fontSize: 12 }}>{it.proposed_note ?? it.detail}</div>}
-        {(it.probability !== null || (it.proposed_value !== null && PRICE_TYPES.includes(it.type))) && (
-          <div className="prop">
-            {it.probability !== null && <span><span className="pbar"><i style={{ width: `${Math.round(it.probability * 100)}%` }} /></span> <span className="mono" style={{ fontSize: 11 }}>p {it.probability.toFixed(2)}</span></span>}
-            {it.proposed_value !== null && PRICE_TYPES.includes(it.type) && <span>proposed <span className="v">{money(it.proposed_value, "INR", 0)}</span> <span className="text-muted-foreground" style={{ fontSize: 11 }}>per 1000</span></span>}
-          </div>
-        )}
-        {resolved && it.resolution && <div className="hint" style={{ marginTop: 8 }}>{[it.resolution.value !== undefined && it.type !== "questionnaire_ambiguous" ? money(it.resolution.value, "INR", 0) : null, it.resolution.note, it.resolution.by && `by ${it.resolution.by}`].filter(Boolean).join(" · ")}</div>}
+      )}
+      {!resolved && canAct && !it.vendor && it.type !== "unknown_vendor" && it.type !== "not_a_quote" && <div className="hint">Assign this reply to a vendor first (its “Unknown sender” card, under Replies to sort); then this card can be decided.</div>}
+      {!resolved && !canAct && <div className="hint">{locked ? "Read-only — the RFx is awarded." : "Waiting for Sujit."}</div>}
 
-        {!resolved && canAct && !mode && !asking && (
-          <div className="acts">
-            {it.actions.map((a) => <Button key={a} size="sm" variant={a === primary ? "default" : "outline"} disabled={busy} onClick={(e) => { e.stopPropagation(); click(a); }}>{label(a)}</Button>)}
-            {SETTINGS_TYPES.includes(it.type) && <Button asChild size="sm" variant="ghost"><Link href="/settings" onClick={(e) => e.stopPropagation()}>Change in settings</Link></Button>}
-          </div>
-        )}
-        {!resolved && !canAct && <div className="hint" style={{ marginTop: 10 }}>{locked ? "Read-only — the RFx is awarded." : "Waiting for Sujit."}</div>}
-
-        {mode && (
-          <div className="acts" onClick={(e) => e.stopPropagation()}>
-            {mode === "override" && <input className="mono inp" style={{ width: 120 }} inputMode="decimal" placeholder="₹ per 1000" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Value per 1000 pcs" />}
-            {mode === "map"
-              ? <select className="sel" value={line} onChange={(e) => setLine(e.target.value)} aria-label="RFx line"><option value="">Pick a line…</option>{it.candidates?.map((c) => <option key={c.line_id} value={c.line_id}>L{c.line_no} {c.description}</option>)}</select>
-              : <input className="inp" style={{ flex: 1, minWidth: 180 }} placeholder="Reason (goes in the ledger)" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason" />}
-            <Button size="sm" variant="default" disabled={busy || (mode === "map" ? !line : !reason.trim() || (mode === "override" && !Number(value)))}
-              onClick={async () => { if (await run(it, mode, mode === "map" ? { line_id: line } : { value: Number(value), reason })) setMode(null); }}>Save</Button>
-            <Button size="sm" variant="ghost" onClick={() => setMode(null)}>Cancel</Button>
-          </div>
-        )}
-        {asking && it.vendor && <ClarifyBlock rfxId={rfxId} vendor={it.vendor} itemIds={[...new Set([it.id, ...askable])]} onDone={() => setAsking(false)} />}
+      {form && (
+        <div className="rqform">
+          {form === "change" && f === "prices" && (
+            <div className="rqprices">
+              {(it.prior_lines ?? []).map((l) => (
+                <label key={l.line_no}><span className="mono">L{l.line_no}</span><span className="d">{l.description}</span>
+                  <input className="mono inp" inputMode="decimal" placeholder="₹ per 1000" value={prices[l.line_no] ?? ""} onChange={(e) => setPrices((p) => ({ ...p, [l.line_no]: e.target.value }))} aria-label={`Line ${l.line_no} price per 1000 pcs`} /></label>
+              ))}
+              <div className="hint">Lines left blank stay not quoted.</div>
+            </div>
+          )}
+          {form === "change" && f === "answers" && it.conflict && it.missing_questions?.[0] && (
+            <div className="acts" style={{ marginTop: 0 }}>
+              {[it.conflict.earlier, it.conflict.other].filter((x) => x.answer).map((x, k) => (
+                <Button key={k} size="sm" variant="outline" onClick={() => { setAnswers({ [it.missing_questions![0].q_no]: x.answer! }); if (!reason) setReason(`Answer from ${x.from ?? (k ? "the later reply" : "the earlier reply")}`); }}>Use “{x.answer!.slice(0, 40)}”</Button>
+              ))}
+              <span className="hint">or type the answer below</span>
+            </div>
+          )}
+          {form === "change" && f === "answers" && (
+            <div className="rqprices">
+              {(it.missing_questions ?? []).map((q) => (
+                <label key={q.q_no}><span className="mono">Q{q.q_no}</span><span className="d" title={q.text}>{q.text}</span>
+                  {q.answer_type === "yes_no"
+                    ? <select className="sel" value={answers[q.q_no] ?? ""} onChange={(e) => setAnswers((x) => ({ ...x, [q.q_no]: e.target.value }))} aria-label={`Q${q.q_no} answer`}><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
+                    : <input className="inp" value={answers[q.q_no] ?? ""} onChange={(e) => setAnswers((x) => ({ ...x, [q.q_no]: e.target.value }))} aria-label={`Q${q.q_no} answer`} />}</label>
+              ))}
+            </div>
+          )}
+          {form === "change" && f === "yesno" ? (
+            <div className="acts" style={{ marginTop: 0 }}>
+              <Button size="sm" variant="default" disabled={busy} onClick={async () => { if (await run(it, "accept-yes")) setForm(null); }}>Answer is Yes</Button>
+              <Button size="sm" variant="outline" disabled={busy} onClick={async () => { if (await run(it, "treat-no")) setForm(null); }}>Answer is No</Button>
+              <Button size="sm" variant="ghost" onClick={() => setForm(null)}>Cancel</Button>
+            </div>
+          ) : (
+          <div className="acts" style={{ marginTop: 0 }}>
+            {form === "change" && (f === "price" || f === "freight" || f === "rate") && <input className="mono inp" style={{ width: 150 }} inputMode="decimal"
+              placeholder={f === "freight" ? "₹ per 1000 (0 = incl.)" : f === "rate" ? "₹ per unit" : "₹ per 1000"} value={value} onChange={(e) => setValue(e.target.value)} aria-label={f === "rate" ? "Exchange rate" : f === "freight" ? "Freight per 1000 pcs" : "Price per 1000 pcs"} />}
+            {form === "change" && f === "gst" && <>
+              <select className="sel" value={gstDir} onChange={(e) => setGstDir(e.target.value as typeof gstDir)} aria-label="GST"><option value="add">Add GST to their prices</option><option value="remove">Take GST out of their prices</option><option value="none">Compare as written</option></select>
+              {gstDir !== "none" && <input className="mono inp" style={{ width: 70 }} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} aria-label="GST %" />}{gstDir !== "none" && <span className="hint">%</span>}
+            </>}
+            {form === "change" && f === "discount" && <>
+              <input className="mono inp" style={{ width: 70 }} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Discount %" /><span className="hint">%</span>
+              {cur?.discount?.kind !== "gross_up" && <select className="sel" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Condition">{DISCOUNT_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}
+              {needN && <input className="mono inp" style={{ width: 110 }} inputMode="decimal" placeholder="N" value={n} onChange={(e) => setN(e.target.value)} aria-label="Condition number" />}
+            </>}
+            {form === "change" && f === "line" && <select className="sel" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="RFx line"><option value="">Pick a line…</option>
+              {it.candidates?.some((c) => c.likely) && <optgroup label="Likely">{it.candidates.filter((c) => c.likely).map((c) => <option key={c.line_id} value={c.line_id}>L{c.line_no} {c.description}</option>)}</optgroup>}
+              <optgroup label="All lines">{it.candidates?.filter((c) => !c.likely).map((c) => <option key={c.line_id} value={c.line_id}>L{c.line_no} {c.description}</option>)}</optgroup></select>}
+            {form === "change" && f === "vendor" && <select className="sel" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Vendor"><option value="">Pick the vendor it came from…</option>
+              {it.vendor_options?.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>}
+            {!(form === "change" && (f === "line" || f === "vendor")) && <input className="inp" style={{ flex: 1, minWidth: 220 }} value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason"
+              placeholder={f === "prices" || f === "answers" ? "Where is this from? e.g. last year's PO, a call on 25 Sep (goes in the ledger)" : "Reason (goes in the ledger)"} />}
+            <Button size="sm" variant="default" disabled={busy || !canSave} onClick={save}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setForm(null)}>Cancel</Button>
+          </div>)}
+        </div>
+      )}
+      {asking && it.vendor && <ClarifyBlock rfxId={rfxId} vendor={it.vendor} itemIds={[...new Set([it.id, ...askable])]} onDone={() => setAsking(false)} />}
       </div>
+    </div>
+  );
+}
+
+/** Where the system read this: text as a plain quote (no parser markers), photos and PDF pages as they are. */
+function Source({ ev }: { ev: Evidence | null }) {
+  if (!ev) return null;
+  return (
+    <div className="rqsrc">
+      <div className="h"><span>{sourceLabel(ev.caption)}</span>{ev.open_url && <OpenFile url={ev.open_url} name={ev.open_name ?? ev.caption.split(" · ")[0]} />}</div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed storage URL, nothing to optimise */}
+      {ev.kind === "image" && ev.url && <img src={ev.url} alt={ev.caption} />}
+      {ev.kind === "pdf" && ev.url && <iframe src={ev.url} title={ev.caption} />}
+      {ev.text && <blockquote><Marked text={plain(ev.text)} mark={ev.mark ? plain(ev.mark) : undefined} /></blockquote>}
     </div>
   );
 }

@@ -1,0 +1,8 @@
+const P_CLARIFY = `Draft a short, polite clarification email from {buyer_name} (Meridian Foods) to {vendor_name} regarding RFx {code}.
+We need explicit answers for the following, listed as bullet points the supplier can reply against:
+{items}
+Ask them to reply to this email. Keep under 150 words. Plain text.
+Return ONLY JSON: {"subject": string, "body_text": string}`;
+
+// Format note sent with P-CLARIFY (v1 had none and the fast model ran the bullets into one paragraph; DECISIONS P6-T3).
+const CLARIFY_FORMAT = "Format body_text with line breaks (\\n): the greeting on its own line, a blank line, one bullet per line starting with \"- \" (keep each bullet's item number and wording), a blank line, the request to reply, then the sign-off on separate lines.";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocate, baseline, fromQuery, ruleText, totals, type ACell, type Inputs } from "./allocate";
+import { allocate, applyDiscounts, baseline, fromQuery, ruleText, totals, type ACell, type ADiscount, type Inputs } from "./allocate";
 
 // Three lines, three vendors. Alpha and Beta cleared the questionnaire; Gamma didn't.
 const line = (id: string, n: number, ply: number, qty: number) => ({ id, line_no: n, description: `L${n}`, annual_qty: qty, ply, item_type: "RSC", delivery_location: "Hosur" });
@@ -55,7 +55,7 @@ describe("allocate", () => {
   });
 
   it("baseline: cheapest vendor who priced every line; else most lines, with a note", () => {
-    expect(baseline(inp, "unit", false)).toEqual({ vendor_id: "c", total: 90 + 240 + 80, lines_priced: 3, note: null });
+    expect(baseline(inp, "unit", false)).toMatchObject({ vendor_id: "c", total: 90 + 240 + 80, lines_priced: 3, note: null });
     const q = baseline(inp, "unit", true)!;
     expect(q).toMatchObject({ vendor_id: "a", total: 500, lines_priced: 2 });
     expect(q.note).toBe("No qualified vendor priced all 3 lines; Alpha priced 2, and the baseline covers those lines only.");
@@ -72,5 +72,36 @@ describe("allocate", () => {
     expect(ruleText({ type: "cheapest_per_line", qualified_only: true, price_basis: "unit" })).toBe("Each line to the cheapest vendor who cleared the questionnaire, on unit price");
     expect(ruleText({ type: "grouped", price_basis: "unit", groups: [{ filter: { ply: 5 }, rule: { type: "cheapest_per_line", qualified_only: true } }, { filter: { ply: 3 }, rule: { type: "cheapest_per_line", qualified_only: false } }] }))
       .toBe("5-ply lines: cheapest vendor who cleared the questionnaire; 3-ply lines: cheapest vendor overall; other lines unallocated (unit price)");
+  });
+});
+
+describe("conditional discounts (P10 D3) — checked per award option, never in line prices", () => {
+  const lines = Array.from({ length: 30 }, (_, i) => line(`l${i + 1}`, i + 1, 5, 1000));
+  const d = (kind: ADiscount["kind"], extra: Partial<ADiscount> = {}): ADiscount => ({ vendor_id: "bal", pct: 3, condition: "if all 30 items are awarded to us", kind, min_lines: null, min_value_inr: null, payment_days: null, ...extra });
+  it("MER-0419 Balaji: all 30 lines → met, 3% of its value off; 16 of 30 → not met, nothing off", () => {
+    const all = applyDiscounts([{ vendor_id: "bal", lines: 30, value: 45_835_488 }], { lines, discounts: [d("all_lines")] });
+    expect(all.lines[0]).toMatchObject({ met: true, why: "30 of 30 lines awarded; needs all 30" });
+    expect(Math.round(all.saving)).toBe(1_375_065);
+    const split = applyDiscounts([{ vendor_id: "bal", lines: 16, value: 20_000_000 }, { vendor_id: "koh", lines: 13, value: 1 }], { lines, discounts: [d("all_lines")] });
+    expect(split.lines[0]).toMatchObject({ met: false, why: "16 of 30 lines awarded; needs all 30", saving: 0 });
+  });
+  it("min lines, min value, payment days, no condition, unclear, and a vendor that wins nothing", () => {
+    const share = [{ vendor_id: "bal", lines: 16, value: 2_00_00_000 }];
+    expect(applyDiscounts(share, { lines, discounts: [d("min_lines", { min_lines: 15 })] }).lines[0].met).toBe(true);
+    expect(applyDiscounts(share, { lines, discounts: [d("min_value", { min_value_inr: 3_00_00_000 })] }).lines[0].met).toBe(false);
+    expect(applyDiscounts(share, { lines, discounts: [d("payment_days", { payment_days: 10 })], payment_days: 45 }).lines[0]).toMatchObject({ met: false, why: "we pay at 45 days; needs payment within 10" });
+    expect(applyDiscounts(share, { lines, discounts: [d("none")] }).lines[0].met).toBe(true);
+    expect(applyDiscounts(share, { lines, discounts: [d("unclear")] }).lines[0]).toMatchObject({ met: null, saving: 0 });
+    expect(applyDiscounts([], { lines, discounts: [d("none")] }).lines[0]).toMatchObject({ met: false, why: "no lines awarded" });
+  });
+  it("the single-vendor baseline gets a vendor's discount when that vendor alone meets it, and can change who is best", () => {
+    const two: Inputs = {
+      lines: lines.slice(0, 2), vendors: [{ id: "bal", name: "Balaji", cleared: true, q_score: 1 }, { id: "koh", name: "Kohinoor", cleared: true, q_score: 1 }],
+      cells: [cell("l1", "bal", "confirmed", 100), cell("l2", "bal", "confirmed", 100), cell("l1", "koh", "confirmed", 98), cell("l2", "koh", "confirmed", 99)],
+      discounts: [d("all_lines")],
+    };
+    const b = baseline(two, "unit", true)!;
+    expect(b).toMatchObject({ vendor_id: "bal", total_quoted: 200, total: 194 }); // 200 − 3% beats Kohinoor's 197
+    expect(b.discount).toMatchObject({ met: true });
   });
 });

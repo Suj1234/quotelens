@@ -9,6 +9,7 @@ import type { Filter, Rule, SubRule } from "@/lib/scenarios/allocate";
 import { inrShort, money, shortDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { MemoView } from "./memo-view";
+import { DiscountLines } from "./discount-lines";
 
 // DESIGN §3.9 Award (both roles) + TRD §14.2 / §17.11 scenario comparison, overrides and the New scenario rule builder (DECISIONS P7: on this tab).
 type Opt = { id: string; name: string; price: number };
@@ -75,7 +76,7 @@ export function AwardScreen(p: Props) {
         <p className="lead">{lead}</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {(st === null || st === "sent_back") && genControls}
-          {st === "draft" && buyer && <>{pdf}{award?.stale && genControls}<span className="chip amber">awaiting Priya</span></>}
+          {st === "draft" && buyer && <>{pdf}{award?.stale && genControls}<span className="chip amber">Awaiting Priya</span></>}
           {st === "draft" && !buyer && !locked && <>{pdf}<Button onClick={() => { setBack(!back); setConfirm(false); }}>Send back</Button><Button variant="default" disabled={!!award?.stale} onClick={() => { setConfirm(true); setBack(false); }}>Approve</Button></>}
           {(st === "approved" || st === "sent_back") && pdf}
         </div>
@@ -112,19 +113,19 @@ export function AwardScreen(p: Props) {
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="t">
-              <thead><tr><th>Scenario</th><th>Rule</th><th className="num">Annual total</th><th className="num">Vendors</th><th className="num">Lines</th><th className="num">Single-source</th><th className="num">vs first</th><th className="num">vs best single</th><th>Share</th><th /></tr></thead>
+              <thead><tr><th>Scenario</th><th>Rule</th><th className="num">Annual total<div className="hint" style={{ fontWeight: 400 }}>as quoted · after discounts</div></th><th className="num">Vendors</th><th className="num">Lines</th><th className="num">Single-source</th><th className="num">vs first</th><th className="num">vs best single</th><th>Share</th><th /></tr></thead>
               <tbody>
                 {scenarios.map((s, j) => (
                   <Fragment key={s.id}>
                     <tr onClick={() => setOpenId(openId === s.id ? null : s.id)} style={{ cursor: "pointer" }} aria-expanded={openId === s.id}>
-                      <td><b style={{ fontWeight: 600 }}>{s.name}</b>{award?.scenario_id === s.id && <> <span className="chip green">selected</span></>}<div className="hint">{s.created_by ?? ""}{s.rule.type === "from_query" ? " · from an answer" : " · by rule"}</div></td>
+                      <td><b style={{ fontWeight: 600 }}>{s.name}</b>{award?.scenario_id === s.id && <> <span className="chip green">Selected</span></>}<div className="hint">{s.created_by ?? ""}{s.rule.type === "from_query" ? " · from an answer" : " · by rule"}</div></td>
                       <td className="text-muted-foreground" style={{ fontSize: 12, maxWidth: 260 }}>{s.rule_text}</td>
-                      <td className="num mono" title={rs(s.total)}>{inrShort(s.total)}</td>
+                      <td className="num mono" title={rs(s.total)}>{inrShort(s.total)}{s.total_after < s.total - 0.5 && <div style={{ color: "var(--green)" }} title={rs(s.total_after)}>{inrShort(s.total_after)}</div>}</td>
                       <td className="num mono">{s.vendor_count}</td>
-                      <td className="num mono">{s.allocated}/{s.lines.length}{s.unallocated.length > 0 && <div><span className="chip amber">{s.unallocated.length} unallocated</span></div>}</td>
+                      <td className="num mono">{s.allocated}/{s.lines.length}{s.unallocated.length > 0 && <div><span className="chip amber">{s.unallocated.length} unallocated</span></div>}{s.expiring.length > 0 && <div><span className={`chip ${s.expiring.some((e) => e.days_left < 0) ? "red" : "amber"}`} title={s.expiring.map((e) => `${e.vendor}: ${e.days_left < 0 ? "expired" : "valid until"} ${e.until}`).join(" · ")}>{s.expiring.some((e) => e.days_left < 0) ? "Quote expired" : "Quote expiring"}</span></div>}</td>
                       <td className="num mono">{s.single_source_lines}</td>
-                      <td className="num mono">{j ? pctOf(s.total, scenarios[0].total) : "—"}</td>
-                      <td className="num mono" title={s.baseline ? `${s.baseline.vendor} ${rs(s.baseline.total)}` : undefined}>{s.baseline ? pctOf(s.total, s.baseline.total) : "—"}</td>
+                      <td className="num mono">{j ? pctOf(s.total_after, scenarios[0].total_after) : "—"}</td>
+                      <td className="num mono" title={s.baseline ? `${s.baseline.vendor} ${rs(s.baseline.total)}` : undefined}>{s.baseline ? pctOf(s.total_after, s.baseline.total) : "—"}</td>
                       <td><span className="stack" role="img" aria-label={s.share.map((x) => `${x.vendor} ${x.pct.toFixed(0)}%`).join(", ")}>{s.share.map((x) => <i key={x.vendor} style={{ width: `${x.pct}%` }} title={`${x.vendor} · ${x.lines} lines · ${x.pct.toFixed(1)}%`} />)}</span></td>
                       <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                         <Button size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); setOpenId(openId === s.id ? null : s.id); }}>{openId === s.id ? "Hide lines" : "Lines"}</Button>
@@ -159,9 +160,13 @@ function Lines({ s, opts, canEdit }: { s: ScenarioView; opts: Record<string, Opt
   return (
     <div>
       <div className="small" style={{ fontSize: 12.5, marginBottom: 8, display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <span>{s.baseline ? <>Best single vendor: <b>{s.baseline.vendor}</b> at <span className="mono">{rs(s.baseline.total)}</span> · this scenario is <span className="mono">{rs(Math.abs(s.savings_vs_baseline ?? 0))}</span> {(s.savings_vs_baseline ?? 0) >= 0 ? "lower" : "higher"}</> : "No single-vendor baseline."}{s.baseline?.note ? ` ${s.baseline.note}` : ""}</span>
+        <span>{s.baseline ? <>Everything to the best single vendor: <b>{s.baseline.vendor}</b> at <span className="mono">{rs(s.baseline.total)}</span>{s.baseline.discount?.met ? <> (<span className="mono">{rs(s.baseline.total_quoted)}</span> quoted, −{s.baseline.discount.pct}% because it wins all its lines)</> : null} · this scenario is <span className="mono">{rs(Math.abs(s.savings_vs_baseline ?? 0))}</span> {(s.savings_vs_baseline ?? 0) >= 0 ? "lower" : "higher"}</> : "No single-vendor baseline."}{s.baseline?.note ? ` ${s.baseline.note}` : ""}</span>
         <span className="text-muted-foreground">{s.share.map((x) => `${x.vendor} ${x.lines} lines · ${x.pct.toFixed(1)}%`).join(" · ")}</span>
       </div>
+      {s.expiring.map((e) => <div key={e.vendor} className="note" style={{ marginBottom: 8, borderLeftColor: e.days_left < 0 ? "var(--red)" : "var(--amber)" }}>
+        <b>{e.vendor}</b>&apos;s quote {e.days_left < 0 ? <>expired on {shortDate(e.until)}</> : <>is valid only until {shortDate(e.until)} ({e.days_left} {e.days_left === 1 ? "day" : "days"} left)</>} — before this award is approved, ask them to extend it.{" "}
+        <a href={`review?vendor=${e.vendor_code}`}>Ask {e.vendor} to extend →</a></div>)}
+      {s.discounts.length > 0 && <div style={{ marginBottom: 10 }}><div className="small" style={{ fontSize: 12.5, marginBottom: 4 }}>This scenario: <span className="mono">{rs(s.total)}</span> as quoted{s.total_after < s.total - 0.5 ? <> · <b className="mono">{rs(s.total_after)}</b> after the discounts it earns</> : " · it earns no vendor discount"}</div><DiscountLines discounts={s.discounts} /></div>}
       <table className="t" style={{ background: "var(--surface)" }}>
         <thead><tr><th>#</th><th>Line</th><th>Vendor</th><th className="num">₹/1000</th><th className="num">Annual ₹</th><th>Runner-up</th><th className="num">Gap</th><th>Reason</th>{canEdit && <th />}</tr></thead>
         <tbody>
@@ -170,7 +175,7 @@ function Lines({ s, opts, canEdit }: { s: ScenarioView; opts: Record<string, Opt
               <tr>
                 <td className="mono text-muted-foreground">{l.line_no}</td>
                 <td>{l.description}</td>
-                <td>{l.vendor ?? <span className="chip amber">unallocated</span>}{l.is_override && <> <span className="chip green">override</span></>}</td>
+                <td>{l.vendor ?? <span className="chip amber">Unallocated</span>}{l.is_override && <> <span className="chip green">Override</span></>}</td>
                 <td className="num mono">{rs(l.price)}</td><td className="num mono">{rs(l.annual_value)}</td>
                 <td className="text-muted-foreground">{l.runner_up ? <>{l.runner_up} <span className="mono">{rs(l.runner_up_price)}</span></> : "—"}</td>
                 <td className="num mono text-muted-foreground">{l.gap_pct === null ? "—" : `${l.gap_pct.toFixed(2)}%`}</td>

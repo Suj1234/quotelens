@@ -58,7 +58,7 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
               </div>
               <div className="sub">
                 {r.response
-                  ? STAGES.some((s) => r.response!.pipeline_status[s] === "running") ? <span className="chip teal">processing…</span>
+                  ? STAGES.some((s) => r.response!.pipeline_status[s] === "running") ? <span className="chip teal">Processing…</span>
                     : <>received {shortDate(r.response.received_at)} · <span className="mono">{st(r.vendor_id)?.lines_priced ?? 0}/{st(r.vendor_id)?.lines_total ?? 0}</span> priced{r.more_replies ? ` · +${r.more_replies} more ${r.more_replies === 1 ? "reply" : "replies"} (Documents tab)` : ""}
                       {clarOf(r.vendor_id).map((c) => <span key={c.id}> · <Link href={`/rfx/${id}/responses/${c.id}`}>clarification reply {shortDate(c.received_at)}</Link></span>)}</>
                   : "no reply yet"}
@@ -71,7 +71,7 @@ export default async function ResponsesPage({ params }: PageProps<"/rfx/[id]/res
                   <span className={`chip ${(r.response.summary.classify as { email?: { kind: string } } | undefined)?.email?.kind === "quotation" ? "teal" : "grey"}`} style={{ margin: "2px 2px 2px 0" }}>EMAIL</span>
                 )}
               </div>
-              <div className="sub">{r.response && (() => { const c = st(r.vendor_id)?.cleared_questionnaire; return c === true ? <span className="chip green">cleared</span> : c === false ? <span className="chip red">not cleared</span> : <span className="chip amber">questionnaire pending</span>; })()}</div>
+              <div className="sub">{r.response && (() => { const c = st(r.vendor_id)?.cleared_questionnaire; return c === true ? <span className="chip green">Cleared</span> : c === false ? <span className="chip red">Not cleared</span> : <span className="chip amber">Questionnaire pending</span>; })()}</div>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                 {r.response && <Button asChild size="sm"><Link href={`/rfx/${id}/responses/${r.response.id}`}>Open</Link></Button>}
                 {buyer && <AddResponse rfxId={id} vendorId={r.vendor_id} vendorName={r.name} clarification={clars.get(r.vendor_id) ?? null} />}

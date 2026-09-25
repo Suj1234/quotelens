@@ -98,3 +98,14 @@ describe("rewriteBestGuess (TRD §13.2)", () => {
     expect(rewriteBestGuess(Q6)).toContain("state in ('low_confidence','ambiguous','references_prior','conflict')");
   });
 });
+
+describe("P9 C2: documents and vendor terms views", () => {
+  it("accepts queries on v_documents and v_vendor_terms", () => {
+    expect(guardSql(`select vendor, file_name, caption from v_documents where rfx_id = '${RFX}' and caption ilike '%ISO%'`, RFX)).toEqual({ ok: true });
+    expect(guardSql(`select vendor, payment_days, payment_terms_raw from v_vendor_terms where rfx_id = '${RFX}' and vendor_code = 'kohinoor'`, RFX)).toEqual({ ok: true });
+  });
+  it("still rejects the base tables behind them", () => {
+    expect(guardSql(`select * from response_terms where rfx_id = '${RFX}'`, RFX).ok).toBe(false);
+    expect(guardSql(`select * from response_files where rfx_id = '${RFX}'`, RFX).ok).toBe(false);
+  });
+});

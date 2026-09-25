@@ -64,7 +64,7 @@ export function ModelCalls({ initial, rfx }: { initial: ModelCallRow[]; rfx: { i
                       <td className="mono xs">{r.model}</td>
                       <td className="num">{k(r.input_tokens)}</td><td className="num">{k(r.output_tokens)}</td>
                       <td className="num">{r.latency_ms == null ? "—" : `${(r.latency_ms / 1000).toFixed(1)}s`}</td>
-                      <td>{r.ok ? <span className="chip green">ok</span> : <span className="chip red">failed</span>}</td>
+                      <td>{r.ok ? <span className="chip green">OK</span> : <span className="chip red">Failed</span>}</td>
                     </tr>
                     {open === r.id && <tr><td colSpan={9} className="xs" style={{ background: "var(--tint)", whiteSpace: "pre-wrap" }}>{r.error ?? "No error text was recorded."}</td></tr>}
                   </Fragment>

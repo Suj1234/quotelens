@@ -8,17 +8,29 @@ import { inrShort } from "@/lib/format";
 import type { SessionUser } from "@/lib/auth";
 import { qualifiedFilter } from "@/lib/query/ask";
 import { allocationColumn, type Row } from "@/lib/query/result";
-import { allocate, baseline, fromQuery, matches, priceOf, ruleText, totals, type Inputs, type Rule, type SLine } from "./allocate";
+import { allocate, applyDiscounts, baseline, fromQuery, matches, priceOf, ruleText, totals, type ADiscount, type Inputs, type Rule, type SLine } from "./allocate";
+
+/** P10 D4: a vendor's discount in an award option, in words — met or not, and why. */
+export type DiscountView = { vendor: string; pct: number; condition: string | null; met: boolean | null; why: string; saving: number };
+/** Quoted total → total after the discounts whose conditions this award meets, with every vendor's discount explained. */
+export function withDiscounts(inp: Inputs, share: { vendor_id: string; lines: number; value: number }[], total: number): { total_after: number; discounts: DiscountView[] } {
+  const d = applyDiscounts(share, inp);
+  const name = (id: string) => inp.vendors.find((v) => v.id === id)?.name ?? "?";
+  return { total_after: total - d.saving, discounts: d.lines.map((x) => ({ vendor: name(x.vendor_id), pct: x.pct, condition: x.condition, met: x.met, why: x.why, saving: x.saving })) };
+}
 
 // TRD §6.18, §13.5, §14.1–14.2: scenarios saved by rule (Award tab) or from an Ask answer; per-line overrides.
 
 /** The comparison as the allocation engine sees it (same cells, states and qualification as the grid and Ask). */
 export async function loadInputs(rfxId: string): Promise<Inputs> {
-  const [lQ, vQ, cQ, aQ] = await Promise.all([
+  const [lQ, vQ, cQ, aQ, dQ, rQ] = await Promise.all([
     db().from("rfx_lines").select("id, line_no, description, annual_qty, ply, item_type, delivery_location").eq("rfx_id", rfxId).order("line_no"),
     db().from("v_vendor_status").select("vendor_id, vendor, vendor_code, cleared_questionnaire").eq("rfx_id", rfxId),
     db().from("line_quotes").select("rfx_line_id, vendor_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value").eq("rfx_id", rfxId),
     db().from("questionnaire_answers").select("vendor_id, passes, rfx_questions(mandatory)").eq("rfx_id", rfxId),
+    // P10 D3: each vendor's total-level discount as read from its quote (and as the buyer settled it on the card).
+    db().from("assumptions").select("vendor_id, value, basis, created_at").eq("rfx_id", rfxId).eq("kind", "discount_treatment").is("superseded_by", null).order("created_at", { ascending: false }),
+    db().from("rfx").select("payment_terms_days").eq("id", rfxId).single(),
   ]);
   for (const q of [lQ, vQ, cQ, aQ]) if (q.error) throw q.error;
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -28,7 +40,19 @@ export async function loadInputs(rfxId: string): Promise<Inputs> {
   const freight = new Map<string, number>();
   for (const c of cQ.data ?? []) if (c.unit_price_inr_per_1000 !== null && c.landed_price_inr_per_1000 !== null)
     freight.set(c.vendor_id, Math.max(freight.get(c.vendor_id) ?? 0, Number(c.landed_price_inr_per_1000) - Number(c.unit_price_inr_per_1000)));
+  const discounts: ADiscount[] = [];
+  // Per vendor: the buyer's row if there is one (a re-run of normalise keeps it), else the newest system row; only "per_award" counts.
+  const rows = [...(dQ.data ?? [])].sort((a, b) => Number(b.basis === "buyer_entered") - Number(a.basis === "buyer_entered"));
+  const seen = new Set<string>();
+  for (const a of rows) {
+    if (seen.has(a.vendor_id)) continue;
+    seen.add(a.vendor_id);
+    const v = a.value as { pct?: number; condition?: string | null; treatment?: string; kind?: ADiscount["kind"]; min_lines?: number | null; min_value_inr?: number | null; payment_days?: number | null };
+    if (!v.pct || v.treatment !== "per_award") continue;
+    discounts.push({ vendor_id: a.vendor_id, pct: Number(v.pct), condition: v.condition ?? null, kind: v.kind ?? "unclear", min_lines: v.min_lines ?? null, min_value_inr: v.min_value_inr ?? null, payment_days: v.payment_days ?? null });
+  }
   return {
+    discounts, payment_days: rQ.data?.payment_terms_days ?? null,
     lines: (lQ.data ?? []).map((l) => ({ ...l, annual_qty: Number(l.annual_qty), ply: n(l.ply) })),
     vendors: (vQ.data ?? []).map((v) => {
       const m = mandatory(v.vendor_id);
@@ -141,16 +165,22 @@ export type ScenarioLineView = {
 };
 export type ScenarioView = {
   id: string; name: string; rule_text: string; rule: Rule; total: number; vendor_count: number; single_source_lines: number; created_at: string; created_by: string | null;
-  baseline: { vendor: string | null; total: number; note: string | null } | null; savings_vs_baseline: number | null;
+  baseline: { vendor: string | null; total: number; total_quoted: number; discount: DiscountView | null; note: string | null } | null; savings_vs_baseline: number | null;
+  /** P10 D4: total after the discounts this award earns (total stays as quoted), and each vendor's discount explained. */
+  total_after: number; discounts: DiscountView[];
+  /** P10 D6: winners whose quote has expired or expires within 14 days (days_left < 0 = expired). */
+  expiring: { vendor: string; vendor_code: string; until: string; days_left: number }[];
   allocated: number; unallocated: number[]; share: { vendor: string; lines: number; value: number; pct: number }[]; lines: ScenarioLineView[]; fingerprint: string;
 };
 
 /** GET /api/scenarios?rfx= — oldest first (the "vs first" column compares with the first one saved). */
 export async function listScenarios(rfxId: string): Promise<ScenarioView[]> {
-  const [sQ, vQ, uQ] = await Promise.all([
+  const [sQ, vQ, uQ, inp, valQ] = await Promise.all([
     db().from("scenarios").select("*, scenario_lines(*, rfx_lines(line_no, description, annual_qty))").eq("rfx_id", rfxId).order("created_at"),
-    db().from("vendors").select("id, name"), db().from("users").select("id, name"),
+    db().from("vendors").select("id, name"), db().from("users").select("id, name"), loadInputs(rfxId),
+    db().from("v_vendor_status").select("vendor_id, vendor, vendor_code, validity_until").eq("rfx_id", rfxId),
   ]);
+  const today = Date.parse(new Date().toISOString().slice(0, 10));
   if (sQ.error) throw sQ.error;
   const vn = (id: string | null) => (id ? (vQ.data ?? []).find((v) => v.id === id)?.name ?? "?" : null);
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -163,11 +193,20 @@ export async function listScenarios(rfxId: string): Promise<ScenarioView[]> {
       rule_pick_id: l.is_override ? ((l.auto ?? {}) as { vendor_id?: string | null }).vendor_id ?? null : (l.vendor_id as string | null),
     })).sort((a, b) => a.line_no - b.line_no);
     const t = totals(lines.map((l) => ({ vendor_id: l.vendor_id, annual_value: l.annual_value, single_source: false, line_no: l.line_no })));
+    const total = Number(s.total_inr ?? 0);
+    const dv = withDiscounts(inp, t.share, total);
+    // P10 D3: the best single vendor is recomputed from today's data, with that vendor's own discount when it alone meets it.
+    const rule = s.rule as Rule;
+    const b = rule ? baseline(inp, rule.price_basis ?? "unit", isQualified(rule), !!rule.include_best_guess) : null;
+    const bd = b?.discount ? withDiscounts(inp, [{ vendor_id: b.vendor_id, lines: b.lines_priced, value: b.total_quoted }], b.total_quoted).discounts.find((x) => x.vendor === vn(b.vendor_id)) ?? null : null;
     return {
       id: s.id, name: s.name, rule_text: s.rule_text, rule: s.rule as Rule, total: Number(s.total_inr ?? 0), vendor_count: s.vendor_count ?? 0, single_source_lines: s.single_source_lines ?? 0,
       created_at: s.created_at, created_by: (uQ.data ?? []).find((u) => u.id === s.created_by)?.name ?? null,
-      baseline: s.baseline_single_vendor_total === null ? null : { vendor: vn(s.baseline_vendor_id), total: Number(s.baseline_single_vendor_total), note: s.baseline_note },
-      savings_vs_baseline: n(s.savings_vs_baseline), allocated: t.allocated, unallocated: t.unallocated_lines,
+      baseline: b ? { vendor: vn(b.vendor_id), total: b.total, total_quoted: b.total_quoted, discount: bd, note: b.note } : null,
+      savings_vs_baseline: b ? b.total - dv.total_after : null, total_after: dv.total_after, discounts: dv.discounts,
+      expiring: (valQ.data ?? []).filter((v) => v.validity_until && t.share.some((x) => x.vendor_id === v.vendor_id))
+        .map((v) => ({ vendor: v.vendor as string, vendor_code: v.vendor_code as string, until: v.validity_until as string, days_left: Math.round((Date.parse(v.validity_until as string) - today) / 86_400_000) }))
+        .filter((v) => v.days_left <= 14), allocated: t.allocated, unallocated: t.unallocated_lines,
       share: t.share.map((x) => ({ vendor: vn(x.vendor_id)!, lines: x.lines, value: x.value, pct: x.pct })), lines,
       fingerprint: fingerprint(lines),
     };

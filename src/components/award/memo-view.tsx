@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { MemoData } from "@/lib/award/memo";
 import { longDate, money } from "@/lib/format";
+import { discountText } from "@/lib/scenarios/allocate";
 
 // DESIGN §2.16 memo on the page — the same memo_json the PDF is rendered from (TRD §14.3's six parts).
 const rs = (v: number | null) => (v === null ? "—" : money(Math.round(v)));
@@ -30,7 +31,7 @@ export function MemoView({ m }: { m: MemoData }) {
             {m.allocation.map((a) => (
               <tr key={a.line_no}>
                 <td className="mono text-muted-foreground">{a.line_no}</td><td>{a.description}</td><td className="num mono">{a.annual_qty.toLocaleString("en-IN")}</td>
-                <td>{a.vendor ?? <span className="chip amber">unallocated</span>}{a.is_override && <> <span className="chip green">override</span></>}</td>
+                <td>{a.vendor ?? <span className="chip amber">Unallocated</span>}{a.is_override && <> <span className="chip green">Override</span></>}</td>
                 <td className="num mono">{rs(a.price)}</td><td className="num mono">{rs(a.annual_value)}</td>
                 <td className="text-muted-foreground">{a.runner_up ? `${a.runner_up} ${rs(a.runner_up_price)}` : "—"}</td><td className="num mono text-muted-foreground">{pct(a.gap_pct)}</td>
                 <td className="text-muted-foreground" style={{ fontSize: 12 }}>{a.reason}</td>
@@ -44,7 +45,9 @@ export function MemoView({ m }: { m: MemoData }) {
       <dl className="kv">
         <dt>Annual total</dt><dd className="mono">{rs(t.total)} <span className="text-muted-foreground" style={{ fontFamily: "var(--font-sans)" }}>for {t.allocated} of {t.lines} lines</span></dd>
         {t.vendors.map((v) => <Fragment key={v.name}><dt>{v.name}</dt><dd>{v.lines} lines · <span className="mono">{rs(v.value)}</span> · {v.pct.toFixed(1)}%</dd></Fragment>)}
-        <dt>Best single vendor</dt><dd>{m.baseline ? <>{m.baseline.vendor} at <span className="mono">{rs(m.baseline.total)}</span>{m.baseline.note ? ` — ${m.baseline.note}` : ""}</> : "none"}</dd>
+        {t.discounts?.map((d) => <Fragment key={d.vendor}><dt>Discount · {d.vendor}</dt><dd>{discountText(d)}{d.saving ? <> · <span className="mono">−{rs(d.saving)}</span></> : null}</dd></Fragment>)}
+        {t.total_after !== undefined && t.total_after < t.total - 0.5 && <><dt>After discounts</dt><dd className="mono">{rs(t.total_after)}</dd></>}
+        <dt>Best single vendor</dt><dd>{m.baseline ? <>{m.baseline.vendor} at <span className="mono">{rs(m.baseline.total)}</span>{m.baseline.discount?.met && m.baseline.total_quoted ? <> (<span className="mono">{rs(m.baseline.total_quoted)}</span> quoted; {discountText(m.baseline.discount)})</> : null}{m.baseline.note ? ` — ${m.baseline.note}` : ""}</> : "none"}</dd>
         <dt>Saving against it</dt><dd>{m.savings === null ? "—" : <><span className="mono">{rs(m.savings)}</span> a year ({pct(m.savings_pct)})</>}</dd>
         <dt>Unallocated lines</dt><dd>{t.unallocated.length ? t.unallocated.join(", ") : "none"}</dd>
         <dt>Single-source lines</dt><dd>{t.single_source.length ? t.single_source.join(", ") : "none"}</dd>
@@ -52,7 +55,7 @@ export function MemoView({ m }: { m: MemoData }) {
       <h2>Exclusions</h2>
       {m.exclusions.length ? m.exclusions.map((e, i) => <p key={i}>{e.vendor} — {e.reason}.</p>) : <p>None.</p>}
       <h2>Validity</h2>
-      {m.validity.map((v) => <p key={v.vendor}>{v.vendor}: {v.days !== null ? `${v.days} days` : "not stated"}{v.until ? `, until ${longDate(v.until)}` : ""}{v.short && <> <span className="chip amber">shorter than asked</span></>}</p>)}
+      {m.validity.map((v) => <p key={v.vendor}>{v.vendor}: {v.days !== null ? `${v.days} days` : "not stated"}{v.until ? `, until ${longDate(v.until)}` : ""}{v.short && <> <span className="chip amber">Shorter than asked</span></>}</p>)}
 
       <h2>Assumptions applied</h2>
       <Paras text={m.narrative.key_assumptions} />

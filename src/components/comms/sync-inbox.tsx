@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-// One sync at a time per tab, shared by the header button, the Overview's 30 s poll and the Review queue's
+// One sync at a time per tab, shared by the header button, the RFx frame's 30 s poll and the Review queue's
 // "Sync inbox — X replied" (TRD §15.3, DESIGN §2.3 / §3.6).
 type State = { busy: boolean; label: string | null };
 let state: State = { busy: false, label: null };
@@ -20,6 +20,19 @@ async function runAll(id: string): Promise<boolean> {
   const r = await fetch(`/api/responses/${id}/run-all`, { method: "POST" });
   const text = await r.text();
   return r.ok && !text.split("\n").filter(Boolean).some((l) => JSON.parse(l).status === "error");
+}
+
+/** Run the six stages on each reply, two at a time; onDone fires after each one. Returns how many stopped at a stage. */
+export async function readReplies(ids: string[], onDone?: (finished: number) => void): Promise<number> {
+  let failed = 0, finished = 0;
+  const queue = [...ids];
+  await Promise.all([0, 1].map(async () => {
+    for (let id = queue.shift(); id; id = queue.shift()) {
+      if (!(await runAll(id).catch(() => false))) failed++;
+      onDone?.(++finished);
+    }
+  }));
+  return failed;
 }
 
 /** Sync the mailbox, then run the six stages on each new reply, two at a time. Returns how many arrived. */
@@ -40,9 +53,7 @@ export async function syncNow(rfxId: string, o: { quiet?: boolean; refresh: () =
     const n = got.length;
     set({ busy: true, label: `Syncing… ${n} new ${n === 1 ? "reply" : "replies"}, processing` });
     o.refresh();
-    let failed = 0;
-    const queue = [...got];
-    await Promise.all([0, 1].map(async () => { for (let x = queue.shift(); x; x = queue.shift()) if (!(await runAll(x.response_id).catch(() => false))) failed++; }));
+    const failed = await readReplies(got.map((g) => g.response_id));
     const names = [...new Set(got.map((g) => g.vendor ?? "an unknown sender"))];
     const what = got.every((g) => g.clarification) ? (n === 1 ? "clarification reply" : "clarification replies") : n === 1 ? "reply" : "replies";
     toast.success(`Synced — ${n} new ${what} from ${names.length > 2 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names.join(" and ")}${failed ? ` · ${failed} stopped at a stage, open it to retry` : ""}`);
@@ -70,7 +81,7 @@ export function SyncRepliedButton({ rfxId, vendor }: { rfxId: string; vendor: st
   return <Button variant="default" disabled={s.busy} onClick={() => syncNow(rfxId, { refresh: router.refresh })}>{s.label ?? `Sync inbox — ${vendor} replied`}</Button>;
 }
 
-/** TRD §15.3: the Overview syncs every 30 s while it is open and visible; never overlapping, quiet when nothing is new. */
+/** TRD §15.3: every RFx tab (buyer, not draft or awarded) syncs every 30 s while visible, mock and Gmail alike; never overlapping, quiet when nothing is new. */
 export function SyncPoller({ rfxId }: { rfxId: string }) {
   const router = useRouter();
   useEffect(() => {

@@ -11,17 +11,21 @@ import type { ResponseRow } from "@/types/db";
 // TRD §8.7 / §9.6 / §12.3 — the clarification loop.
 
 /** Cards a vendor can be asked about (DESIGN §3.6: ambiguous units, low reads, prior pricing, questionnaire). */
-export const ASKABLE = ["ambiguous_unit", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing"];
+export const ASKABLE = ["ambiguous_unit", "price_check", "low_confidence_read", "prior_pricing", "questionnaire_ambiguous", "questionnaire_missing",
+  // P10 B2: every card the vendor can answer (the four-button model's "Ask vendor").
+  "missing_line", "conflict", "freight_treatment", "fx_assumption", "discount_treatment", "tax_basis", "validity_short", "vendor_mismatch", "vendor_condition", "total_mismatch"];
 
 // TRD §9.6 P-CLARIFY, verbatim.
+// P10 (v2; v1 archived): the model writes only the greeting / intro and the closing. The questions go in verbatim as the
+// bullets code wrote, so every asked item is in the email whatever the number of cards (v1 had the model copy the bullets:
+// with many cards it summarised "items 1–12" or ran past the length limit, and the draft failed).
 const P_CLARIFY = `Draft a short, polite clarification email from {buyer_name} (Meridian Foods) to {vendor_name} regarding RFx {code}.
-We need explicit answers for the following, listed as bullet points the supplier can reply against:
+The questions themselves are inserted between your two parts, exactly as written below — don't repeat or reword them:
 {items}
-Ask them to reply to this email. Keep under 150 words. Plain text.
-Return ONLY JSON: {"subject": string, "body_text": string}`;
-
-// Format note sent with P-CLARIFY (v1 had none and the fast model ran the bullets into one paragraph; DECISIONS P6-T3).
-const CLARIFY_FORMAT = "Format body_text with line breaks (\\n): the greeting on its own line, a blank line, one bullet per line starting with \"- \" (keep each bullet's item number and wording), a blank line, the request to reply, then the sign-off on separate lines.";
+Return ONLY JSON: {"subject": string, "opening": string, "closing": string}.
+- opening: the greeting on its own line, a blank line, then one sentence saying we need a few points clarified on their quotation for RFx {code}.
+- closing: one sentence asking them to reply to this email with the answers, a blank line, then the sign-off on separate lines.
+Plain text, line breaks as \n, no bullets in your parts.`;
 
 /** The vendor's main reply: the non-clarification response that supplied most of its cells (as the grid header uses). */
 export async function mainResponse(rfxId: string, vendorId: string): Promise<string | null> {
@@ -56,26 +60,28 @@ export async function outstandingClarifications(rfxId: string) {
   }));
 }
 
-type Item = { id: string; type: string; title: string; detail: string | null; status: string; rfx_line_id: string | null; question_id: string | null; evidence: Record<string, unknown> };
+type Item = { id: string; type: string; title: string; detail: string | null; status: string; rfx_line_id: string | null; question_id: string | null; proposed_value: number | null; evidence: Record<string, unknown> };
 
 async function loadItems(rfxId: string, vendorId: string, ids: string[]) {
   if (!ids.length) throw new AppError("BAD_INPUT", "Pick at least one item to ask about.", undefined, 400);
-  const { data, error } = await db().from("review_items").select("id, type, title, detail, status, rfx_line_id, question_id, evidence").in("id", ids).eq("rfx_id", rfxId).eq("vendor_id", vendorId);
+  const { data, error } = await db().from("review_items").select("id, type, title, detail, status, rfx_line_id, question_id, proposed_value, evidence").in("id", ids).eq("rfx_id", rfxId).eq("vendor_id", vendorId);
   if (error) throw error;
   const items = (data ?? []) as Item[];
   if (items.length !== ids.length) throw new AppError("BAD_INPUT", "Some items aren't this vendor's cards on this RFx.", undefined, 400);
-  const bad = items.find((i) => i.status !== "open" || !ASKABLE.includes(i.type));
+  const bad = items.find((i) => (i.status !== "open" && i.status !== "asked_vendor") || !ASKABLE.includes(i.type)); // asking again is allowed
   if (bad) throw new AppError("BAD_INPUT", `“${bad.title}” can't be asked about (${bad.status === "open" ? bad.type.replaceAll("_", " ") : bad.status.replaceAll("_", " ")}).`, undefined, 409);
   return items;
 }
 
 /** One bullet per card, naming the line and exactly what is missing (TRD §9.6 {items}). */
 async function bullets(rfxId: string, vendorId: string, items: Item[]) {
-  const [{ data: lines }, { data: qs }, { data: cells }] = await Promise.all([
+  const [{ data: lines }, { data: qs }, { data: cells }, { data: rfx }] = await Promise.all([
     db().from("rfx_lines").select("id, line_no, description, ply, length_mm, width_mm, height_mm").eq("rfx_id", rfxId),
     db().from("rfx_questions").select("id, q_no, text").eq("rfx_id", rfxId),
-    db().from("line_quotes").select("rfx_line_id, original_unit").eq("rfx_id", rfxId).eq("vendor_id", vendorId),
+    db().from("line_quotes").select("rfx_line_id, original_unit, state").eq("rfx_id", rfxId).eq("vendor_id", vendorId),
+    db().from("rfx").select("tax_basis, validity_days_requested, delivery_locations").eq("id", rfxId).single(),
   ]);
+  const plants = ((rfx?.delivery_locations as string[] | null) ?? []).join(" and ") || "our plants";
   const spec = (id: string | null) => {
     const l = (lines ?? []).find((x) => x.id === id);
     if (!l) return null;
@@ -90,6 +96,8 @@ async function bullets(rfxId: string, vendorId: string, items: Item[]) {
     switch (i.type) {
       case "ambiguous_unit":
         return { id: i.id, ref: s?.no ?? null, text: pack ? `${s?.label}: priced per ${pack} but the ${pack} size is not stated — please state the number of pieces per ${pack}.` : `${s?.label}: ${i.detail ?? "the unit is unclear"} — please state the price in INR per 1000 pieces.` };
+      case "price_check":
+        return { id: i.id, ref: s?.no ?? null, text: `${s?.label}: your price${i.proposed_value ? ` (read as ₹${Math.round(Number(i.proposed_value)).toLocaleString("en-IN")} per 1000 pieces)` : ""} is well away from what we expected — please confirm the price and its unit (per piece, per 1000 pieces, per box or bundle, and how many pieces).` };
       case "low_confidence_read":
         return { id: i.id, ref: s?.no ?? null, text: `${s?.label}: we could not read the price clearly — please confirm the price, in the currency and unit of your quotation.` };
       case "prior_pricing": {
@@ -99,8 +107,30 @@ async function bullets(rfxId: string, vendorId: string, items: Item[]) {
       }
       case "questionnaire_ambiguous":
         return { id: i.id, ref: q?.q_no ?? null, text: `Q${q?.q_no} (${q?.text}): your answer ${i.title.replace(/^Q\d+:\s*/, "")} — please confirm yes or no, with the date if it is pending.` };
-      default: // questionnaire_missing
+      case "questionnaire_missing":
         return { id: i.id, ref: null, text: `Questionnaire: please answer ${i.detail ?? "the mandatory questions"}.` };
+      case "missing_line": {
+        const nos = (cells ?? []).filter((c) => c.state === "not_quoted").map((c) => (lines ?? []).find((l) => l.id === c.rfx_line_id)?.line_no).filter((n): n is number => !!n).sort((a, b) => a - b);
+        return { id: i.id, ref: nos[0] ?? null, text: `${nos.length === 1 ? `Item ${nos[0]}` : `Items ${nos.join(", ")}`}: not quoted — please quote ${nos.length === 1 ? "it" : "them"} in INR per 1000 pieces, or confirm you don't supply ${nos.length === 1 ? "it" : "them"}.` };
+      }
+      case "conflict":
+        return { id: i.id, ref: s?.no ?? null, text: `${s?.label}: your reply gives two different prices for this item — please confirm which one applies.` };
+      case "freight_treatment":
+        return { id: i.id, ref: null, text: `Freight: your quote excludes freight — please state the freight to ${plants} in INR per 1000 pieces, or confirm prices delivered to our plants.` };
+      case "fx_assumption":
+        return { id: i.id, ref: null, text: `Currency: your prices are not in INR — please confirm the currency, or restate them in INR per 1000 pieces.` };
+      case "discount_treatment":
+        return { id: i.id, ref: null, text: `Discount: your quote offers ${i.proposed_value ?? "a"}% — please confirm exactly when it applies (which items or what order value must be awarded, or the payment terms).` };
+      case "tax_basis":
+        return { id: i.id, ref: null, text: `GST: please restate your prices ${rfx?.tax_basis === "incl_gst" ? "including" : "excluding"} GST, as the RFx asked, and state the GST rate.` };
+      case "validity_short":
+        return { id: i.id, ref: null, text: `Validity: your prices are valid for ${i.proposed_value ?? "fewer"} days — please extend validity to ${rfx?.validity_days_requested ?? 60} days.` };
+      case "vendor_mismatch": // never name the other company: that would disclose a competitor's quote
+        return { id: i.id, ref: null, text: `One of the files in your reply doesn't appear to be your company's quotation — please confirm it is yours, or send your own quotation.` };
+      case "vendor_condition":
+        return { id: i.id, ref: null, text: `Your quote states: “${(i.detail ?? i.title).slice(0, 200)}” — please confirm whether it applies to this RFx and how it affects your prices.` };
+      default: // total_mismatch
+        return { id: i.id, ref: null, text: `Your quotation's total doesn't match the sum of the item prices — please confirm the correct item prices and total.` };
     }
   });
   // Line order, then questions (a supplier answers down their own sheet).
@@ -125,13 +155,12 @@ export async function draftClarification(rfxId: string, vendorId: string, itemId
   const items = await loadItems(rfxId, vendorId, itemIds);
   const { rfx, v, n, tag } = await vendorAndTag(rfxId, vendorId);
   const list = await bullets(rfxId, vendorId, items);
-  const refs = list.map((b) => b.ref).filter((r): r is number => r !== null);
-  // Every asked item must be in the email (the supplier replies against the bullets).
-  const Draft = z.object({ subject: z.string().min(5).max(160), body_text: z.string().min(40).max(2000) })
-    .refine((d) => refs.every((r) => new RegExp(`\\b${r}\\b`).test(d.body_text)), { message: `body_text must mention every item number: ${refs.join(", ")}` });
-  const prompt = P_CLARIFY.replace("{buyer_name}", user.name).replace("{vendor_name}", v.name).replace("{code}", rfx.code).replace("{items}", list.map((b) => `- ${b.text}`).join("\n"));
-  const d = await generateJSON({ tier: "fast", purpose: "clarify", rfx_id: rfxId, schema: Draft, temperature: 0.4, parts: [{ text: prompt }, { text: CLARIFY_FORMAT }, { text: `Sign off as ${user.name}, Category Buyer, Meridian Foods (${user.email}).` }] });
-  return { to: v.email, reply_to: replyToAddress(tag), clar_n: n, subject: d.subject, body: d.body_text, items: list.map((b) => ({ id: b.id, text: b.text })) };
+  const Draft = z.object({ subject: z.string().min(5).max(160), opening: z.string().min(10).max(600), closing: z.string().min(10).max(600) });
+  const bulletsText = list.map((b) => `- ${b.text}`).join("\n");
+  const prompt = P_CLARIFY.replace("{buyer_name}", user.name).replace("{vendor_name}", v.name).replaceAll("{code}", rfx.code).replace("{items}", bulletsText);
+  const d = await generateJSON({ tier: "fast", purpose: "clarify", rfx_id: rfxId, schema: Draft, temperature: 0.4, parts: [{ text: prompt }, { text: `Sign off as ${user.name}, Category Buyer, Meridian Foods (${user.email}).` }] });
+  const body = `${d.opening.trim()}\n\n${bulletsText}\n\n${d.closing.trim()}`;
+  return { to: v.email, reply_to: replyToAddress(tag), clar_n: n, subject: d.subject, body, items: list.map((b) => ({ id: b.id, text: b.text })) };
 }
 
 /** POST /api/clarify/send — send it (mock mailbox), mark the cards asked, vendor → clarification_sent. */
@@ -151,7 +180,7 @@ export async function sendClarification(o: { rfxId: string; vendorId: string; su
   const at = new Date().toISOString();
   for (const i of items) {
     const { error } = await db().from("review_items").update({ status: "asked_vendor", updated_at: at,
-      resolution: { by: user.name, at, note: "Asked the vendor", communication_id: sent.id, clar_n: n } }).eq("id", i.id).eq("status", "open");
+      resolution: { by: user.name, at, note: "Asked the vendor", communication_id: sent.id, clar_n: n } }).eq("id", i.id).in("status", ["open", "asked_vendor"]);
     if (error) throw error;
   }
   await db().from("rfx_vendors").update({ status: "clarification_sent" }).eq("rfx_id", o.rfxId).eq("vendor_id", o.vendorId);

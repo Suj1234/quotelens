@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import type { CellState, Grid, GridCell } from "@/lib/comparison";
 import { inrShort, money } from "@/lib/format";
 import { AskButton } from "@/components/ask/ask-sheet";
-import { Button } from "@/components/ui/button";
+import { DownloadButton } from "@/components/download-button";
+import { Conditions } from "./conditions";
 
 type View = "unit" | "landed" | "orig";
 const COUNTED: CellState[] = ["confirmed", "inferred", "reviewed"];
@@ -44,25 +45,23 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
         <span style={{ flex: 1 }} />
         {approver && <AskButton />}
         {/* DESIGN §2.8 Export (TRD: XLSX/CSV); the workbook uses the basis on screen */}
-        <Button asChild><a href={`/api/export/comparison?rfx=${rfxId}&format=xlsx&basis=${basis}`} download>Export</a></Button>
-        <Button asChild variant="ghost" size="sm"><a href={`/api/export/comparison?rfx=${rfxId}&format=csv&basis=${basis}`} download>CSV</a></Button>
+        <DownloadButton href={`/api/export/comparison?rfx=${rfxId}&format=xlsx&basis=${basis}`}>Export</DownloadButton>
+        <DownloadButton href={`/api/export/comparison?rfx=${rfxId}&format=csv&basis=${basis}`} variant="ghost" size="sm">CSV</DownloadButton>
       </div>
       <div className="gridbox">
         <table className="cmp">
           <thead>
             <tr>
-              <th className="line"><div className="vh"><div className="nm">Line</div><div className="m">₹ per 1000 pcs · {view === "orig" ? "as written" : basis === "landed" ? "landed" : "unit price"}</div></div></th>
+              <th className="line"><div className="vh"><div className="nm">Line</div><div className="m">{view === "orig" ? "as the vendor wrote it · units differ" : `₹ per 1000 pcs · ${basis === "landed" ? "landed" : "unit price"}`}</div></div></th>
               {vendors.map((v) => (
                 <th key={v.code}>
                   <div className="vh">
                     <div className="nm">{v.name}<span className={`chip ${v.cleared === true ? "green" : v.cleared === false ? "red" : "amber"}`} title={v.cleared_note}>{v.cleared === true ? "✓" : v.cleared === false ? "✗" : "?"}</span></div>
                     <div className="m">
                       <span className="mono">{v.priced}/{grid.lines.length} priced</span>
-                      {v.freight_included === false && <span>· freight extra</span>}
-                      {v.currency && v.currency !== "INR" && <span>· {v.currency}</span>}
-                      {v.validity_short && <span className="chip amber" style={{ height: 15 }}>valid {v.validity_days}d</span>}
                     </div>
-                    <div className="tot">{inrShort(basis === "landed" ? v.total_landed : v.total_unit)} a year</div>
+                    <Conditions list={v.conditions} />
+                    <div className="tot">{inrShort(basis === "landed" ? v.total_landed : v.total_unit)} a year{view === "orig" ? " at unit price" : ""}</div>
                   </div>
                 </th>
               ))}
@@ -81,7 +80,7 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
                   </td>
                   {row.map((c, i) => {
                     if (!c) return <td key={vendors[i].code}><div className="cell">—</div></td>;
-                    const isMin = min !== null && eligible(c) && price(c) === min;
+                    const isMin = view !== "orig" && min !== null && eligible(c) && price(c) === min; // as written mixes units: nothing to rank
                     const k = `${c.line_no}:${c.vendor}`;
                     return (
                       <td key={k}>
@@ -102,7 +101,7 @@ export function PricesGrid({ rfxId, grid, onOpen, selected, onBasis, approver }:
       <div className="legend" style={{ margin: "10px 0 20px" }}>
         {LEGEND.map(([s, label]) => <span key={s}><i className={`sw cell ${s}`} />{label} <span className="mono">{counts[s] ?? 0}</span></span>)}
         {!!counts.conflict && <span><i className="sw cell conflict" />Conflict <span className="mono">{counts.conflict}</span></span>}
-        <span className="hint">· hover a cell for its source, click for the chain · teal edge = lowest eligible on the line</span>
+        <span className="hint">· hover a cell for its source, click for the chain · {view === "orig" ? "vendors\u2019 own units, not comparable — switch to Unit price to rank" : "teal edge = lowest eligible on the line"}</span>
       </div>
     </>
   );

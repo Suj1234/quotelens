@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getResponseDetail, getRfx, type ItemRow } from "@/lib/rfx-detail";
-import { countWord, longDate, money } from "@/lib/format";
+import { countWord, longDate, money, cap } from "@/lib/format";
 import { ext, formatLabel } from "@/lib/file-labels";
 import { currencyCode } from "@/lib/normalise/fx";
 import { PipelineStrip } from "@/components/rfx/pipeline-strip";
@@ -90,7 +90,7 @@ export default async function ResponseDetailPage({ params, searchParams }: PageP
                 <dt>Validity</dt>
                 <dd>
                   {t.validity_days ? `${t.validity_days} days` : t.validity_until ? `until ${longDate(t.validity_until as string)}` : "not stated"}
-                  {typeof t.validity_days === "number" && t.validity_days < rfx.validity_days_requested && <> <span className="chip amber">shorter than asked</span></>}
+                  {typeof t.validity_days === "number" && t.validity_days < rfx.validity_days_requested && <> <span className="chip amber">Shorter than asked</span></>}
                 </dd>
                 <dt>Freight</dt><dd>{[t.freight_terms_raw, t.freight_included === true ? "included" : t.freight_included === false ? "excluded" : null].filter(Boolean).join(" — ") || "not stated"}</dd>
                 <dt>Payment</dt><dd>{(t.payment_terms_raw as string) ?? (t.payment_days ? `${t.payment_days} days` : "not stated")}</dd>
@@ -128,7 +128,7 @@ export default async function ResponseDetailPage({ params, searchParams }: PageP
                     <td style={{ whiteSpace: "nowrap" }}>
                       <span className="pbar"><i style={{ width: `${Math.round((i.raw_confidence ?? 0) * 100)}%` }} /></span>{" "}
                       <span className="mono" style={{ fontSize: 11 }}>{i.raw_confidence?.toFixed(2) ?? "—"}</span>
-                      {!mapping && (i.raw_confidence ?? 1) < 0.6 && <> <span className="chip amber">low read</span></>}
+                      {!mapping && (i.raw_confidence ?? 1) < 0.6 && <> <span className="chip amber">Low read</span></>}
                     </td>
                     {mapping && <td className="mono" style={{ fontSize: 11, whiteSpace: "nowrap" }}><Mapped lines={mappedTo(i.id)} state={stateOf(i.id)} /></td>}
                   </tr>
@@ -149,7 +149,7 @@ const FLAG_LABEL: Record<string, string> = {
 
 // DESIGN §3.5: mono "L14" + amber/grey chips for unit? / low read / prior.
 function Mapped({ lines, state }: { lines: number[]; state?: string }) {
-  if (!lines.length) return <span className="chip amber">unplaced</span>;
+  if (!lines.length) return <span className="chip amber">Unplaced</span>;
   const label = lines.length > 1 ? `L${lines[0]}–${lines[lines.length - 1]}` : `L${lines[0]}`;
   const chip = { ambiguous: ["amber", "unit?"], low_confidence: ["amber", "low read"], references_prior: ["grey", "prior"], conflict: ["amber", "conflict"], not_quoted: ["grey", "not quoted"] }[state ?? ""];
   return <>{label}{chip && <> <span className={`chip ${chip[0]}`}>{chip[1]}</span></>}</>;
@@ -158,7 +158,7 @@ function Mapped({ lines, state }: { lines: number[]; state?: string }) {
 function EmailKind({ summary }: { summary: Record<string, unknown> }) {
   const e = (summary.classify as { email?: { kind: string; p: number } } | undefined)?.email;
   if (!e) return <span className="hint">not classified</span>;
-  return <span className={`chip ${e.kind === "quotation" ? "teal" : "grey"}`}>{e.kind.replace("_", " ")} · <span className="mono">{e.p.toFixed(2)}</span></span>;
+  return <span className={`chip ${e.kind === "quotation" ? "teal" : "grey"}`}>{cap(e.kind)} · <span className="mono">{e.p.toFixed(2)}</span></span>;
 }
 
 /** Location in one line: "Price Offer!G8", "p.1", "photo", "para 5", "line 5". */

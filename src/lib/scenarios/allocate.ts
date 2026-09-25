@@ -6,7 +6,10 @@ export type ALine = { id: string; line_no: number; description: string; annual_q
 export type AVendor = { id: string; name: string; code?: string; cleared: boolean | null; q_score: number };
 /** guess_* = the system's best guess on an ambiguous / low-confidence cell (landed = guess + the vendor's freight). */
 export type ACell = { line_id: string; vendor_id: string; state: string; unit: number | null; landed: number | null; guess_unit: number | null; guess_landed: number | null };
-export type Inputs = { lines: ALine[]; vendors: AVendor[]; cells: ACell[] };
+/** P10 D2–D3: a vendor's total-level discount and what it depends on (read from its quote; checked here per award option). */
+export type ADiscount = { vendor_id: string; pct: number; condition: string | null; kind: "all_lines" | "min_lines" | "min_value" | "payment_days" | "none" | "unclear";
+  min_lines: number | null; min_value_inr: number | null; payment_days: number | null };
+export type Inputs = { lines: ALine[]; vendors: AVendor[]; cells: ACell[]; discounts?: ADiscount[]; payment_days?: number | null };
 
 export type Basis = "unit" | "landed";
 export type Filter = { ply?: number; item_type?: string; delivery_location?: string; line_nos?: number[] };
@@ -147,7 +150,38 @@ export function totals(lines: { vendor_id: string | null; annual_value: number |
   };
 }
 
-export type Baseline = { vendor_id: string; total: number; lines_priced: number; note: string | null };
+export type DiscountLine = { vendor_id: string; pct: number; condition: string | null; met: boolean | null; why: string; saving: number };
+const inr0 = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+/**
+ * P10 D3: each vendor's discount against what that vendor wins in this award option. Met → pct off its awarded value.
+ * "unclear" is never applied (the buyer settles it on the review card). Pure; the same rule for every vendor.
+ */
+export function applyDiscounts(share: { vendor_id: string; lines: number; value: number }[], inp: Pick<Inputs, "lines" | "discounts" | "payment_days">): { lines: DiscountLine[]; saving: number } {
+  const n = inp.lines.length;
+  const out = (inp.discounts ?? []).map((d): DiscountLine => {
+    const s = share.find((x) => x.vendor_id === d.vendor_id) ?? { lines: 0, value: 0 };
+    let met: boolean | null, why: string;
+    switch (d.kind) {
+      case "all_lines": met = s.lines === n; why = `${s.lines} of ${n} lines awarded; needs all ${n}`; break;
+      case "min_lines": met = s.lines >= (d.min_lines ?? Infinity); why = `${s.lines} lines awarded; needs at least ${d.min_lines}`; break;
+      case "min_value": met = s.value >= (d.min_value_inr ?? Infinity); why = `${inr0(s.value)} awarded; needs at least ${inr0(d.min_value_inr ?? 0)}`; break;
+      case "payment_days": met = inp.payment_days != null && d.payment_days != null && inp.payment_days <= d.payment_days; why = `we pay at ${inp.payment_days ?? "?"} days; needs payment within ${d.payment_days}`; break;
+      case "none": met = s.lines > 0; why = s.lines ? "no condition" : "no lines awarded"; break;
+      default: met = null; why = "condition unclear — settle it on the review card";
+    }
+    if (met && !s.lines) { met = false; why = "no lines awarded"; }
+    return { vendor_id: d.vendor_id, pct: d.pct, condition: d.condition, met, why, saving: met ? s.value * d.pct / 100 : 0 };
+  });
+  return { lines: out, saving: out.reduce((a, d) => a + d.saving, 0) };
+}
+
+/** "Sri Balaji Packaging −3% (“if all 30 items are awarded to us”): met — 30 of 30 lines awarded; needs all 30" (Decide, Award, memo, Overview). */
+export function discountText(d: { vendor: string; pct: number; condition: string | null; met: boolean | null; why: string }): string {
+  return `${d.vendor} −${d.pct}%${d.condition ? ` (“${d.condition}”)` : ""}: ${d.met === true ? "met" : d.met === false ? "not met" : "not applied"} — ${d.why}`;
+}
+
+/** total = after any discount whose condition the single-vendor award meets; total_quoted = as quoted. */
+export type Baseline = { vendor_id: string; total: number; total_quoted: number; discount: DiscountLine | null; lines_priced: number; note: string | null };
 /**
  * TRD §13.5: the cheapest single vendor among those who priced every line (same eligibility as the scenario:
  * qualified vendors when it is qualified-only). If nobody priced every line, the vendors with the most lines priced
@@ -161,12 +195,14 @@ export function baseline(inp: Inputs, basis: Basis, qualifiedOnly: boolean, incl
       const p = c ? priceOf(c, basis, includeBestGuess) : null;
       if (p) { total += p.price * l.annual_qty / 1000; n++; }
     }
-    return { v, total, n };
+    // Everything to this one vendor: its own discount is checked against that award (P10 D3).
+    const d = applyDiscounts([{ vendor_id: v.id, lines: n, value: total }], { ...inp, discounts: (inp.discounts ?? []).filter((x) => x.vendor_id === v.id) });
+    return { v, total: total - d.saving, quoted: total, discount: d.lines[0] ?? null, n };
   }).filter((c) => c.n > 0);
   if (!cands.length) return null;
   const most = Math.max(...cands.map((c) => c.n));
   const best = cands.filter((c) => c.n === most).sort((a, b) => a.total - b.total || a.v.name.localeCompare(b.v.name))[0];
-  return { vendor_id: best.v.id, total: best.total, lines_priced: best.n,
+  return { vendor_id: best.v.id, total: best.total, total_quoted: best.quoted, discount: best.discount, lines_priced: best.n,
     note: most === inp.lines.length ? null : `No ${qualifiedOnly ? "qualified " : ""}vendor priced all ${inp.lines.length} lines; ${best.v.name} priced ${most}, and the baseline covers those lines only.` };
 }
 

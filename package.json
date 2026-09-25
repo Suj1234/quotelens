@@ -15,7 +15,8 @@
     "db:check": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/db-check.ts",
     "check:models": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/check-models.ts",
     "test:conversations": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/test-conversations.ts",
-    "seed:template": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed-template.ts"
+    "seed:template": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed-template.ts",
+    "test:guards": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/test-pipeline-guards.ts"
   },
   "dependencies": {
     "@google/adk": "^2.1.0",
@@ -60,5 +61,9 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "adm-zip": "^0.6.1",
+    "uuid": "^11.1.1"
   }
 }

@@ -13,7 +13,7 @@ export async function getRfx(id: string) {
 
 export type VendorRow = {
   vendor_id: string; name: string; city: string | null; short_code: string; status: string;
-  response: (Pick<ResponseRow, "id" | "received_at" | "pipeline_status" | "summary" | "source" | "email_text"> & {
+  response: (Pick<ResponseRow, "id" | "received_at" | "pipeline_status" | "stage_errors" | "updated_at" | "summary" | "source" | "email_text"> & {
     files: Pick<ResponseFile, "id" | "original_name" | "file_kind">[]; items: number; priced: number;
   }) | null;
   more_replies: number;
@@ -23,7 +23,7 @@ export type VendorRow = {
 export async function listVendorResponses(rfxId: string): Promise<VendorRow[]> {
   const [inv, resp, cellsQ] = await Promise.all([
     db().from("rfx_vendors").select("status, vendors(id, name, city, short_code)").eq("rfx_id", rfxId),
-    db().from("responses").select("id, vendor_id, received_at, pipeline_status, summary, source, email_text, is_clarification, response_files(id, original_name, file_kind, created_at), extracted_items(unit_price)")
+    db().from("responses").select("id, vendor_id, received_at, pipeline_status, stage_errors, updated_at, summary, source, email_text, is_clarification, response_files(id, original_name, file_kind, created_at), extracted_items(unit_price)")
       .eq("rfx_id", rfxId).eq("is_clarification", false).order("received_at", { ascending: false }),
     db().from("line_quotes").select("response_id").eq("rfx_id", rfxId).not("extracted_item_id", "is", null),
   ]);
@@ -36,7 +36,7 @@ export async function listVendorResponses(rfxId: string): Promise<VendorRow[]> {
     return {
       vendor_id: v.id, name: v.name, city: v.city, short_code: v.short_code, status: iv.status,
       response: r ? {
-        id: r.id, received_at: r.received_at, pipeline_status: r.pipeline_status, summary: r.summary, source: r.source, email_text: r.email_text,
+        id: r.id, received_at: r.received_at, pipeline_status: r.pipeline_status, stage_errors: r.stage_errors, updated_at: r.updated_at, summary: r.summary, source: r.source, email_text: r.email_text,
         files: [...r.response_files].sort((a, b) => a.created_at.localeCompare(b.created_at)),
         items: r.extracted_items.length, priced: r.extracted_items.filter((i) => i.unit_price !== null).length,
       } : null,

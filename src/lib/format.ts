@@ -40,3 +40,6 @@ export function inrShort(v: number): string {
 export const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 /** YYYY-MM-DD plus n days. */
 export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+
+/** "clarification_sent" → "Clarification sent" — for status and kind values shown as labels. */
+export const cap = (s: string) => s.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());

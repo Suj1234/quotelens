@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LIMIT, ReplyForm, tooLarge } from "@/components/rfx/add-response";
 
 /** Reply to one email in the vendor's mock mailbox: builds a real reply .eml to the tagged Reply-To; no response yet. */
-export function PortalReply({ rfxId, vendorId, vendorName, mailboxId, subject, to }: { rfxId: string; vendorId: string; vendorName: string; mailboxId: string; subject: string; to: string }) {
+export function PortalReply({ rfxId, vendorId, vendorName, mailboxId, subject, to, again }: { rfxId: string; vendorId: string; vendorName: string; mailboxId: string; subject: string; to: string; again?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -30,11 +30,12 @@ export function PortalReply({ rfxId, vendorId, vendorName, mailboxId, subject, t
       router.refresh();
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
-  if (!open) return <div className="acts"><Button size="sm" onClick={() => setOpen(true)}>Reply</Button></div>;
+  if (!open) return <div className="acts"><Button size="sm" onClick={() => setOpen(true)}>{again ? "Reply again" : "Reply"}</Button></div>;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--hair2)" }}>
+    <div className="replypane">
+      <div className="eyebrow">Your reply · as {vendorName}</div>
       <div className="email"><div className="h"><span>From</span><b>{vendorName}</b><span>To</span><b className="mono" style={{ fontWeight: 400 }}>{to}</b><span>Subject</span><b>{/^re:/i.test(subject) ? subject : `Re: ${subject}`}</b></div></div>
-      <ReplyForm files={files} setFiles={setFiles} text={text} setText={setText} placeholder={`Dear Sujit, please find our quotation attached… — ${vendorName}`} />
+      <ReplyForm files={files} setFiles={setFiles} text={text} setText={setText} placeholder={`Dear Sujit, please find our quotation attached… — ${vendorName}`} minHeight={320} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <span className="hint">Sent as {vendorName}, to the address the email asked for. It waits unread until the buyer syncs the inbox.</span>
         <span style={{ display: "flex", gap: 6 }}>

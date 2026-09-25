@@ -93,7 +93,7 @@
   .site-footer a { color: var(--ink2); text-decoration: none; }
   .site-footer a:hover { color: var(--accent-ink); text-decoration: underline; }
   @media (max-width: 900px) { .site-footer { padding: 14px 16px; flex-direction: column; align-items: flex-start; } }
-  .lead { font-size: 15px; line-height: 1.5; max-width: 64ch; color: var(--ink2); }
+  .lead { font-size: 15px; line-height: 1.5; color: var(--ink2); }
   .lead b { color: var(--ink); font-weight: 600; }
 }
 
@@ -116,6 +116,7 @@
   table.t td { padding: 8px 10px; border-bottom: 1px solid var(--hair2); vertical-align: top; }
   table.t tbody tr:last-child td { border-bottom: 0; }
   table.t tbody tr:hover td { background: var(--tint); }
+  table.t tbody tr:hover .chip.grey { background: var(--surface); } /* grey chip is --tint too: keep it visible on hover */
   table.t td.num, table.t th.num { text-align: right; }
   /* Headers are always Plex Sans (DESIGN.md §1.3); codes and numbers never break mid-token */
   table.t th { font-family: var(--font-sans); }
@@ -181,7 +182,7 @@
 }
 /* design/prototype.html: comparison grid, drawer, evidence, review queue (DESIGN.md §2.6–2.11), from P3 on */
 @layer components {
-  .cmpwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 14px 28px 0; }
+  .cmpwrap { display: flex; flex-direction: column; flex: 1; padding: 14px 28px 0; }
   .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .seg { display: inline-flex; border: 1px solid var(--hair); border-radius: 5px; overflow: hidden; }
   .seg button { padding: 5px 11px; font-size: 12px; color: var(--muted); background: var(--surface); }
@@ -192,7 +193,10 @@
   .legend .sw.low_confidence { border: 1px dotted var(--amber); }
   .legend .sw.conflict { border-color: var(--red); outline: 0; }
   .legend .sw.inferred::before { left: 3px; width: 4px; height: 4px; }
-  .gridbox { flex: 1; min-height: 320px; overflow: auto; border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); }
+  /* the page scrolls, not the grid: the box is as tall as the table; fit-content fills the page and wraps the headers, and only
+     grows past it (the page scrolls sideways) when the columns can't fit even wrapped. clip (unlike hidden/auto) isn't a
+     scroll container, so the sticky header and Line column stick to the page */
+  .gridbox { width: fit-content; min-width: 100%; overflow: clip; border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); }
   table.cmp { border-collapse: separate; border-spacing: 0; font-size: 12.5px; min-width: 960px; line-height: normal; }
   table.cmp th, table.cmp td { border-bottom: 1px solid var(--hair2); border-right: 1px solid var(--hair2); padding: 0; }
   table.cmp thead th { position: sticky; top: 0; background: var(--surface); z-index: 3; text-align: left; font-weight: 500; vertical-align: top; }
@@ -219,6 +223,7 @@
   .cell.conflict { outline: 1px solid var(--red); outline-offset: -1px; }
   .cell.sel { outline: 2px solid var(--ink); outline-offset: -2px; }
   .cell[data-tip]:hover::after { content: attr(data-tip); position: absolute; right: 8px; top: 100%; z-index: 5; background: var(--ink); color: var(--paper); font-family: var(--font-sans); font-size: 11px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+  table.cmp tbody tr:nth-last-child(-n+2) .cell[data-tip]:hover::after { top: auto; bottom: 100%; } /* bottom rows: tip opens upward, not past the box's clip */
   .scrim { position: fixed; inset: 0; background: rgba(20,22,26,.22); z-index: 20; }
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--drawer), 100vw); background: var(--surface); border-left: 1px solid var(--hair); z-index: 30; display: flex; flex-direction: column; box-shadow: var(--shadow); }
   .drawer > .hd { padding: 14px 18px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -237,17 +242,46 @@
   .snip { padding: 10px 12px; font-family: var(--font-mono); font-size: 11.5px; white-space: pre-wrap; background: var(--surface); line-height: 1.5; word-break: break-word; }
   .snip mark { background: var(--amber-bg); color: var(--amber); padding: 0 2px; }
   .rq { display: flex; flex-direction: column; gap: 12px; }
-  .rqcard { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 18px; padding: 14px; border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); }
-  .rqcard.resolved { opacity: .5; }
-  .rqcard.cur { outline: 2px solid var(--ink); outline-offset: -1px; }
-  .rqcard .ttl { font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .rqcard .prop { margin-top: 10px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+  .rqcard { display: grid; grid-template-columns: minmax(260px, 380px) 1fr; gap: 24px; align-items: start; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); }
+  .rqcard.noev { grid-template-columns: 1fr; }
+  .rqcard .rqmain { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .rqcard.resolved { opacity: .6; }
+  .rqcard .rqmeta { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
+  .rqcard .ttl { font-weight: 600; font-size: 14px; }
+  .rqcard .rqdetail { font-size: 12.5px; color: var(--muted); }
+  .rqcard .rqnothing { font-size: 12.5px; color: var(--ink2); }
+  .rqcard .rqnothing b { font-weight: 600; }
+  .rqcard .prop { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
   .rqcard .prop .v { font-family: var(--font-mono); font-size: 18px; }
-  .rqcard .acts { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .rqgroup { margin-top: 10px; }
+  .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  /* P10 D5: vendor conditions — chips, and the full list on hover / focus */
+  .conds { position: relative; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; cursor: help; outline: none; }
+  .conds .pop { display: none; position: fixed; z-index: 30; width: 420px; overflow: auto; overscroll-behavior: contain; padding: 4px 14px; border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); font-size: 12px; line-height: 1.45; font-weight: 400; text-align: left; white-space: normal; color: var(--ink); cursor: auto; }
+  .conds:hover .pop, .conds:focus .pop, .conds:focus-within .pop { display: block; }
+  /* sticky header cells each stack on their own: lift the one whose pop is open above its neighbours */
+  table.cmp thead th:has(.conds:hover), table.cmp thead th:has(.conds:focus-within) { z-index: 5; }
+  .conds .pop .row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--hair2); }
+  .conds .pop .row:last-child { border-bottom: 0; }
+  .conds .pop .row b { font-weight: 500; color: var(--muted); }
+  .conds .pop .amb { color: var(--amber); }
+  .rqsrc { min-width: 0; padding: 10px 12px; border-radius: 5px; background: var(--paper); }
+  .rqsrc .h { display: flex; justify-content: space-between; gap: 12px; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+  .rqsrc .h a { color: inherit; }
+  .rqsrc blockquote { margin: 0; padding: 2px 0 2px 12px; border-left: 2px solid var(--hair); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .rqsrc blockquote mark { background: var(--amber-bg); color: inherit; padding: 0 2px; border-radius: 2px; }
+  .rqsrc img { display: block; max-width: 100%; max-height: 320px; border: 1px solid var(--hair); border-radius: 4px; }
+  .rqsrc iframe { display: block; width: 100%; height: 300px; border: 1px solid var(--hair); border-radius: 4px; background: var(--surface); }
+  .rqform { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .rqprices { display: flex; flex-direction: column; gap: 6px; max-width: 620px; }
+  .rqprices label { display: grid; grid-template-columns: 40px 1fr 130px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .rqprices .d { color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rqcard .acts { margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .email { border: 1px solid var(--hair); border-radius: 5px; background: var(--surface); font-size: 12.5px; width: 100%; }
   .email .h { padding: 8px 12px; border-bottom: 1px solid var(--hair2); display: grid; grid-template-columns: 64px 1fr; gap: 3px 8px; color: var(--muted); }
   .email .h b { color: var(--ink); font-weight: 500; }
   .email .b { padding: 12px; white-space: pre-wrap; }
+  .email .att { padding: 0 12px 12px; display: flex; flex-wrap: wrap; gap: 8px; }
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hair); }
   .tabs button, .tabs a { padding: 9px 12px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; text-decoration: none; }
   .tabs button.active, .tabs a.active { color: var(--ink); border-color: var(--ink); }
@@ -292,7 +326,7 @@
   /* prototype: ask answer card (DESIGN §2.13) */
   .qa { border: 1px solid var(--hair); border-radius: 6px; background: var(--surface); padding: 14px 16px; }
   .qa .q { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
-  .qa .a { font-size: 13.5px; line-height: 1.55; max-width: 70ch; }
+  .qa .a { font-size: 13.5px; line-height: 1.55; }
   .qa .how { margin-top: 8px; font-size: 12px; color: var(--muted); }
   .qa .how button { color: var(--accent-ink); font-weight: 500; }
   .qa pre { margin: 8px 0 0; padding: 10px; background: var(--tint); border-radius: 5px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; color: var(--ink2); }
@@ -311,6 +345,9 @@
   .sugg { display: flex; gap: 6px; flex-wrap: wrap; }
   .sugg button { border: 1px solid var(--hair); border-radius: 14px; padding: 3px 10px; font-size: 12px; color: var(--ink2); background: var(--surface); text-align: left; }
   .sugg button:hover { border-color: var(--ink); }
+  /* Vendor portal: the vendor's reply, set apart from the email it answers. */
+  .sentreply { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 0 24px; padding-left: 12px; border-left: 2px solid var(--hair); }
+  .replypane { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; padding: 14px; border: 1px solid var(--hair); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--accent-tint); }
   .drop { border: 1px dashed var(--hair); border-radius: 6px; padding: 22px; text-align: center; color: var(--muted); background: var(--tint); cursor: pointer; display: block; }
   .drop:hover, .drop.over { border-color: var(--accent); }
   .split { display: grid; grid-template-columns: minmax(340px, 460px) 1fr; gap: 16px; align-items: start; }
@@ -486,3 +523,27 @@
   .tone.muted { color: var(--muted); }
   @media (max-width: 900px) { .listcard .listtabs { overflow-x: auto; } .searchbox { flex-basis: 100%; } }
 }
+
+/* P9 C13: Ask is a chat with the analyst — the user's message, its reply, then what its tools did */
+.ask-ex { display: flex; flex-direction: column; gap: 10px; }
+.ask-ex .msg.me { border-left: 0; padding: 8px 12px; background: var(--tint2); border-radius: 6px; align-self: flex-end; max-width: 88%; }
+.ask-ex .msg.cp { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
+.ask-act { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12.5px; padding-left: 14px; }
+.ask-act a { color: var(--accent-ink); font-weight: 500; }
+.ask-draft { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--hair); border-radius: 6px; padding: 10px; background: var(--tint); }
+.ask-draft textarea { font-size: 12.5px; resize: vertical; }
+/* P9 N1: email preview in the Issue dialog */
+.mail-pv { margin-top: 8px; border: 1px solid var(--hair); border-radius: 6px; padding: 10px 12px; background: var(--tint); display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.mail-pv .lbl { display: inline-block; width: 64px; }
+.mail-pv pre { white-space: pre-wrap; font-family: inherit; font-size: 12.5px; line-height: 1.5; margin: 8px 0 4px; }
+/* P9: Ask wider (tables, charts) and as a full page */
+.sheet.ask-sheet { width: min(680px, 100vw); }
+.ask-page { display: flex; flex-direction: column; height: calc(100vh - 250px); min-height: 480px; }
+.ask-page > .hd { padding: 14px 16px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: center; }
+.ask-page > .bd { padding: 16px 20px; overflow: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.ask-page > .ft { border-top: 1px solid var(--hair); padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; }
+.ask-page .ask-ex .msg.me { max-width: 70%; }
+/* P9: answer cards collapse to question + answer */
+.qa .qhead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.qa .qhead .qa-toggle { font-size: 12px; font-weight: 500; color: var(--accent-ink); white-space: nowrap; }
+.ask-ex .msg.cp b { font-weight: 600; }

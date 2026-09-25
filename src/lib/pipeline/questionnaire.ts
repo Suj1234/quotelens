@@ -1,4 +1,5 @@
 import "server-only";
+import { VENDOR_DATA_RULE, vendorData } from "@/lib/ai/vendor-data";
 import { z } from "zod";
 import { bool, choice, decide, type Question } from "@/lib/ai/decision";
 import { generateJSON, inlineFile, type Part } from "@/lib/ai/gemini";
@@ -58,20 +59,20 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
       if (budget <= 0) continue;
       const text = (await get("derived", f.derived_text_path)).toString("utf8").slice(0, budget);
       budget -= text.length;
-      parts.push({ text: `### ${f.original_name}\n${text}` });
+      parts.push({ text: `### ${f.original_name}` }, ...vendorData(f.original_name, [{ text }]));
     } else if (f.derived_image_paths?.length) {
-      parts.push({ text: `### ${f.original_name} (image)` }, inlineFile(await get("derived", f.derived_image_paths[0]), "image/png"));
+      parts.push({ text: `### ${f.original_name} (image)` }, ...vendorData(f.original_name, [inlineFile(await get("derived", f.derived_image_paths[0]), "image/png")]));
     } else {
-      parts.push({ text: `### ${f.original_name} (PDF)` }, inlineFile(await get("raw", f.storage_path), "application/pdf"));
+      parts.push({ text: `### ${f.original_name} (PDF)` }, ...vendorData(f.original_name, [inlineFile(await get("raw", f.storage_path), "application/pdf")]));
     }
     sources.push(f.original_name);
   }
-  if (resp.email_text && budget > 0) { parts.push({ text: `### email body\n${cleanEmail(resp.email_text).slice(0, budget)}` }); sources.push("email body"); }
+  if (resp.email_text && budget > 0) { parts.push({ text: "### email body" }, ...vendorData("email body", [{ text: cleanEmail(resp.email_text).slice(0, budget) }])); sources.push("email body"); }
 
   const qList = questions.map((q) => `Q${q.q_no} (${q.answer_type}): ${q.text}`).join(" | ");
   const qa = parts.length
     ? await generateJSON({ tier: "fast", purpose: "questionnaire", rfx_id: resp.rfx_id, response_id: resp.id, schema: QaResult, temperature: 0,
-        parts: [{ text: P_QA.replace("{questions}", qList) }, ...parts] })
+        parts: [{ text: `${P_QA.replace("{questions}", qList)}\n${VENDOR_DATA_RULE}` }, ...parts] })
     : { answers: [] };
   const byNo = new Map(qa.answers.map((a) => [a.q_no, a]));
 
@@ -125,13 +126,28 @@ export async function questionnaire(resp: ResponseRow): Promise<QuestionnaireSum
     if (error) throw error;
   }
 
+  // Where each of two disagreeing answers came from, in words ("the email", "Qtn SBP-0912 Meridian.xlsx"), for the card (P10).
+  const priorIds = [...new Set(disagree.map((r) => elsewhere.get(r.question_id)!.response_id).filter(Boolean))] as string[];
+  const { data: priorResps } = priorIds.length ? await db().from("responses").select("id, email_text, response_files(original_name, file_kind)").in("id", priorIds) : { data: [] };
+  const nameOf = (files: { original_name: string; file_kind?: string | null }[], hasEmail: boolean, loc?: { type?: string } | null) => {
+    const docs = files.filter((f) => f.file_kind !== "supporting");
+    if (loc?.type === "text" && hasEmail && !docs.length) return "the email";
+    if (docs.length === 1 && loc?.type !== "text") return docs[0].original_name;
+    return hasEmail && (!docs.length || loc?.type === "text") ? "the email" : docs[0]?.original_name ?? "their reply";
+  };
+  const thisFiles = (files as { original_name: string; file_kind: string | null }[]).map((f) => ({ original_name: f.original_name, file_kind: f.file_kind }));
   const reviews: ReviewInput[] = [...write.filter((r) => r.state === "ambiguous"), ...disagree].map((r) => {
     const q = questions.find((x) => x.id === r.question_id)!;
+    const o = elsewhere.get(q.id);
+    const pr = o ? (priorResps ?? []).find((x) => x.id === o.response_id) : undefined;
     return {
       type: "questionnaire_ambiguous", question_id: q.id,
       title: elsewhere.has(q.id) ? `Q${q.q_no}: two answers from this vendor — “${(elsewhere.get(q.id)!.answer_raw ?? "").slice(0, 40)}” vs “${(r.answer_raw ?? "").slice(0, 40)}”` : `Q${q.q_no}: “${(r.answer_raw ?? "").slice(0, 70)}”`,
       detail: elsewhere.has(q.id) ? `${q.text} The earlier answer stands until you decide.` : q.text, probability: r.probability,
-      evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw },
+      evidence: { location: r.location, snippet: r.location?.snippet ?? r.answer_raw, answer_type: q.answer_type,
+        // P10: two answers from one vendor — both kept, each with where it came from; the earlier one stands until the buyer decides.
+        ...(o ? { conflict: { earlier: { answer: o.answer_raw, from: pr ? nameOf((pr.response_files ?? []) as { original_name: string; file_kind: string | null }[], !!pr.email_text) : "their earlier reply" },
+          other: { answer: r.answer_raw, from: nameOf(thisFiles, !!resp.email_text, r.location as { type?: string } | null) } } } : {}) },
     };
   });
   // Missing mandatory answers make the vendor "not cleared" (view 0004) — say so once, so the buyer can ask the vendor.

@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorConditions, type Condition } from "@/lib/conditions";
 import { db } from "@/lib/db";
 import { longDate, money } from "@/lib/format";
 import type { RfxLine } from "@/types/db";
@@ -16,6 +17,8 @@ export type GridCell = {
 export type GridVendor = {
   id: string; code: string; name: string; cleared: boolean | null; cleared_note: string; priced: number; lines: number;
   freight_included: boolean | null; currency: string | null; validity_days: number | null; validity_short: boolean;
+  /** P10 D5: everything the vendor attached to its prices (chips + hover). */
+  conditions: Condition[];
   total_unit: number; total_landed: number;
 };
 export type GridLine = { id: string; line_no: number; sku: string; description: string; annual_qty: number; delivery_location: string };
@@ -64,13 +67,14 @@ export function whereText(l: Loc | null | undefined): string {
 }
 
 export async function getComparison(rfxId: string): Promise<Grid> {
-  const [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ] = await Promise.all([
+  const [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ, conds] = await Promise.all([
     db().from("rfx").select("validity_days_requested").eq("id", rfxId).single(),
     db().from("rfx_lines").select("id, line_no, sku, description, annual_qty, delivery_location").eq("rfx_id", rfxId).order("line_no"),
     db().from("v_vendor_status").select("*").eq("rfx_id", rfxId),
     db().from("line_quotes").select("rfx_line_id, vendor_id, response_id, state, unit_price_inr_per_1000, landed_price_inr_per_1000, best_guess_value, best_guess_note, original_value, original_unit, original_currency, conversion_chain, extracted_items(location)").eq("rfx_id", rfxId),
     db().from("responses").select("id, vendor_id, received_at, response_terms(currency, validity_days, validity_until, freight_included)").eq("rfx_id", rfxId).order("received_at", { ascending: false }),
     db().from("questionnaire_answers").select("vendor_id, state, passes, answer_raw, rfx_questions(q_no, disqualify_if, mandatory)").eq("rfx_id", rfxId),
+    vendorConditions(rfxId),
   ]);
   for (const q of [rfxQ, linesQ, statusQ, cellsQ, respQ, qaQ]) if (q.error) throw q.error;
   const lines = (linesQ.data as Pick<RfxLine, "id" | "line_no" | "sku" | "description" | "annual_qty" | "delivery_location">[]);
@@ -114,10 +118,13 @@ export async function getComparison(rfxId: string): Promise<Grid> {
     const annual = (c: GridCell, v: number | null) => (v ?? 0) * (lines.find((l) => l.line_no === c.line_no)!.annual_qty) / 1000;
     return {
       id: s.vendor_id, code: s.vendor_code, name: s.vendor, cleared: s.cleared_questionnaire,
-      cleared_note: s.cleared_questionnaire === true ? "Cleared the questionnaire" : [...failing, ...missing, ...pending].join(" · ") || "Questionnaire not read yet",
+      cleared_note: s.cleared_questionnaire === true ? "Cleared the questionnaire" : [...failing, ...missing, ...pending].join(" · ")
+        // Answers read but no pass/fail question in this RFx: nothing to clear, but not "not read" either.
+        || (qa.some((a) => a.vendor_id === s.vendor_id) ? "No pass/fail questions" : "Questionnaire not read yet"),
       priced: mine.length, lines: s.lines_total, freight_included: t?.freight_included ?? s.freight_included, currency: t?.currency ?? null,
       validity_days: t?.validity_days ?? null, validity_short: !!t?.validity_days && t.validity_days < requested,
       total_unit: mine.reduce((a, c) => a + annual(c, c.unit), 0), total_landed: mine.reduce((a, c) => a + annual(c, c.landed), 0),
+      conditions: conds.get(s.vendor_id) ?? [],
     };
   });
   return { lines, vendors, cells, validity_requested: requested };

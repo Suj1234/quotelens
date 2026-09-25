@@ -38,7 +38,7 @@ test("tool runs, action recorded, every model call logged with its purpose and u
   const events: unknown[] = [];
   const model = new Scripted([call("add_item", { name: "box" }), (req) => say(`count=${(lastToolResult(req) as { count: number }).count}`)]);
   const out = await runAgent({ ...base, model, onEvent: (e) => events.push(e) });
-  expect(out).toEqual({ reply: "count=1", actions: [{ tool: "add_item", text: "Added box", data: undefined }] });
+  expect(out).toEqual({ reply: "count=1", actions: [{ tool: "add_item", text: "Added box", data: undefined, result: { ok: true, count: 1 } }] });
   expect(done).toEqual(["box"]);
   expect(events).toEqual([{ type: "step", text: "Adding box" }, { type: "action", tool: "add_item", text: "Added box" }]);
   expect(logged.map((l) => [l.purpose, l.ok])).toEqual([["test_agent", true], ["test_agent", true]]);

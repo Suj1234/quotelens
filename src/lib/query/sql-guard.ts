@@ -10,6 +10,9 @@ export const VIEWS: Record<string, string[]> = {
   v_vendor_status: ["rfx_id", "vendor_id", "vendor", "vendor_code", "status", "disqualified_reason", "lines_priced", "lines_total", "cleared_questionnaire", "validity_until", "freight_included", "validity_days"],
   v_questionnaire: ["rfx_id", "q_no", "question", "answer_type", "disqualify_if", "vendor", "vendor_code", "answer_bool", "answer_number", "answer_text", "probability", "state", "passes"],
   v_assumptions: ["rfx_id", "kind", "description", "basis", "made_by", "created_at", "vendor", "line_no"],
+  v_documents: ["rfx_id", "vendor", "vendor_code", "file_name", "mime", "page_count", "kind", "caption", "source", "is_clarification", "received_at"],
+  v_vendor_terms: ["rfx_id", "vendor", "vendor_code", "currency", "payment_days", "payment_terms_raw", "validity_days", "validity_until", "freight_included", "freight_terms_raw",
+    "taxes_included", "tax_terms_raw", "total_discount_pct", "total_discount_condition", "references_prior_pricing", "references_prior_pricing_text", "other_notes"],
 };
 
 // Every table in migrations 0001–0005 (+ the migration log). Named anywhere → rejected, even as an alias.

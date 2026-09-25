@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -52,6 +52,7 @@ export async function createResponse(input: {
     const storage_path = await put("raw", rawPath(rfxId, responseId, fileId, f.name), f.buf, mime);
     const row = await db().from("response_files").insert({
       id: fileId, response_id: responseId, original_name: f.name, mime, size_bytes: f.buf.length, storage_path,
+      sha256: createHash("sha256").update(f.buf).digest("hex"),
     });
     if (row.error) throw row.error;
     await derive(rfxId, responseId, fileId, f);

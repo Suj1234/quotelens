@@ -1,29 +1,41 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { simpleParser } from "mailparser";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { listComms, type Comm } from "@/lib/comms";
-import { put } from "@/lib/storage";
+import { get, put } from "@/lib/storage";
 import type { IncomingFile } from "@/lib/responses";
 import { buildEml } from "./index";
 
 // The vendor's side of the mock mailbox (DECISIONS "Mock mailbox design"): what we sent them, and their replies.
 
-export type MailboxMessage = Comm & { mailbox_id: string; replied: boolean };
+export type VendorReply = Pick<Comm, "from" | "to" | "subject" | "body" | "attachments"> & { id: string; at: string; seen: boolean };
+export type MailboxMessage = Comm & { mailbox_id: string; replies: VendorReply[] };
 
-/** Every email we sent this vendor for this RFx (dispatch, clarifications), newest first — the portal's inbox. */
+/** Every email we sent this vendor for this RFx (dispatch, clarifications), newest first, each with the vendor's replies to it — the portal's inbox. */
 export async function vendorInbox(rfxId: string, vendorId: string): Promise<MailboxMessage[]> {
-  const [{ data: box, error }, comms] = await Promise.all([
+  const [{ data: box, error }, comms, received] = await Promise.all([
     db().from("mock_mailbox").select("id, message_id").eq("rfx_id", rfxId).eq("vendor_id", vendorId).eq("direction", "to_vendor"),
     listComms(rfxId, { direction: "outbound", vendorId }),
+    listComms(rfxId, { direction: "inbound", vendorId }),
   ]);
   if (error) throw error;
   const ids = (box ?? []).map((b) => b.message_id);
-  const { data: replies } = ids.length ? await db().from("mock_mailbox").select("in_reply_to").eq("direction", "to_buyer").in("in_reply_to", ids) : { data: [] };
-  const answered = new Set((replies ?? []).map((r) => r.in_reply_to));
+  const { data: rows } = ids.length
+    ? await db().from("mock_mailbox").select("id, message_id, in_reply_to, from_addr, to_addr, subject, eml_path, seen, created_at").eq("direction", "to_buyer").in("in_reply_to", ids).order("created_at")
+    : { data: [] };
+  // Synced replies come from `communications` (attachments downloadable); unsynced ones are read from their .eml (names only).
+  const replies = await Promise.all((rows ?? []).map(async (r): Promise<VendorReply & { in_reply_to: string }> => {
+    const c = received.find((x) => x.message_id === r.message_id);
+    const base = { id: r.id, at: r.created_at, seen: r.seen, in_reply_to: r.in_reply_to!, from: r.from_addr, to: r.to_addr, subject: r.subject };
+    if (c) return { ...base, body: c.body, attachments: c.attachments };
+    const m = await simpleParser(await get("raw", r.eml_path));
+    return { ...base, body: m.text?.trim() || null, attachments: m.attachments.map((a) => ({ name: a.filename ?? "attachment", url: null })) };
+  }));
   return comms.flatMap((c) => {
     const b = (box ?? []).find((x) => x.message_id === c.message_id);
-    return b ? [{ ...c, mailbox_id: b.id, replied: answered.has(c.message_id) }] : [];
+    return b ? [{ ...c, mailbox_id: b.id, replies: replies.filter((r) => r.in_reply_to === c.message_id) }] : [];
   }).reverse();
 }
 

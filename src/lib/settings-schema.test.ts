@@ -16,15 +16,15 @@ describe("settings validation (PUT /api/settings)", () => {
     expect(S.fx_rates.safeParse({ usd: { rate: 83, date: "2026-09-23", source: "m" } }).success).toBe(false);
     expect(S.fx_rates.safeParse({ INR: { rate: 1, date: "2026-09-23", source: "m" } }).success).toBe(false);
   });
-  it("enums and freight", () => {
+  it("enums; discount, freight and cost of money are no longer settings (P10)", () => {
     expect(S.decision_provider.safeParse("jev").success).toBe(true);
     expect(S.decision_provider.safeParse("openai").success).toBe(false);
-    expect(S.discount_default.safeParse("net").success).toBe(true);
-    expect(S.discount_default.safeParse("half").success).toBe(false);
     expect(S.email_mode.safeParse("mock").success).toBe(true);
     expect(S.email_mode.safeParse("gmail").success).toBe(false);
-    expect(S.freight_default_inr_per_1000.safeParse(0).success).toBe(true);
-    expect(S.freight_default_inr_per_1000.safeParse(-1).success).toBe(false);
-    expect(S.freight_default_inr_per_1000.safeParse("180").success).toBe(false);
+    expect(Object.keys(S)).not.toContain("discount_default");
+    expect(Object.keys(S)).not.toContain("freight_default_inr_per_1000");
+    expect(Object.keys(S)).not.toContain("landed_cost");
+    expect(S.price_check.safeParse({ median_ratio: 2 }).success).toBe(true);
+    expect(S.price_check.safeParse({ median_ratio: 2, rs_per_kg_min: 25, rs_per_kg_max: 150 }).success).toBe(false); // now per category
   });
 });

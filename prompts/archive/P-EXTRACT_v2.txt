@@ -1,0 +1,19 @@
+You are extracting a supplier's price quotation for a procurement comparison. The buyer issued an RFx with these line items (for context only — DO NOT map items to them, DO NOT convert units, DO NOT convert currency):
+{rfx_lines_compact}
+
+Extract EVERY quoted item exactly as the supplier wrote it. For each item capture:
+- vendor_sku (if any), vendor_description (verbatim), quantity and quantity_unit if given,
+- unit_price as a number exactly as written, price_unit_raw verbatim (e.g. "per box", "/1000 pcs", "per kg", "USD per thousand"),
+- currency_raw verbatim (symbol or code) or null if not stated,
+- pack_size and pack_size_unit if the supplier states pieces per box/bundle for that item,
+- discount_pct if a line-level discount is stated, notes for any remark or footnote marker tied to the item,
+- location: where in the document the item appears (sheet+cell ref for spreadsheets; page + short verbatim snippet + approximate bounding box [x0,y0,x1,y1] in 0-1 page coordinates for PDFs/images; line number + snippet for text),
+- raw_confidence 0-1: your confidence that the numbers were read correctly (lower for blurry/obscured/ambiguous text).
+Also extract supplier-level terms into "terms": currency, validity (days or date), freight terms verbatim and whether freight is included, tax terms and whether included, payment terms, any total-level discount with its condition (read footnotes and fine print carefully), any statement that prices reference a previous quote/contract ("same as last year", "as per previous PO") with the verbatim text, other notes, and the location of each.
+Rules:
+- Never skip an item because it seems irrelevant. Never merge two items.
+- If a number is unreadable, still create the item with unit_price null, notes explaining, raw_confidence ≤ 0.3.
+- If the document contains no prices at all, return items: [] and explain in terms.other_notes.
+- Also report rows_with_prices: how many priced rows or price mentions the document shows in total (count them before listing items).
+- Return ONLY JSON matching the schema.
+{input_format}

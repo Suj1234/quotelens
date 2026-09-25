@@ -3,14 +3,15 @@ import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { audit } from "@/lib/log";
 import { SettingSchemas, type Settings } from "@/lib/settings-schema";
+import { PRICE_CHECK_DEFAULT } from "@/lib/price-check";
 
 export type { Settings } from "@/lib/settings-schema";
 
 // Seed defaults (TRD §6.19) — used when a key is missing.
 const DEFAULTS: Settings = {
   email_mode: "mock", decision_provider: "auto", thresholds: { act: 0.85, review: 0.6 },
-  fx_rates: {}, landed_cost: { include_tax: false, cost_of_money_annual_pct: 0 }, discount_default: "gross", vendor_addresses: {},
-  freight_default_inr_per_1000: 180, // TRD §11.7 example; editable per vendor (rfx_vendors.freight_assumption_inr_per_1000)
+  fx_rates: {}, vendor_addresses: {},
+  price_check: PRICE_CHECK_DEFAULT, // P9 Q3: 2× median (the ₹/kg band is in the category template, P10 S4)
   category_templates: {}, // none until seeded (scripts/seed-template.ts) or set in Settings; the co-pilot then asks for everything
 };
 

@@ -31,6 +31,7 @@ const template = CategoryTemplate.parse({
   },
   question_library: questions.map((q) => ({ text: q.text, answer_type: q.answer_type, mandatory: q.mandatory, disqualify_if: q.disqualify_if })),
   approved_vendor_ids: (invited ?? []).map((v) => v.vendor_id as string),
+  price_band: { rs_per_kg_min: 25, rs_per_kg_max: 150 }, // usual corrugated ₹/kg (was the global price-check band, P10 S4)
 });
 
 const { data: cur } = await db().from("settings").select("value").eq("key", "category_templates").maybeSingle();

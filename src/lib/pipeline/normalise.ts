@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { currencyCode, fxRate } from "@/lib/normalise/fx";
 import { applyLineDiscount, grossUp, landed, round2 } from "@/lib/normalise/price";
+import { readDiscount, readingText, type DiscountReading } from "./discount";
+import { linesTotal, totalCheck } from "@/lib/normalise/total";
 import { parseUnit, toPer1000Factor, type UnitKey } from "@/lib/normalise/units";
 import { longDate, money } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
@@ -35,14 +37,14 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const main = clar && resp.supersedes_response_id ? (await db().from("responses").select("*").eq("id", resp.supersedes_response_id).maybeSingle<ResponseRow>()).data : null;
   const termsOf = main ?? resp;
 
-  const [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ, fx, th, discountDefault, freightDefault] = await Promise.all([
+  const [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ, fx, th] = await Promise.all([
     db().from("rfx").select("*").eq("id", resp.rfx_id).single<Rfx>(),
     db().from("rfx_lines").select("*").eq("rfx_id", resp.rfx_id).order("line_no"),
     db().from("extracted_items").select("*").eq("response_id", resp.id),
     db().from("response_terms").select("*").eq("response_id", termsOf.id).maybeSingle(),
-    db().from("rfx_vendors").select("freight_assumption_inr_per_1000").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).maybeSingle(),
+    db().from("rfx_vendors").select("freight_assumption_inr_per_1000, fx_rate_override, gst_adjust_pct").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId).maybeSingle(),
     db().from("line_quotes").select("id, rfx_line_id, state, reviewed_by, response_id, extracted_item_id, unit_price_inr_per_1000, best_guess_value").eq("rfx_id", resp.rfx_id).eq("vendor_id", vendorId),
-    getSetting("fx_rates"), getSetting("thresholds"), getSetting("discount_default"), getSetting("freight_default_inr_per_1000"),
+    getSetting("fx_rates"), getSetting("thresholds"),
   ]);
   for (const q of [rfxQ, linesQ, itemsQ, termsQ, rvQ, existingQ]) if (q.error) throw q.error;
   const rfx = rfxQ.data!;
@@ -55,14 +57,12 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   const td = (main?.summary.normalise as NormaliseSummary | undefined)?.terms ?? await decideTerms(termsOf, rfx, terms, notes);
   const refPrior = td.p.references_prior_pricing >= 0.5;
   const freightIncluded = td.p.freight_excluded < 0.5;
-  const freightPer1000 = rvQ.data?.freight_assumption_inr_per_1000 ?? freightDefault;
+  // P10 S2: no default freight. The amount is the buyer's figure for this vendor (Change on the freight card) or not known yet.
+  const freightPer1000: number | null = rvQ.data?.freight_assumption_inr_per_1000 ?? null;
   const grossUpPct = terms.total_discount_pct && td.p.rates_net_of_discount >= 0.5 && td.p.buyer_misses_condition >= 0.5 ? terms.total_discount_pct : null;
-  // TRD §11.4: a total-level discount is shown gross by default; Settings → "net" takes it off every line of that vendor.
-  const netPct = !grossUpPct && terms.total_discount_pct && discountDefault === "net" ? terms.total_discount_pct : null;
-  const discountRow = () => ({ kind: "discount_treatment" as const, basis: "settings_default" as const, value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: discountDefault },
-    description: netPct
-      ? `${netPct}% total discount (${terms.total_discount_condition ?? "no condition stated"}) applied to every line — Settings: net.`
-      : `${terms.total_discount_pct}% total discount available (${terms.total_discount_condition ?? "no condition stated"}); not applied (${discountDefault}) — toggle to allocate pro rata.` });
+  // P10 D1: a total-level discount never changes line prices; award options apply it where its condition is met (D3).
+  const discountRow = () => ({ kind: "discount_treatment" as const, basis: "vendor_stated" as const, value: { pct: terms.total_discount_pct, condition: terms.total_discount_condition, treatment: "per_award" },
+    description: `${terms.total_discount_pct}% total discount offered (${terms.total_discount_condition ?? "no condition stated"}); not in line prices — applied in award options where the condition is met.` });
 
   // Idempotency: this stage owns the system's assumptions for this vendor, its open review items, and every cell
   // of this vendor except the ones a buyer already decided (reviewed / excluded) — those are never overwritten.
@@ -164,11 +164,6 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       chain.push({ step: "discount_gross_up", pct: grossUpPct, basis: "system_inferred", assumption_id: aid });
       inferred = true;
     }
-    if (netPct) {
-      v = applyLineDiscount(v, netPct);
-      chain.push({ step: "total_discount", pct: netPct, basis: "settings_default", assumption_id: vendorAssumption("discount", discountRow()) });
-      inferred = true;
-    }
 
     const { unit, pack: packInUnit } = parseUnit(it.price_unit_raw);
     let factor: number | null = null;
@@ -220,18 +215,23 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       chain.push({ step: "currency", from: null, to: rfx.currency, rate: 1, basis: "assumed", assumption_id: aid });
       inferred = true;
     } else if (curCode !== rfx.currency) {
-      const rate = fxRate(fx, curCode);
+      // P10 B2: the buyer's rate for this vendor (Change on the currency card) wins over the company table.
+      const own = rvQ.data?.fx_rate_override != null ? { rate: Number(rvQ.data.fx_rate_override), date: new Date().toISOString().slice(0, 10), source: "set by the buyer" } : null;
+      const rate = own ?? fxRate(fx, curCode);
       if (!rate) ambiguous ??= `No ${curCode}→${rfx.currency} rate in Settings.`;
       else {
-        const aid = vendorAssumption(`fx-${curCode}`, { kind: "fx_rate", basis: "settings_default", value: rate, description: `${curCode}→${rfx.currency} at ${rate.rate} (${rate.source}, ${rate.date}).` });
+        const aid = vendorAssumption(`fx-${curCode}`, { kind: "fx_rate", basis: own ? "buyer_entered" : "settings_default", value: rate, description: `${curCode}→${rfx.currency} at ${rate.rate} (${rate.source}, ${rate.date}).` });
         v *= rate.rate;
         chain.push({ step: "currency", from: curCode, to: rfx.currency, rate: rate.rate, rate_date: rate.date, assumption_id: aid });
         inferred = true;
       }
     }
 
+    // P10 B2: the buyer's GST correction for this vendor (Change on the GST card): +18 adds GST, −18 takes it out.
+    const gst = Number(rvQ.data?.gst_adjust_pct ?? 0);
+    if (gst && v !== null) { v *= 1 + gst / 100; chain.push({ step: "gst_adjust", pct: gst, basis: "buyer_entered" }); }
     const value = round2(v);
-    const landedV = round2(landed(value, { freight_included: freightIncluded, freight_per_1000: freightPer1000 }));
+    const landedV = round2(landed(value, { freight_included: freightIncluded, freight_per_1000: freightPer1000 ?? 0 }));
     if (clar) {
       // Answered by the vendor: the cell counts, as reviewed (gold `after_clarification`); still unclear → the original stays.
       if (ambiguous || (it.raw_confidence ?? 1) < LOW_READ) { clarOut.unanswered.push(line.line_no); continue; }
@@ -285,13 +285,19 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
   // Vendor-level ledger entries and informational review items (TRD §8.4, §11.4, §11.7) — only when this reply priced something
   // (a stray file for a known vendor must not raise freight/discount cards or ledger rows).
   const wrote = !clar && cells.some((c) => c.extracted_item_id); // vendor-level terms belong to the main reply
+  let reading: DiscountReading | null = null;
   if (wrote && terms.total_discount_pct && !grossUpPct) {
-    vendorAssumption("discount", discountRow());
+    // P10 D2: what the discount depends on, read once; award options check it (allocate.ts applyDiscounts).
+    reading = await readDiscount({ pct: terms.total_discount_pct, condition: terms.total_discount_condition, lines: lines.length, rfx_id: resp.rfx_id, response_id: resp.id });
+    const row = discountRow();
+    vendorAssumption("discount", { ...row, value: { ...row.value, ...reading },
+      description: `${terms.total_discount_pct}% total discount offered ("${terms.total_discount_condition ?? "no condition stated"}") — ${readingText(reading, lines.length)}. Not in line prices; applied in award options where the condition is met.` });
   }
   if (wrote && terms.total_discount_pct) {
     reviews.push({ type: "discount_treatment", title: grossUpPct ? `Printed rates are net of a ${grossUpPct}% discount we won't earn` : `${terms.total_discount_pct}% discount on total${terms.total_discount_condition ? ` ${terms.total_discount_condition}` : ""}`,
-      detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.` : netPct ? `Applied to every line (Settings: net). Condition: ${terms.total_discount_condition ?? "—"}.` : `Not applied by default. Condition: ${terms.total_discount_condition ?? "—"}.`,
-      proposed_value: terms.total_discount_pct, evidence: { terms: true } });
+      detail: grossUpPct ? `Grossed up to the payable rate (÷ ${round4(1 - grossUpPct / 100)}). Condition: ${terms.total_discount_condition ?? "—"}.`
+        : `Read as: ${terms.total_discount_pct}% off the total, ${readingText(reading!, lines.length)}. Not in line prices; each award option applies it only where the condition is met.`,
+      proposed_value: terms.total_discount_pct, evidence: { terms: true, ...(reading ? { discount: reading } : {}), ...(grossUpPct ? { gross_up: true } : {}) } });
   }
   const refPriorLines = clar ? [] : cells.filter((c) => c.state === "references_prior");
   if (refPriorLines.length) {
@@ -307,9 +313,22 @@ export async function normalise(resp: ResponseRow): Promise<NormaliseSummary> {
       detail: `${nos.length} lines cannot be priced without a number from the vendor.`, probability: td.p.references_prior_pricing, proposed_value: nos.length, evidence: { terms: true, lines: nos } });
   }
   if (wrote && !freightIncluded) {
-    vendorAssumption("freight", { kind: "freight_treatment", basis: rvQ.data?.freight_assumption_inr_per_1000 ? "buyer_entered" : "settings_default", value: { inr_per_1000: freightPer1000 },
-      description: `Freight not included ("${terms.freight_terms_raw ?? "not stated"}"); landed price adds ₹${freightPer1000} per 1000 pcs.` });
-    reviews.push({ type: "freight_treatment", title: `${(terms.freight_terms_raw ?? "Freight not stated").slice(0, 70)} — freight excluded`, detail: `"${terms.freight_terms_raw ?? "not stated"}" → landed price adds ₹${freightPer1000} per 1000.`, proposed_value: freightPer1000, probability: td.p.freight_excluded, evidence: { terms: true } });
+    // Only a figure the buyer gave goes in the ledger; without one the landed price is the unit price and says so (P10 S2).
+    if (freightPer1000 !== null) vendorAssumption("freight", { kind: "freight_treatment", basis: "buyer_entered", value: { inr_per_1000: freightPer1000 },
+      description: `Freight not included ("${terms.freight_terms_raw ?? "not stated"}"); landed price adds ₹${freightPer1000} per 1000 pcs (set by the buyer).` });
+    reviews.push({ type: "freight_treatment", title: `${(terms.freight_terms_raw ?? "Freight not stated").slice(0, 70)} — freight excluded`,
+      detail: freightPer1000 !== null ? `"${terms.freight_terms_raw ?? "not stated"}" → landed price adds ₹${freightPer1000} per 1000 (set by the buyer).` : `"${terms.freight_terms_raw ?? "not stated"}" — the amount isn't stated, so landed prices don't include freight yet.`,
+      proposed_value: freightPer1000, probability: td.p.freight_excluded, evidence: { terms: true } });
+  }
+  // P10 C13: the vendor's own grand total vs the sum of its lines (vendor's currency and units). Only when most priced items
+  // carry a quantity we can read as pieces — otherwise the sum means nothing and no card is raised.
+  const stated = Number((terms as { stated_total?: number | null }).stated_total ?? 0);
+  if (wrote && stated > 0) {
+    const lt = linesTotal([...items.values()] as unknown as Parameters<typeof linesTotal>[0]); // the rows carry quantity / quantity_unit (select *)
+    const chk = lt.priced && lt.covered >= 0.8 * lt.priced ? totalCheck(stated, lt.sum) : null;
+    if (chk && !chk.ok) reviews.push({ type: "total_mismatch", title: `The quotation's total doesn't match its lines (${chk.pct}% apart)`,
+      detail: `The sum of the line prices × quantities is ${Math.round(lt.sum).toLocaleString("en-IN")}; the quotation states ${stated.toLocaleString("en-IN")} (${(terms as { stated_total_currency?: string | null }).stated_total_currency ?? terms.currency ?? ""}). A misread line, a hidden charge or a discount taken at the bottom would all show up like this.`,
+      proposed_value: stated, evidence: { terms: true, stated, sum: Math.round(lt.sum), covered: lt.covered, priced: lt.priced } });
   }
   for (const a of assumptions.filter((a) => a.kind === "fx_rate")) {
     const r = a.value as { rate: number; date: string };

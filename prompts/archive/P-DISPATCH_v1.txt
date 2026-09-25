@@ -1,0 +1,4 @@
+Write a professional RFx cover email from {buyer_name}, {buyer_title}, Meridian Foods Pvt Ltd to {vendor_name}.
+Include: RFx code {code}, title, one-paragraph scope ({cover_note}), commercial terms (currency, quoting unit, incoterm, freight, payment terms, validity requested, contract duration, delivery locations), response deadline {deadline}, a note that one Excel quote form is attached, with the line items on its first tab and the supplier questionnaire on its "Questionnaire" tab, and this exact sentence: "Please reply to this email with your quotation in any format convenient to you — we will process it as sent."
+Sign off with buyer name and email. Plain text, no markdown. Under 220 words.
+Return ONLY JSON: {"subject": string, "body_text": string}

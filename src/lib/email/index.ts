@@ -16,6 +16,7 @@ export type SendInput = {
 export type EmlInput = {
   from: string; to: string; reply_to?: string; subject: string; text: string;
   attachments: { filename: string; content: Buffer; contentType?: string }[]; in_reply_to?: string | null; references?: string[];
+  message_id?: string; // keep an existing Message-ID when rebuilding a stored email (redraftDispatch)
 };
 
 /** Reply-To carries the tag that ties a reply to the RFx and vendor (TRD §15.1). Mock mailbox address — live Gmail is out of scope. */
@@ -29,7 +30,7 @@ const composer = nodemailer.createTransport({ streamTransport: true, buffer: tru
 /** The email exactly as SMTP would carry it; the Message-ID is generated here (`<uuid@sender-domain>`). */
 export async function buildEml(m: EmlInput): Promise<{ eml: Buffer; messageId: string }> {
   const info = await composer.sendMail({
-    from: m.from, to: m.to, replyTo: m.reply_to, subject: m.subject, text: m.text, attachments: m.attachments,
+    from: m.from, to: m.to, replyTo: m.reply_to, subject: m.subject, text: m.text, attachments: m.attachments, messageId: m.message_id,
     ...(m.in_reply_to ? { inReplyTo: m.in_reply_to, references: m.references?.length ? m.references : [m.in_reply_to] } : {}),
   });
   return { eml: info.message as Buffer, messageId: info.messageId };
