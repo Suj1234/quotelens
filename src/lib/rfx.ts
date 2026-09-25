@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { RfxStatus } from "@/types/db";
 import type { ListRow } from "@/lib/rfx-list";
+import { readingOf } from "@/lib/overview";
 
 // annual_value: the approved award's scenario total (DECISIONS P0-T4: shown only once approved)
 export type RfxListRow = ListRow;
@@ -9,7 +10,7 @@ export type RfxListRow = ListRow;
 export async function listRfx(): Promise<RfxListRow[]> {
   const { data, error } = await db()
     .from("rfx")
-    .select("id, code, title, status, response_deadline, created_at, updated_at, rfx_lines(count), rfx_vendors(count), review_items(count), responses(vendor_id, is_clarification), awards(status, approved_at, scenarios(total_inr))")
+    .select("id, code, title, status, response_deadline, created_at, updated_at, rfx_lines(count), rfx_vendors(count), review_items(count), responses(vendor_id, is_clarification, pipeline_status, stage_errors, updated_at), awards(status, approved_at, scenarios(total_inr))")
     .eq("review_items.status", "open")
     .order("code", { ascending: false });
   if (error) throw error;
@@ -23,6 +24,8 @@ export async function listRfx(): Promise<RfxListRow[]> {
     approved_at: award?.status === "approved" ? award.approved_at : null,
     lines: r.rfx_lines[0]?.count ?? 0,
     invited: r.rfx_vendors[0]?.count ?? 0,
+    // Same rule as the Overview: a vendor's reply that hasn't been through the six stages keeps the event from "Ready to award".
+    unread: r.responses.filter((x) => x.vendor_id && readingOf(x.pipeline_status, x.stage_errors, x.updated_at).state !== "read").length,
     responded: new Set(r.responses.filter((x) => x.vendor_id && !x.is_clarification).map((x) => x.vendor_id)).size,
     annual_value: award?.status === "approved" && award.scenarios?.total_inr != null ? Number(award.scenarios.total_inr) : null,
     };

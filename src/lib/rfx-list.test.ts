@@ -3,7 +3,7 @@ import { DEFAULTS, applyFilters, deadlineText, nextStep, presetRange, type ListR
 
 const row = (o: Partial<ListRow>): ListRow => ({
   id: o.code ?? "x", code: "MER-0001", title: "Corrugated packaging", status: "draft",
-  created: "2026-09-20T10:00:00Z", updated: "2026-09-24T10:00:00Z", deadline: null, lines: 30, invited: 5, responded: 0, open_reviews: 0, approved_at: null, annual_value: null, ...o,
+  created: "2026-09-20T10:00:00Z", updated: "2026-09-24T10:00:00Z", deadline: null, lines: 30, invited: 5, responded: 0, open_reviews: 0, approved_at: null, annual_value: null, unread: 0, ...o,
 });
 const rows = [
   row({ code: "MER-0417", status: "awarded", annual_value: 45_300_000, approved_at: "2026-09-24T09:00:00Z", responded: 5 }),
@@ -37,6 +37,9 @@ describe("rfx list", () => {
     expect(nextStep(rows[1]).text).toBe("Ready to issue");
     expect(nextStep(rows[0])).toEqual({ text: "Approved 24 Sep", tone: "green" });
     expect(nextStep(row({ status: "issued", responded: 3 })).text).toBe("Waiting on 2 of 5");
+    // Replies in but not read: never "Ready to award", whatever the review count says.
+    expect(nextStep(row({ status: "issued", responded: 5, unread: 5 }))).toEqual({ text: "5 replies not read", tone: "amber" });
+    expect(nextStep(row({ status: "reviewing", responded: 5, unread: 1, open_reviews: 3 })).text).toBe("1 reply not read");
     expect(deadlineText({ status: "issued", deadline: "2026-09-27" }, now)).toEqual({ text: "Due in 2 days", tone: "amber" });
     expect(deadlineText({ status: "issued", deadline: "2026-09-25" }, now).text).toBe("Due today");
     expect(deadlineText({ status: "awarded", deadline: "2026-09-01" }, now).text).toBe("Closed");

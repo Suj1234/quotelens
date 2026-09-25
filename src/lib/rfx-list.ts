@@ -8,6 +8,8 @@ export type ListRow = {
   id: string; code: string; title: string; status: RfxStatus; created: string; updated: string;
   deadline: string | null; lines: number; invited: number; responded: number;
   open_reviews: number; approved_at: string | null; annual_value: number | null;
+  /** Vendor replies received but not yet through the six stages. */
+  unread: number;
 };
 
 export const STATUS_TABS: { key: string; label: string; statuses: RfxStatus[] | null }[] = [
@@ -21,6 +23,8 @@ export const STATUS_TABS: { key: string; label: string; statuses: RfxStatus[] | 
 
 export type Tone = "amber" | "green" | "muted" | "";
 
+const unreadStep = (n: number): { text: string; tone: Tone } => ({ text: `${n} ${n === 1 ? "reply" : "replies"} not read`, tone: "amber" });
+
 /** What the buyer does next with this event. */
 export function nextStep(r: ListRow): { text: string; tone: Tone } {
   const waiting = r.invited - r.responded;
@@ -28,9 +32,10 @@ export function nextStep(r: ListRow): { text: string; tone: Tone } {
     case "draft": return r.lines === 0 ? { text: "Finish lines", tone: "muted" } : { text: "Ready to issue", tone: "" };
     case "issued":
     case "receiving":
+      if (r.unread > 0) return unreadStep(r.unread);
       if (r.open_reviews > 0) return { text: `${r.open_reviews} to review`, tone: "amber" };
       return waiting > 0 ? { text: `Waiting on ${waiting} of ${r.invited}`, tone: "muted" } : { text: "Ready to award", tone: "" };
-    case "reviewing": return r.open_reviews > 0 ? { text: `${r.open_reviews} to review`, tone: "amber" } : { text: "Ready to award", tone: "" };
+    case "reviewing": return r.unread > 0 ? unreadStep(r.unread) : r.open_reviews > 0 ? { text: `${r.open_reviews} to review`, tone: "amber" } : { text: "Ready to award", tone: "" };
     case "awarded": return { text: r.approved_at ? `Approved ${shortDate(r.approved_at)}` : "Awarded", tone: "green" };
     default: return { text: "Closed", tone: "muted" };
   }

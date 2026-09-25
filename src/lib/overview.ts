@@ -6,6 +6,7 @@ import { getRfx, listVendorResponses } from "@/lib/rfx-detail";
 import { getSetting } from "@/lib/settings";
 import { getUnmatchedResponses } from "@/lib/unmatched";
 import { formatLabel } from "@/lib/file-labels";
+import { STAGES, type Stage } from "@/types/db";
 
 // DESIGN §3.4 / TRD §17.4 RFx overview. Every number in the lead sentence is computed here.
 
@@ -15,6 +16,20 @@ export type OverviewVendor = {
   validUntil: string | null; validityDays: number | null; validityShort: boolean; cleared: boolean | null; clearedNote: string;
   needs: number; responseId: string | null; status: string;
 };
+
+export type Reading = { state: "read" | "unread" | "reading" | "failed"; stage?: Stage; error?: string };
+
+// A stage left "running" this long ago died with its tab or function; offer to read the reply again.
+const STALLED_MS = 5 * 60_000;
+
+/** Where a reply is in the six stages (responses.pipeline_status). */
+export function readingOf(ps: Partial<Record<Stage, string>>, errors: Partial<Record<Stage, string>>, updatedAt: string | null): Reading {
+  const failed = STAGES.find((s) => ps[s] === "error");
+  if (failed) return { state: "failed", stage: failed, error: errors[failed] };
+  if (STAGES.every((s) => ps[s] === "done")) return { state: "read" };
+  const stalled = !updatedAt || Date.now() - new Date(updatedAt).getTime() > STALLED_MS;
+  return { state: STAGES.some((s) => ps[s] === "running") && !stalled ? "reading" : "unread" };
+}
 
 const ACK: Record<string, string> = { freight_treatment: "freight", fx_assumption: "FX", discount_treatment: "discount", tax_basis: "GST basis" }; // DESIGN §3.6: Acknowledge
 
