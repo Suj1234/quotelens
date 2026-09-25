@@ -275,7 +275,7 @@ Anand Box Works, Peenya 2nd Stage, Bengaluru 560058
 Mob 98450 xxxxx
 """
 open(f"{OUT}/05_anand/anand_email_body.txt","w").write(anand_body)
-eml=f"""From: Anand Kumar <sujeetnair00+anand@gmail.com>
+eml=f"""From: Anand Kumar <anand@anandboxworks.example>
 To: Sujit Menon <sender+rfx-mer-0417-anand@gmail.com>
 Subject: Re: RFx MER-0417 - Corrugated packaging FY26-27 - Meridian Foods
 Date: Thu, 02 Oct 2026 11:42:10 +0530
