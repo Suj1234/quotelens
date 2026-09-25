@@ -34,8 +34,8 @@ export function IssueDialog({ draft, onClose }: { draft: Draft; onClose: () => v
       const res = await fetch(`/api/rfx/${r.id}/issue`, { method: "POST" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(`${body.error ?? "Issue failed"} (${body.code ?? res.status})`);
-      toast(`Issued — ${body.sent} emails in the outbox`);
-      router.push(`/rfx/${r.id}/outbox`);
+      toast(`Issued — ${body.sent} emails sent`);
+      router.push(`/rfx/${r.id}/overview`);
     } catch (e) {
       toast.error((e as Error).message === "Failed to fetch" ? "Couldn't reach the server (NETWORK)" : (e as Error).message);
       setBusy(false);

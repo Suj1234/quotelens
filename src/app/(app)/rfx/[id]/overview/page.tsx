@@ -45,7 +45,7 @@ export default async function OverviewPage({ params }: PageProps<"/rfx/[id]/over
     <div className="page read">
       <div className="eyebrow">Where this stands</div>
       <p className="lead" style={{ marginTop: 6 }}>
-        {o.replied === 0 ? <>Issued {r.frozen_at ? longDate(r.frozen_at) : ""} to {word(invited)} vendors. <b>No replies yet</b>{r.response_deadline ? <> — the deadline is {longDate(r.response_deadline)}</> : null}.</>
+        {o.replied === 0 ? <>Issued {r.frozen_at ? longDate(r.frozen_at) : ""} to {word(invited)} vendors. <b>No replies yet</b>{r.response_deadline ? <> — the deadline is {longDate(r.response_deadline)}</> : null}. <Link href={`/rfx/${id}/outbox`}>View sent emails</Link>{o.mode === "mock" && !locked ? <span className="hint"> · reply as a vendor with Portal (mock) below</span> : null}</>
           : <>
             {o.replied === invited ? <>All {word(invited)} vendors replied{days ? ` within ${days === 1 ? "a day" : `${word(days)} days`}` : ""}. </> : <>{countWord(o.replied)} of {invited} vendors have replied. </>}
             {unread.length ? <>
