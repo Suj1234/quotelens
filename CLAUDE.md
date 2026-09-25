@@ -179,7 +179,7 @@ All UI in this phase and later follows `design/DESIGN.md` §2–3; the prototype
 
 ---
 
-## 6. Human tasks (Sabarish) and when
+## 6. Human tasks (Sujeet) and when
 
 | When | Task |
 |---|---|
@@ -216,7 +216,7 @@ All UI in this phase and later follows `design/DESIGN.md` §2–3; the prototype
 - [x] P0-T1 … (commit abc123)
 ## In progress
 - [ ] P2-T5 normalise stage — states for Westline ambiguous ok; Anand references_prior not filling → fixing
-## Open questions (for Sabarish)
+## Open questions (for Sujeet)
 - Should total-level discounts default to gross or net? (PRD says gross; implemented gross)
 ## Known issues
 - OrientPack line 14 read as 30.32 with confidence 0.7 on the synthetic photo — threshold or prompt tuning needed

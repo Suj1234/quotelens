@@ -1,4 +1,4 @@
--- 0012_model_costs.sql — cost of every model call (Sabarish's request, 25 Sep 2026).
+-- 0012_model_costs.sql — cost of every model call (Sujeet's request, 25 Sep 2026).
 -- Prices: one row per model and period, USD per 1M tokens, from Google's pricing page; edit rows here (Supabase dashboard),
 -- no screen in the app. Cost is stored on each call in USD and in ₹ at the Settings USD rate of the moment of the call.
 -- Calls logged before this migration keep cost null (decided: leave empty, no estimates).

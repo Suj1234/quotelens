@@ -1,6 +1,6 @@
 You are continuing the QuoteLens build. Phases 0–7 are done, committed and deployed. Your job is **Phase 8** (CLAUDE.md §3: P8-T1 to P8-T4), the last build phase: the Settings / Eval / Model-calls screens, the completed demo RFx (MER-0417 awarded), a polish pass, and the full TRD §22 test checklist on production. It ends at the CLAUDE.md §10 demo-readiness gate. Stop after the Phase 8 checkpoint and report.
 
-The human (Sabarish) is not an engineer and will not be available during the run. Explain what you do in plain language as you go. **Before you start building, tell him the plan in a few lines with a time estimate for each part, and repeat "done / now doing / left + estimate" at every milestone** (in P7 he twice asked "what is happening, when will it finish?" while verification ran).
+The human (Sujeet) is not an engineer and will not be available during the run. Explain what you do in plain language as you go. **Before you start building, tell him the plan in a few lines with a time estimate for each part, and repeat "done / now doing / left + estimate" at every milestone** (in P7 he twice asked "what is happening, when will it finish?" while verification ran).
 
 ---
 
@@ -14,7 +14,7 @@ DESIGN is the visual spec, TRD wins on behaviour. So: **one `/settings` page** w
 
 **B. Completing MER-0417 (P8-T2) — real decisions, done once, approval last.**
 CLAUDE P8-T2: reload MER-0417 with the **realistic** set, clear its review queue **as Sujit through the UI** ("this is real usage, leave the audit trail"), ask Q1–Q8 once, save two scenarios, generate the memo, **approve as Priya**. Approval cannot be undone, and MER-0417 is the RFx the interviewers see as "completed".
-- If PROGRESS.md "Open questions" has Sabarish's answers on how to decide the queue, follow them.
+- If PROGRESS.md "Open questions" has Sujeet's answers on how to decide the queue, follow them.
 - If not, use these defaults (easiest to defend) and list every decision in PROGRESS under "MER-0417 decisions (Sujit)":
   - **Westline ambiguous bundle sizes (items 5, 9, 15, 19):** Ask vendor → send → paste the dataset's `supabase/seed/03_westline/westline_clarification_reply.txt` as the reply (Add response → "This answers the clarification…"). This is the real P6 loop.
   - **OrientPack low-confidence line 14:** open the photo in the drawer. If the price is legible, Override with the value you can read and a reason quoting what is visible; if not, Ask vendor (mock) or Exclude with the reason "unreadable on the rate card photo".
@@ -25,11 +25,11 @@ CLAUDE P8-T2: reload MER-0417 with the **realistic** set, clear its review queue
 - **Never read the gold key (`gold.json`, `gold_cells.csv`) to choose a value** — that is faking (CLAUDE §0 rule 3). The eval afterwards judges the reviewed state.
 - Order: reload → queue → Q1–Q8 (as Priya, on Decide) → two scenarios (Q1 and Q5 saved from the answers) → Sujit generates the memo from Q1 → **read the PDF back and check it** → only then Priya approves.
 
-**C. MER-0420 "Untitled RFx".** An empty draft created on 24 Sep from a session that wasn't the P7 agent (probably Sabarish). If PROGRESS "Open questions" says delete it, delete it with a script (rows only, it has no files); if not answered, leave it and say so in the report (the demo gate expects exactly MER-0417/0418/0419, so ask again).
+**C. MER-0420 "Untitled RFx".** An empty draft created on 24 Sep from a session that wasn't the P7 agent (probably Sujeet). If PROGRESS "Open questions" says delete it, delete it with a script (rows only, it has no files); if not answered, leave it and say so in the report (the demo gate expects exactly MER-0417/0418/0419, so ask again).
 
 **D. Email transport card.** Live Gmail is out of scope by decision (DECISIONS "Live Gmail out of scope"). The card shows **Mock** selected; **Gmail** disabled with "not in this build"; **Resend** disabled "not configured". The TRD's "vendor demo addresses map" is not built (it only serves Gmail) — record it. No dead controls.
 
-**E. Other open questions** (co-pilot initiative P5, asked cards in the Open list P6, memo wording P7, demo-script Gmail steps P6): follow Sabarish's answers if PROGRESS has them; otherwise leave behaviour as it is (P8 adds no features) and keep them listed.
+**E. Other open questions** (co-pilot initiative P5, asked cards in the Open list P6, memo wording P7, demo-script Gmail steps P6): follow Sujeet's answers if PROGRESS has them; otherwise leave behaviour as it is (P8 adds no features) and keep them listed.
 
 ---
 
@@ -147,7 +147,7 @@ Then run `git log --oneline -15`, `npm test` (77 tests, must be green) and `npm 
 
 ### P8-T2 Completed RFx MER-0417 (CLAUDE P8-T2; §0 B)
 - [ ] 8.15 Reload MER-0417 with the realistic set (`run-seed-pipeline.ts --set realistic --rfx MER-0417`): eval recorded (expected 150/150, questionnaire 42–43/50 — the OrientPack realistic reply has no questionnaire). Investigate any wrong cell before moving on.
-- [ ] 8.16 Queue cleared **as Sujit in the UI** per §0 B (or Sabarish's answers): every card decided with a reason; Westline clarification loop run for real; PROGRESS lists each decision; ledger and Timeline show them; 0 open items at the end.
+- [ ] 8.16 Queue cleared **as Sujit in the UI** per §0 B (or Sujeet's answers): every card decided with a reason; Westline clarification loop run for real; PROGRESS lists each decision; ledger and Timeline show them; 0 open items at the end.
 - [ ] 8.17 Q1–Q8 asked once on MER-0417 (as Priya on Decide) — all computed, SQL shown, times recorded; answers listed in PROGRESS (numbers will differ from MER-0419: reviewed cells count).
 - [ ] 8.18 Two scenarios saved from the answers (Q1, Q5), compared on Award; totals equal the answers.
 - [ ] 8.19 Sujit generates the memo from Q1 → PDF read back (six parts, 30 rows, ledger rows = Ledger tab, ₹, no unverified numbers, open items reflect the cleared queue) → **then** Priya approves → MER-0417 **Awarded**, locked, RFx list shows its annual value; approved PDF has both signatures.
@@ -180,7 +180,7 @@ Rows 8.27–8.38 = TRD §22 items 1–12, each run on **production**, each with 
 - [ ] 8.39 CLAUDE §10 on production, every box: incognito login both users; MER-0417 completed (awarded), MER-0418 draft, MER-0419 seeded with queue open; Eval page shows the latest number and per-cell diff; `wrong_category_IT_quote.xlsx` dropped into an Add response sheet → Unmatched, no crash (on a throwaway or MER-0419 then reload); Q1–Q8 each within 15 s (record times; latency outliers noted); "Gmail round trip within 12 hours" = the mock mailbox round trip (DECISIONS); Settings provider switch visible; Model calls show provider per call; memo PDF downloads; PROGRESS and DECISIONS up to date.
 - [ ] 8.40 Settings restored and verified by script (§1 defaults).
 - [ ] 8.41 Tests (settings validation, eval route shape if unit-testable), lint, build green; `npm run pipeline:seed` 150/150, questionnaire 50/50; push; production checked after the deploy.
-- [ ] 8.42 Final state (script): RFx list = MER-0417 (awarded, realistic, 0 open items, memo approved), MER-0418 (untouched draft), MER-0419 (seeded, 14 open items, no scenarios / awards, 64 saved queries or the count before P8), plus MER-0420 only if Sabarish said keep; all throwaway RFx deleted with their files and mailbox rows; settings at defaults.
+- [ ] 8.42 Final state (script): RFx list = MER-0417 (awarded, realistic, 0 open items, memo approved), MER-0418 (untouched draft), MER-0419 (seeded, 14 open items, no scenarios / awards, 64 saved queries or the count before P8), plus MER-0420 only if Sujeet said keep; all throwaway RFx deleted with their files and mailbox rows; settings at defaults.
 - [ ] 8.43 Side by side with the prototype at 1440 px: Settings (cards, eval, model calls) and every screen touched by the polish pass; differences fixed or recorded.
 - [ ] 8.44 Rows 8.1–8.43 ticked in PROGRESS.md with evidence (`--check`: every row keeps its requirement text, no older row changed); PROGRESS header ("P8 ✅ — build complete; next: human tasks"), eval line, what works / what doesn't, Known issues and Open questions updated.
 
@@ -192,11 +192,11 @@ Rows 8.27–8.38 = TRD §22 items 1–12, each run on **production**, each with 
 - Award / regret emails to vendors (PRD item 33, optional).
 - Landed-cost cost of money (cut list item 2).
 - New features of any kind (CLAUDE P8-T3 "No new features") — polish only.
-- The Loom recording, the one-page note (`docs/06_One_Page_Note.md`) and the OrientPack photo — Sabarish's tasks (CLAUDE §6).
+- The Loom recording, the one-page note (`docs/06_One_Page_Note.md`) and the OrientPack photo — Sujeet's tasks (CLAUDE §6).
 
 ---
 
-## 7. When Phase 8 is done: stop and report to Sabarish
+## 7. When Phase 8 is done: stop and report to Sujeet
 
 Plain language (he is not an engineer). Lead with the status line: **"The build is complete"** or **"complete except …"**.
 1. **What was built**, screen by screen: the Settings page (what each card changes and when it takes effect), the Eval section (what the number means, how to run it, how to open a cell), Model calls.

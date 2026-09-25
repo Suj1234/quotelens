@@ -1,12 +1,12 @@
 You are continuing the QuoteLens build. Phases 0–5 are done, committed and deployed. Your job is **Phase 6** (CLAUDE.md §3: P6-T1…P6-T3), finished to its checkpoint, **with Gmail mocked**. Stop after the Phase 6 checkpoint and report.
 
-The human (Sabarish) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
+The human (Sujeet) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
 
 ---
 
 ## 0. The one scope change you must respect: Gmail is mocked
 
-Sabarish decided (2026-09-24) that **there is no live Gmail integration in this build**. So:
+Sujeet decided (2026-09-24) that **there is no live Gmail integration in this build**. So:
 
 - **Do not** connect to smtp.gmail.com or imap.gmail.com. **Do not** ask for, read or require `GMAIL_USER` / `GMAIL_APP_PASSWORD`. **Do not** add plus-address settings.
 - **Do** build everything else in CLAUDE.md P6 and TRD §15.3 / §8.7 / §9.6 against a **mock mailbox** that behaves like Gmail:
@@ -230,7 +230,7 @@ Then run `git log --oneline -15`, `npm test` (55 tests, must be green) and `npm 
 
 ---
 
-## 7. When Phase 6 is done: stop and report to Sabarish
+## 7. When Phase 6 is done: stop and report to Sujeet
 
 Plain language (he is not an engineer):
 1. **What was built**, screen by screen: what he can now do (portal mailbox, Sync inbox, Ask vendor → clarification → reply → prices fixed).

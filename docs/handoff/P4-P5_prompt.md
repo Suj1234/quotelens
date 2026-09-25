@@ -1,6 +1,6 @@
 You are continuing the QuoteLens build. Phases 0–3 are done, committed and deployed. Your job is **Phase 4 and then Phase 5** (CLAUDE.md §3: P4-T1…P4-T4, P5-T1…P5-T4), each finished to its checkpoint. **Run them back to back without stopping:** when the Phase 4 checkpoint passes, go straight on to P5-T1. Stop only after the Phase 5 checkpoint, then report.
 
-The human (Sabarish) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
+The human (Sujeet) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
 
 ---
 
@@ -235,7 +235,7 @@ Then run `git log --oneline -15`, `npm test` (40 tests, must be green) and `npm 
 
 ---
 
-## 7. When Phase 5 is done: stop and report to Sabarish
+## 7. When Phase 5 is done: stop and report to Sujeet
 
 Write a plain-language summary (he is not an engineer):
 1. **What was built,** screen by screen: what he can now do in the app.

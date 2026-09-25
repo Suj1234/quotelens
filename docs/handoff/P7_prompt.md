@@ -1,6 +1,6 @@
 You are continuing the QuoteLens build. Phases 0–6 are done, committed and deployed. Your job is **Phase 7** (CLAUDE.md §3: P7-T1 and P7-T2) — scenarios, the award memo and approval — finished to its checkpoint. Stop after the Phase 7 checkpoint and report.
 
-The human (Sabarish) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
+The human (Sujeet) is not an engineer and will not be available during the run. Explain what you do in plain language as you go.
 
 ---
 
@@ -13,7 +13,7 @@ The human (Sabarish) is not an engineer and will not be available during the run
 - the answer cards.
 
 Most of what it shows already exists (Ask, the Q1 total, the Q2 baseline).
-- **If PROGRESS.md "Open questions" has Sabarish's answer, follow it.**
+- **If PROGRESS.md "Open questions" has Sujeet's answer, follow it.**
 - **If not:** build it in P7 as the last task before the checkpoint (P7-T3 below), and record in DECISIONS that you chose to. It is small, and without it the approver's journey (open the RFx → decide → approve) has no landing page.
 
 **B. Where scenarios live.**
@@ -302,7 +302,7 @@ Then run `git log --oneline -15`, `npm test` (67 tests, must be green) and `npm 
 
 ---
 
-## 7. When Phase 7 is done: stop and report to Sabarish
+## 7. When Phase 7 is done: stop and report to Sujeet
 
 Plain language (he is not an engineer):
 1. **What was built**, screen by screen, and what he can now do: save a scenario from an answer, compare scenarios, override a line, generate the memo, send it back, approve, and what "locked" means.

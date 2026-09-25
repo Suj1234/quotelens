@@ -189,7 +189,7 @@ quotelens/
 | `OPENROUTER_API_KEY` | no | If set, decision layer uses Jev via OpenRouter |
 | `OPENROUTER_JEV_MODEL` | no | default `typesafe/jev-1.13` |
 | `EMAIL_MODE` | no | Overridden by `settings.email_mode`; default `mock` |
-| `GMAIL_USER` | gmail mode | Sender account, e.g. `sabarish.sender@gmail.com` |
+| `GMAIL_USER` | gmail mode | Sender account, e.g. `sujeet.sender@gmail.com` |
 | `GMAIL_APP_PASSWORD` | gmail mode | 16-char App Password (2-step verification required on the account) |
 | `GMAIL_IMAP_HOST` | no | default `imap.gmail.com` |
 | `GMAIL_SMTP_HOST` | no | default `smtp.gmail.com` |

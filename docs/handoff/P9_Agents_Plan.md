@@ -6,7 +6,7 @@
 
 ## 0. Why this phase exists
 
-The build (P0–P8) is complete, but measured line by line against the assignment (`docs/Aerchain-Product-Assignment 1.pdf`), two of its three jobs are conversations, and neither conversation is a real AI loop that can act:
+The build (P0–P8) is complete, but measured line by line against the assignment (the assignment PDF), two of its three jobs are conversations, and neither conversation is a real AI loop that can act:
 
 - *"A buyer **talks** an RFx into existence with an AI co-pilot — scope, line items, questionnaire, terms."* Today the co-pilot makes one model call per message. It can't change or remove anything, sometimes claims changes it didn't make, has no currency field, isn't told today's date, reads every attachment as a line sheet, and the screen looks like a form with chat on the side (four chips that send pre-written sentences).
 - *"Then the buyer stops clicking and starts asking … over the whole comparison … all the way to a defensible award decision."* Today Ask answers questions (with SQL, a repair round and a number check) but can't take any step towards the award. It also can't see attached documents or the full vendor terms.

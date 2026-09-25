@@ -6,9 +6,9 @@
 | Document | 1 of 6 — Product Requirements Document |
 | Version | 1.0 |
 | Date | 23 September 2026 |
-| Owner | Sabarish (candidate, Aerchain PM take-home) |
+| Owner | Sujeet |
 | Status | Approved for build |
-| Related | 2 FSD/TRD · 3 Dataset Pack · 4 Build Plan (CLAUDE.md) · 5 Demo Script · 6 One-page Note |
+| Related | 2 FSD/TRD · 3 Dataset Pack · 4 Build Plan (CLAUDE.md) |
 | Build window | 48 hours, solo, Claude Code end to end |
 | Working product name | **QuoteLens** (placeholder; rename freely) |
 
@@ -24,9 +24,9 @@ Terminology for non-technical readers is in §20 (Glossary). Technical implement
 
 ## 1. Context — the assignment
 
-### 1.1 The brief (Aerchain, Product Management take-home)
+### 1.1 The brief
 
-Aerchain's brief, titled "Kill the Quote Spreadsheet", asks for a working system that:
+The brief, titled "Kill the Quote Spreadsheet", asks for a working system that:
 
 1. Lets a buyer **talk an RFx into existence** with an AI co-pilot — scope, line items, questionnaire, terms.
 2. Sends it to vendors over **a channel the candidate chooses**.
@@ -137,7 +137,7 @@ This is the thesis of the one-page note and the reason the review queue, provena
 | Excluded | Reason |
 |---|---|
 | Supplier discovery / recommendation | A different procurement job (Fairmarkit, Keelvar do this); not in brief |
-| Automated negotiation | Different job; Aerchain has its own product for it |
+| Automated negotiation | Different job; dedicated negotiation products cover it |
 | PO creation, ERP integration, invoicing | Downstream of award; not in brief |
 | Real authentication, roles, SSO | Two seeded users suffice for the demo; hours saved go to extraction |
 | Multi-tenant, org management | Single tenant |
@@ -412,7 +412,6 @@ Additional: "Who has the shortest validity?", "Who didn't quote line 22?", "Why 
 
 | Player | Relevant capability | Gap this product targets |
 |---|---|---|
-| Aerchain (grader) | Sourcing Agent accepts bids in any format; vendor follow-up agent | They know where extraction breaks; this product shows the buyer where |
 | Fairmarkit | Bid Analysis Agent over images/sheets/PDFs → award recommendations | Recommendation without visible uncertainty/provenance |
 | Keelvar | Sourcing Optimizer — scenario analysis, award recommendations | Scenario concept borrowed; Keelvar assumes structured bids |
 | Quotable AI | Parser "99% accuracy" from PDFs/emails/sheets | Accuracy claim without per-cell confidence |
